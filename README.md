@@ -9,7 +9,7 @@ A GUI for managing document metadata for books, textbooks, or articles.
 ## Dependencies
 Note this requires lablgtk3 (>= 2.18.12)
 ```
-opam install lablgtk3 lwt irmin-unix
+opam install lablgtk3 lwt irmin-unix tls
 ```
 
 ## Compile
