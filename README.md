@@ -3,10 +3,11 @@ A GUI for managing document metadata for books, textbooks, or articles.
 
 ## Features
 * search for metadata on [openlibrary.org](https://openlibrary.org/) and [semanticscholar.org](https://www.semanticscholar.org/)
-* metadata includes authors, title, publishing year, tags, and DOI/ISBN
+* metadata includes authors, title, publishing year, tags, bookmark, and DOI/ISBN
 * tag management (to be implemented)
 
 ## Dependencies
+Note this requires lablgtk3 (>= 2.18.12)
 ```
 opam install lablgtk3 lwt irmin-unix
 ```
