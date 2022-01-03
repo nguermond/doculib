@@ -1,6 +1,8 @@
 open Lwt.Syntax
 open Format
 
+exception InitializationFailure of string
+                                 
 (* We store an absolute path to a library,
  * and paths are relative to this path. 
  * The path to the file is also its key.
@@ -198,10 +200,12 @@ let import_documents path doc_type () : doc list =
 
 let init () =
   (if (not (Sys.file_exists "doculib_config.json")) then
-     failwith "No configuration file!");
+     raise (InitializationFailure "Configuration file `doculib_config.json` is missing!"));
   let json = Yojson.Basic.from_file "doculib_config.json" in
   let r = Json.to_string (Json.raise_opt "root not found" (Json.get "root" json)) in
   let d = Json.to_string (Json.raise_opt "data not found" (Json.get "data" json)) in
   prerr_endline ("Configuration:\n"^r^"\n"^d);
+  (if (not (Sys.file_exists r)) then
+     raise (InitializationFailure "Invalid 'root' path in `doculib_config.json`!"));
   root := r;
   data := d
