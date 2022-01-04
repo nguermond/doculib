@@ -134,8 +134,7 @@ class model filter store view = object (self)
       );
     ignore(view#append_column col)
 end
-                              
-                              
+      
 let get_rel_path (path : string) : string =
   (String.sub path (String.length !Db.root)
      ((String.length path) - (String.length !Db.root)))
@@ -176,11 +175,8 @@ let rec import_file (model : model) (doc_type : string) (path : string) : unit =
          import_file model doc_type path)
        (Array.to_list (Sys.readdir path)))
   
-let import_dir (doc_type : string) (model : model) () =
-  let dialog = GWindow.file_chooser_dialog
-                 ~action:`OPEN
-                 ~title:"Import"
-                 () in
+let import_dir (doc_type : string) (model : model) : unit =
+  let dialog = GWindow.file_chooser_dialog ~action:`OPEN ~title:"Import Documents" () in
   dialog#set_current_folder !Db.root;
   dialog#add_button_stock `CANCEL `CANCEL;
   dialog#add_button_stock `OPEN `OPEN;
@@ -191,6 +187,17 @@ let import_dir (doc_type : string) (model : model) () =
                | files -> List.iter (import_file model doc_type) files)
    | `DELETE_EVENT | `CANCEL -> ());
   dialog#destroy()
+
+let choose_dir (title : string) : string option =
+  let dialog = GWindow.file_chooser_dialog ~action:`SELECT_FOLDER ~title () in
+  dialog#add_button_stock `CANCEL `CANCEL;
+  dialog#add_button_stock `OPEN `OPEN;
+  let path =
+    (match dialog#run() with
+     | `OPEN -> dialog#filename
+     | `DELETE_EVENT | `CANCEL -> None) in
+  dialog#destroy();
+  path
 
 
 let make_document_list ?(height=400) ?(show_path=true) ?(multiple=false) ?(show_stars=true)
@@ -232,7 +239,6 @@ let make_document_list ?(height=400) ?(show_path=true) ?(multiple=false) ?(show_
   (if show_path then
      ignore(model#add_column "Path" ~editable:false 200 (Str path)));
 
-  (* TODO: sort chosen column *)
   (match sort with
   | None -> ()
   | Some col -> store#set_sort_column_id col.index (view#get_column col.index)#sort_order);
@@ -242,13 +248,14 @@ let make_document_list ?(height=400) ?(show_path=true) ?(multiple=false) ?(show_
   
 let search_metadata (default : Db.doc) (search_str : string) : Db.doc option =
   let docs = Search.search_document default.doc_type default.doc_type search_str in
-  let dialog = GWindow.dialog
-                 ~title:"Search for Metadata"
-                 ~width:800
-                 ~height:400 () in
+  let dialog = GWindow.dialog ~title:"Search for Metadata"
+                 ~width:800 ~height:400 () in
 
-  let hbox = GPack.hbox ~border_width:8 ~spacing:8 ~packing:(dialog#vbox#pack)() in
-  
+  let hbox = GPack.hbox ~border_width:8 ~spacing:8 ~packing:(dialog#vbox#pack)() in  
+  let search_l = GMisc.label ~text:"Query:" ~packing:(hbox#pack) () in
+  let search_e = GEdit.entry ~text:search_str ~packing:(hbox#add) () in
+  let refresh_b = GButton.button ~label:"Refresh" ~packing:(hbox#pack ~from:`END) () in
+
   let model = make_document_list ~height:380 ~show_path:false ~show_stars:false
             default.doc_type dialog#vbox#pack docs in
   
@@ -266,15 +273,6 @@ let search_metadata (default : Db.doc) (search_str : string) : Db.doc option =
    | _ -> failwith "Not possible");
   
   
-  let search_l = GMisc.label ~text:"Query:"
-                   ~packing:(hbox#pack) () in
-
-  let search_e = GEdit.entry ~packing:(hbox#add) () in
-  search_e#set_text search_str;
-  
-  let refresh_b = GButton.button ~label:"Refresh"
-                    ~packing:(hbox#pack ~from:`END) () in
-
   refresh_b#connect#clicked ~callback:(fun () ->
       let search_str = search_e#text in
       let search_type = (if database_l1#active then "article" else "book") in
@@ -285,61 +283,74 @@ let search_metadata (default : Db.doc) (search_str : string) : Db.doc option =
       model#append_data default.doc_type docs;
       ());
 
-  let select_b = GButton.button ~label:"Select"
-                   ~packing:(dialog#action_area#pack ~from:`END) () in
-  let skip_b = GButton.button ~label:"Skip"
-                 ~packing:(dialog#action_area#pack ~from:`END) () in
-  let cancel_b = GButton.button ~label:"Cancel"
-                   ~packing:(dialog#action_area#pack ~from:`END) () in
+  dialog#add_button "Select" `OK;
+  dialog#add_button "Skip" `DELETE_EVENT;
+  dialog#add_button_stock `CANCEL `CANCEL;
+  
+  let ret =
+    (match dialog#run() with
+     | `OK ->
+        let selection = (model#get_view#selection#get_selected_rows) in
+        let p = (List.nth selection 0) in
+        let doc : Db.doc =
+          { star = false;
+            title = (model#get ~row:(model#get_store#get_iter p) ~column:title);
+            authors = Str.split (Str.regexp "; +")
+                        (model#get ~row:(model#get_store#get_iter p) ~column:authors);
+            year = (model#get ~row:(model#get_store#get_iter p) ~column:year);
+            doi = (model#get ~row:(model#get_store#get_iter p) ~column:doi);
+            isbn = (model#get ~row:(model#get_store#get_iter p) ~column:isbn);
+            tags = default.tags;
+            doc_type = default.doc_type;
+            path = default.path
+          } in Some doc
+     | `CANCEL -> None
+     | `DELETE_EVENT -> Some default) in
 
-  let ret : (Db.doc ref) = ref default in
-  
-  select_b#connect#clicked ~callback:(fun () ->
-      let selection = (model#get_view#selection#get_selected_rows) in
-      let p = (List.nth selection 0) in
-      let doc : Db.doc =
-        { star = false;
-          title = (model#get ~row:(model#get_store#get_iter p) ~column:title);
-          authors = Str.split (Str.regexp "; +")
-                      (model#get ~row:(model#get_store#get_iter p) ~column:authors);
-          year = (model#get ~row:(model#get_store#get_iter p) ~column:year);
-          doi = (model#get ~row:(model#get_store#get_iter p) ~column:doi);
-          isbn = (model#get ~row:(model#get_store#get_iter p) ~column:isbn);
-          tags = default.tags;
-          doc_type = default.doc_type;
-          path = default.path
-        } in
-      ret := doc;
-      dialog#response `DELETE_EVENT; ());
-
-  let cancelled : (bool ref) = ref false in
-  skip_b#connect#clicked ~callback:(fun () ->
-      dialog#response `DELETE_EVENT; ());
-  
-  cancel_b#connect#clicked ~callback:(fun () ->
-      cancelled := true;
-      dialog#response `DELETE_EVENT; ());
-  
-  dialog#run();
   dialog#destroy();
-  (match !cancelled with
-   | true -> None
-   | false -> Some !ret)
-
+  ret
   
-(* let model_of_list conv l =
- *   let cols = new GTree.column_list in
- *   let column = cols#add conv in
- *   let model = GTree.list_store cols in
- *   List.iter
- *     (fun data ->
- *       let row = model#append () in
- *       model#set ~row ~column data)
- *     l ;
- *   (model, column) *)
+let new_library (notebook : GPack.notebook) : model =
+  let dialog = GWindow.dialog ~title:"New Library" ~border_width:8 () in
+  let grid = GPack.grid  ~col_spacings:8 ~row_spacings:8 ~packing:dialog#vbox#pack () in
+
+  let name_l = GMisc.label ~text:"Name" ~packing:(grid#attach ~left:0 ~top:0) () in
+  let name_e = GEdit.entry ~packing:(grid#attach ~left:1 ~top:0) () in
+  let root_path_l = GMisc.label ~text:"Location" ~packing:(grid#attach ~left:0 ~top:1) () in
+  let root_path_hbox = GPack.hbox ~spacing:8 ~packing:(grid#attach ~left:1 ~top:1) () in
+  let root_path_e = GMisc.label ~packing:(root_path_hbox#pack) () in
+  let root_path_b = GButton.button ~label:"Choose" ~packing:(root_path_hbox#pack) () in
+  let doc_type_l = GMisc.label ~text:"Type" ~packing:(grid#attach ~left:0 ~top:2) () in
+  let doc_type_c = GEdit.combo_box_text ~active:0 ~strings:["article"; "book"] ~packing:(grid#attach ~left:1 ~top:2)() in
+
+  root_path_b#connect#clicked ~callback:(fun () ->
+      let root_path =
+        match (choose_dir "Choose Library Location") with
+        | Some path -> path
+        | None -> "" in
+      root_path_e#set_text root_path);
+
+  dialog#add_button_stock `OK `OK;
+  dialog#add_button_stock `CANCEL `CANCEL;
+  
+  (match (dialog#run()) with
+   | `OK ->
+      let page = 
+        GPack.vbox ~border_width:8 ~spacing:8
+          ~packing:(fun w ->
+            (notebook#append_page
+               ~tab_label:((GMisc.label ~text:name_e#text ())#coerce) w);()) () in
+      let doc_type =
+        match GEdit.text_combo_get_active doc_type_c with
+        | None -> failwith "doc_type select: Not possible"
+        | Some s -> s in
+      let model = make_document_list ~multiple:true ~sort:(Some star) doc_type page#add [] in
+      dialog#destroy();
+      model
+   | `CANCEL | `DELETE_EVENT -> dialog#destroy(); raise Cancel)
   
 let edit_document (doc : Db.doc) : Db.doc option =
-  let dialog = GWindow.dialog ~title:"Edit Document" ~modal:false ~border_width:8 () in
+  let dialog = GWindow.dialog ~title:"Edit Document" ~border_width:8 () in
   let grid = GPack.grid  ~col_spacings:8 ~row_spacings:8 ~packing:dialog#vbox#pack () in
 
   let edit_field label row default =
@@ -348,15 +359,14 @@ let edit_document (doc : Db.doc) : Db.doc option =
     entry
   in
 
-  let title = (edit_field "Title" 0 doc.title) in
-  let authors = (edit_field "Author(s)" 1 (String.concat "; " doc.authors)) in
-
   (* TODO: Entry completion *)
   (* let (model, col) = model_of_list Gobject.Data.string ["example 1" ; "example 2"] in
    * let c = GEdit.entry_completion ~model ~entry:authors () in
    * c#set_text_column col ;
    * c#set_match_func (fun str p -> true); *)
   
+  let title = (edit_field "Title" 0 doc.title) in
+  let authors = (edit_field "Author(s)" 1 (String.concat "; " doc.authors)) in
   let year = (edit_field "Year" 2 doc.year) in
   let doi = (edit_field "DOI" 3 doc.doi) in
   let isbn = (edit_field "ISBN" 4 doc.isbn) in
@@ -366,38 +376,28 @@ let edit_document (doc : Db.doc) : Db.doc option =
   let path_l' = GMisc.label ~text:doc.path ~line_wrap:true ~selectable:true
                   ~packing:(grid#attach ~left:1 ~top:6) () in
   
-  let save_b = GButton.button ~label:"Save" ~packing:(dialog#action_area#pack ~from:`END) () in
-  let skip_b = GButton.button ~label:"Skip" ~packing:(dialog#action_area#pack ~from:`END) () in
-  let cancel_b = GButton.button ~label:"Cancel" ~packing:(dialog#action_area#pack ~from:`END) () in
-
-  let ret : (Db.doc ref) = ref doc in  
-  save_b#connect#clicked ~callback:(fun () ->
-      let doc : Db.doc =
-        { star = doc.star;
-          title = title#text;
-          authors = (Str.split (Str.regexp "; +") authors#text);
-          year = year#text; (* TODO: only allow numeric! *)
-          doi = doi#text;
-          isbn = isbn#text;
-          tags = (Str.split (Str.regexp "; +") tags#text);
-          doc_type = doc.doc_type;
-          path = doc.path
-        } in
-      ret := doc;
-      dialog#response `DELETE_EVENT; ());
-
-  let cancelled : (bool ref) = ref false in
-  cancel_b#connect#clicked ~callback:(fun () ->
-      cancelled := true;
-      dialog#response `DELETE_EVENT; ());
-  skip_b#connect#clicked ~callback:(fun () ->
-      dialog#response `DELETE_EVENT; ());
-  
-  dialog#run();
+  dialog#add_button_stock `SAVE `SAVE;
+  dialog#add_button "Skip" `DELETE_EVENT;
+  dialog#add_button_stock `CANCEL `CANCEL;
+    
+  let ret = (match dialog#run() with
+             | `SAVE ->
+                let doc : (Db.doc) =
+                  { star = doc.star;
+                    title = title#text;
+                    authors = (Str.split (Str.regexp "; +") authors#text);
+                    year = year#text; (* TODO: only allow numeric! *)
+                    doi = doi#text;
+                    isbn = isbn#text;
+                    tags = (Str.split (Str.regexp "; +") tags#text);
+                    doc_type = doc.doc_type;
+                    path = doc.path
+                  } in Some doc
+             | `CANCEL -> None
+             | `DELETE_EVENT -> Some doc) in
+       
   dialog#destroy();
-  (match !cancelled with
-   | true -> None
-   | false -> Some !ret)
+  ret
 
   
 let main () =
@@ -603,13 +603,14 @@ let main () =
   file_factory#add_item "Import Files"
     ~callback:(fun () ->
       let page = notebook#current_page in
-      import_dir (List.nth doc_types page) (List.nth models page) ();
+      import_dir (List.nth doc_types page) (List.nth models page);
       ());
 
-  file_factory#add_item "New Category"
+  file_factory#add_item "New Library"
     ~callback:(fun () ->
-      prerr_endline "New Category: To be implemented..."; ());
-
+      try (ignore (new_library notebook)) with
+      | Cancel -> ()
+    );
   
   file_factory#add_separator ();
 
