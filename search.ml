@@ -11,10 +11,10 @@ let get_database_name (doc_type : string) : string =
 
 (* Open library *)
 let query_book_string (search_str : string) () : string Lwt.t =
-  (prerr_endline "Searching open library...");
   let url = "http://openlibrary.org/search.json?q=" in
   let fields = "&fields=title,author_name,first_publish_year,isbn" in
   let uri = (Uri.of_string (url ^ search_str ^ fields)) in
+  prerr_endline ("Searching "^(url ^ search_str ^ fields));
   let open Lwt in
   Client.get uri >>= fun (resp, body) ->
   let code = resp |> Response.status |> Code.code_of_status in
@@ -24,11 +24,11 @@ let query_book_string (search_str : string) () : string Lwt.t =
 
 (* Semantic scholar *)
 let query_article_string (search_str : string) () : string Lwt.t =
-  (prerr_endline "Searching semantic scholar...");
   let url = "https://api.semanticscholar.org/graph/v1/paper/" in
   let query = "search?query=" in
   let fields = "&fields=authors,title,year,externalIds" in
   let uri = (Uri.of_string (url ^ query ^ search_str ^ fields)) in
+  prerr_endline ("Searching "^(url ^ query ^ search_str ^ fields));
   let open Lwt in
   Client.get uri >>= fun (resp, body) ->
   let code = resp |> Response.status |> Code.code_of_status in

@@ -18,3 +18,5 @@ val from_string : ?buf:Bi_outbuf.t -> ?fname:string -> ?lnum:int -> string -> t
 val raise_opt : string -> ([> `Null] as 'a) option -> 'a
 
 val default : ([> `Null] as 'a) -> 'a option -> 'a
+
+val to_file : ?len:int -> ?std:bool -> string -> t -> unit
