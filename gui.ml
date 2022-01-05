@@ -2,180 +2,26 @@
 open StdLabels
 open Gobject.Data
 
+   
 exception Cancel
+exception LibraryDoesNotExist of string
 
+module List = struct
+  include List
+  let index (lst : 'a list) (x : 'a) : int option =
+    let ind = ref None in
+    (List.iteri (fun j y ->
+         (if (x = y) && (!ind = None) then ind := (Some j))) lst);
+    !ind
+end
+            
 let iter_cancel f lst : unit =
   try (List.iter f lst) with
   | Cancel -> ()
         
-let col_names = ["star"; "authors"; "title"; "year"; "doi"; "isbn"; "tags"; "path"]
-               
-let cols = new GTree.column_list
-let star = cols#add boolean
-let authors = cols#add string
-let title = cols#add string
-let year = cols#add string
-let doi = cols#add string
-let isbn = cols#add string
-let tags = cols#add string
-let path = cols#add string
-
-
-type cell_renderer =
-  CellRenderer : ((#GTree.cell_renderer) * (string * 'b GTree.column) list) -> cell_renderer
-
-type column =
-  Str : string GTree.column -> column
-| Bool : bool GTree.column -> column
-
-
-class model filter store view = object (self)
-  val filter : GTree.model_filter = filter
-  val mutable store : GTree.list_store = store
-  val view : GTree.view = view
-  val mutable num_cols = 0
-
-  method get_filter = filter
-  method get_store = store
-  method get_view = view
-                  
-  method get_row p =
-    (store#get_iter (filter#convert_path_to_child_path p))
-
-  method set : 'a. row:Gtk.tree_iter -> column:('a GTree.column) -> 'a -> unit =
-    store#set
-
-  method get : 'a. row:Gtk.tree_iter -> column:('a GTree.column) -> 'a =
-    store#get
-
-  method remove (row : Gtk.tree_iter) : unit =
-    ignore (store#remove row)
-    
-  method set_entry row (doc : Db.doc) : unit =
-    let open Db in
-    store#set ~row ~column:star doc.star;
-    store#set ~row ~column:title doc.title;
-    store#set ~row ~column:authors (String.concat "; " doc.authors);
-    store#set ~row ~column:doi doc.doi;
-    store#set ~row ~column:isbn doc.isbn;
-    store#set ~row ~column:year doc.year;
-    store#set ~row ~column:tags (String.concat "; " doc.tags);
-    store#set ~row ~column:path doc.path
-    
-  method append_data (doc_type : string) (data : Db.doc list) : unit =
-    List.iter
-      (fun entry ->
-        let open Db in
-        (if entry.doc_type = doc_type then
-           let row = store#append () in
-           self#set_entry row entry))
-      data
-
-  method update_model (doc_type : string) : unit =
-    let data = Db.get_documents () in
-    store#clear();
-    self#append_data doc_type data
-
-  method reset_sort_indicators () : unit =
-    for i=0 to num_cols - 1 do
-      (view#get_column i)#set_sort_indicator false;
-    done
-    
-  method add_column title width ?(editable=true)
-           ?(cell_renderer:cell_renderer option = None)
-           (column : column) : unit =
-    num_cols <- num_cols + 1;
-    let col : (GTree.view_column) =
-      (match cell_renderer, column with
-       | None, Str col ->
-          let renderer,values = (GTree.cell_renderer_text
-                                   [`EDITABLE editable;
-                                    `HEIGHT 36; (* 18 * number of lines *)
-                                    `WRAP_WIDTH width;
-                                    `WRAP_MODE `WORD_CHAR],
-                                 ["text",col]) in
-          
-          (* 2 rows of text *)
-          renderer#set_fixed_height_from_font 2;
-          
-          (* save cell edits *)
-          renderer#connect#edited ~callback:(fun p str ->
-              let row = (self#get_row p) in
-              let path = (store#get ~row ~column:path) in
-              let key = (List.nth col_names (col.index)) in
-              let doc = Db.get_document path in
-              let doc = Db.edit_document (Db.set_attribute key str) doc in
-              (prerr_endline (Format.asprintf "%a" Db.pp_doc doc));
-              Db.set_document path doc;
-              store#set ~row ~column:col str
-            );
-          GTree.view_column ~title ~renderer:(renderer,values) ()
-       | Some (CellRenderer (renderer,values)), Bool _ ->
-          GTree.view_column ~title ~renderer:(renderer,values) ()
-       | _ -> failwith "Unexpected column")
-    in
-    
-    col#set_resizable(true);
-    col#set_min_width(20);
-    col#set_reorderable(true);
-    col#set_clickable(true);
-    col#set_fixed_width width;
-    col#set_sort_order `DESCENDING;
-
-    col#connect#clicked ~callback:(fun () ->
-        let title = col#title in
-        let id = (match column with Str c -> c.index | Bool c -> c.index) in
-        (if col#sort_order = `DESCENDING
-         then (prerr_endline "Desc"; col#set_sort_order `ASCENDING)
-         else (prerr_endline "Asc"; col#set_sort_order `DESCENDING));
-        self#reset_sort_indicators ();
-        col#set_sort_indicator true;
-        store#set_sort_column_id id col#sort_order
-      );
-    ignore(view#append_column col)
-end
       
-let get_rel_path (path : string) : string =
-  (String.sub path (String.length !Db.root)
-     ((String.length path) - (String.length !Db.root)))
   
-let get_doc_name (path : string) : string =
-  let s_path = (String.split_on_char '/' path) in
-  let name = (List.nth s_path ((List.length s_path) - 1)) in
-  let name = (String.split_on_char '.' name) in
-  (List.nth name 0)
-  
-let open_doc (rel_path : string) : unit =
-  let path = (!Db.root ^ rel_path) in
-  let ret = Sys.command ("xdg-open \""^path^"\"") in
-  (if ret > 0 then
-     prerr_endline (path ^ " could not be opened!"));
-  ()
-
-let rename_doc (rel_path : string) (new_name : string) : unit =
-  let path = (!Db.root ^ rel_path) in
-  let rpath = (List.tl (List.rev (String.split_on_char '/' path))) in
-  let new_path = (!Db.root ^ (String.concat "/" (List.rev (new_name :: rpath)))) in
-  (prerr_endline ("Old path: "^path));
-  (prerr_endline ("New path: "^new_path));
-  if (Sys.file_exists new_path) then
-    prerr_endline ("Cannot rename file - another file of the same name exists!")
-  else (Sys.rename path new_path)
-(* else (Sys.command ("mv \""^path^"\" \""^new_path^"\"") *)
-    
-let rec import_file (model : model) (doc_type : string) (path : string) : unit =
-  if not (Sys.is_directory path) then
-    (let rel_path = get_rel_path path in
-     match (Db.import_file rel_path doc_type) with
-     | Some doc -> ignore (model#append_data doc_type [doc])
-     | None -> ())
-  else
-    (List.iter (fun name ->
-         let path = path^"/"^name in
-         import_file model doc_type path)
-       (Array.to_list (Sys.readdir path)))
-  
-let import_dir (doc_type : string) (model : model) : unit =
+let choose_files (doc_type : string) (model : Model.model) : unit =
   let dialog = GWindow.file_chooser_dialog ~action:`OPEN ~title:"Import Documents" () in
   dialog#set_current_folder !Db.root;
   dialog#add_button_stock `CANCEL `CANCEL;
@@ -184,7 +30,7 @@ let import_dir (doc_type : string) (model : model) : unit =
   (match dialog#run() with
    | `OPEN -> (match dialog#get_filenames with
                | [] -> failwith "No file name!"
-               | files -> List.iter (import_file model doc_type) files)
+               | files -> List.iter (Db.import_file model doc_type) files)
    | `DELETE_EVENT | `CANCEL -> ());
   dialog#destroy()
 
@@ -199,52 +45,6 @@ let choose_dir (title : string) : string option =
   dialog#destroy();
   path
 
-
-let make_document_list ?(height=400) ?(show_path=true) ?(multiple=false) ?(show_stars=true)
-      ?(sort : ('a GTree.column) option=None) doc_type packing data : model =
-  let swindow = GBin.scrolled_window
-                  ~height ~shadow_type:`ETCHED_IN ~hpolicy:`AUTOMATIC
-                  ~vpolicy:`AUTOMATIC ~packing () in
-
-  let store = GTree.list_store cols in
-  let filter = (GTree.model_filter store) in
-  let view = GTree.view ~reorderable:true
-               ~model:filter ~packing:swindow#add() in
-  let model = (new model filter store view) in
-
-  view#set_enable_grid_lines `HORIZONTAL;
-  (if multiple then view#selection#set_mode `MULTIPLE);
-  
-  (* Columns *)
-  let renderer,values = (GTree.cell_renderer_toggle [], ["active", star]) in
-  renderer#connect#toggled ~callback:(fun p ->
-      let row = (model#get_row p) in
-      let value = (not (store#get ~row ~column:star)) in
-      let path = model#get ~row ~column:path in
-      let doc = Db.get_document path in
-      let doc = Db.edit_document (Star value) doc in
-      Db.set_document path doc;
-      store#set ~row ~column:star value);
-  
-  (if show_stars then
-     model#add_column "Star" 40 ~cell_renderer:(Some (CellRenderer (renderer,values))) (Bool star));
-  model#add_column "Author(s)" 200 (Str authors);
-  model#add_column "Title" 400 (Str title);
-  model#add_column "Year" 100 (Str year);
-  model#add_column "Tags" 200 (Str tags);
-  (match doc_type with
-   | "article" -> model#add_column "DOI" 80 (Str doi)
-   | "book" -> model#add_column "ISBN" 80 (Str isbn)
-   | _ -> ());
-  (if show_path then
-     ignore(model#add_column "Path" ~editable:false 200 (Str path)));
-
-  (match sort with
-  | None -> ()
-  | Some col -> store#set_sort_column_id col.index (view#get_column col.index)#sort_order);
-  
-  model#append_data doc_type data;
-  model
   
 let search_metadata (default : Db.doc) (search_str : string) : Db.doc option =
   let docs = Search.search_document default.doc_type default.doc_type search_str in
@@ -310,44 +110,6 @@ let search_metadata (default : Db.doc) (search_str : string) : Db.doc option =
   dialog#destroy();
   ret
   
-let new_library (notebook : GPack.notebook) : model =
-  let dialog = GWindow.dialog ~title:"New Library" ~border_width:8 () in
-  let grid = GPack.grid  ~col_spacings:8 ~row_spacings:8 ~packing:dialog#vbox#pack () in
-
-  let name_l = GMisc.label ~text:"Name" ~packing:(grid#attach ~left:0 ~top:0) () in
-  let name_e = GEdit.entry ~packing:(grid#attach ~left:1 ~top:0) () in
-  let root_path_l = GMisc.label ~text:"Location" ~packing:(grid#attach ~left:0 ~top:1) () in
-  let root_path_hbox = GPack.hbox ~spacing:8 ~packing:(grid#attach ~left:1 ~top:1) () in
-  let root_path_e = GMisc.label ~packing:(root_path_hbox#pack) () in
-  let root_path_b = GButton.button ~label:"Choose" ~packing:(root_path_hbox#pack) () in
-  let doc_type_l = GMisc.label ~text:"Type" ~packing:(grid#attach ~left:0 ~top:2) () in
-  let doc_type_c = GEdit.combo_box_text ~active:0 ~strings:["article"; "book"] ~packing:(grid#attach ~left:1 ~top:2)() in
-
-  root_path_b#connect#clicked ~callback:(fun () ->
-      let root_path =
-        match (choose_dir "Choose Library Location") with
-        | Some path -> path
-        | None -> "" in
-      root_path_e#set_text root_path);
-
-  dialog#add_button_stock `OK `OK;
-  dialog#add_button_stock `CANCEL `CANCEL;
-  
-  (match (dialog#run()) with
-   | `OK ->
-      let page = 
-        GPack.vbox ~border_width:8 ~spacing:8
-          ~packing:(fun w ->
-            (notebook#append_page
-               ~tab_label:((GMisc.label ~text:name_e#text ())#coerce) w);()) () in
-      let doc_type =
-        match GEdit.text_combo_get_active doc_type_c with
-        | None -> failwith "doc_type select: Not possible"
-        | Some s -> s in
-      let model = make_document_list ~multiple:true ~sort:(Some star) doc_type page#add [] in
-      dialog#destroy();
-      model
-   | `CANCEL | `DELETE_EVENT -> dialog#destroy(); raise Cancel)
   
 let edit_document (doc : Db.doc) : Db.doc option =
   let dialog = GWindow.dialog ~title:"Edit Document" ~border_width:8 () in
@@ -395,15 +157,12 @@ let edit_document (doc : Db.doc) : Db.doc option =
                   } in Some doc
              | `CANCEL -> None
              | `DELETE_EVENT -> Some doc) in
-       
   dialog#destroy();
   ret
 
-  
-let main () =
-  Db.init ();
-  let data = Db.get_documents() in
 
+    
+let main () =
   GMain.init();
   let icon = GdkPixbuf.from_file "icons/Gnome-colors-applications-office.svg" in
   let window = GWindow.window ~title:"DocuLib" ~icon () in
@@ -419,69 +178,18 @@ let main () =
   let context_menu = GMenu.menu () in
   let context_factory = new GMenu.factory context_menu in
 
+  (* Search bar *)
   let search_box = GPack.hbox ~border_width:8 ~spacing:8
                      ~packing:(vbox#pack ~from:`START) () in
-
-  (* Notebook *)
-  let notebook = GPack.notebook ~packing:vbox#add () in
-
-  (* Article page *)
-  let page1 = 
-    GPack.vbox ~border_width:8 ~spacing:8
-      ~packing:(fun w ->
-        (notebook#append_page
-           ~tab_label:((GMisc.label ~text:"Articles"())#coerce) w);())() in
-
-  let model1 = make_document_list ~multiple:true ~sort:(Some star) "article" page1#add data in
-
-  (* Textbook page *)
-  let page2 =
-    GPack.vbox ~border_width:8 ~spacing:8
-      ~packing:(fun w ->
-        (notebook#append_page
-           ~tab_label:((GMisc.label ~text:"Textbooks"())#coerce) w);
-        ())() in
-
-  let model2 = make_document_list ~multiple:true ~sort:(Some star) "book" page2#add data in
-
   let search_e = GEdit.entry ~packing:(search_box#add) () in
   search_e#set_secondary_icon_stock `FIND;
   search_e#set_secondary_icon_tooltip_text
-    ("?X      single character\n"
-     ^"X*      any character sequence\n"
+    ( "?X      single character\n"
+     ^"*       any character sequence\n"
      ^"[X]    character set (eg. [a-z])\n"
      ^"X & Y    conjunction\n"
      ^"X | Y    disjunction\n"
      ^"\\X      character escape");
-  
-  (* Handle click events *)
-  let handle_view_events (model : model) () : unit =
-    (* Open selected files with default program on select *)
-    model#get_view#connect#after#row_activated
-      ~callback:(fun _ _ ->
-        List.iter (fun p ->
-            open_doc (model#get_store#get ~row:(model#get_row p) ~column:path))
-          model#get_view#selection#get_selected_rows);
-    
-    (* Spawn context menu on right click *)
-    model#get_view#event#connect#button_press
-      ~callback:(fun ev ->
-        (if (GdkEvent.Button.button ev) == 3 then
-           (context_menu#popup ~button:3 ~time:(GdkEvent.Button.time ev);
-            (if (model#get_view#selection#count_selected_rows) > 1
-             then true (* select on right click *)
-             else false (* do not deselect *)))
-         else false)
-      );
-    ()
-  in
-
-  let doc_types = ["article"; "book"] in
-  let models = [model1; model2] in
-
-  handle_view_events model1 ();
-  handle_view_events model2 ();
-
   let filter_func = (fun (model : GTree.model) row ->
       let search_query = search_e#text in
       let search_string = (String.concat " " (List.map (fun column -> model#get ~row ~column) [title; authors; tags; path])) in
@@ -492,47 +200,33 @@ let main () =
         (string_match pat ~numerrs:(if (String.length search_string > 2) then 1 else 0) search_string)
     ) in
 
-  model1#get_filter#set_visible_func filter_func;
-  model2#get_filter#set_visible_func filter_func;
+  (* Notebook *)
+  let notebook = GPack.notebook ~packing:vbox#add () in
+  let notebook = new notebook notebook context_menu filter_func in
+  Db.init ();
+  let libraries = (List.map (fun lib -> (lib, Db.get_doc_type lib)) Db.get_libraries()) in
+  notebook#init libraries;
   
+
   (* Search on edit *)
   search_e#connect#changed ~callback:(fun _ ->
-      prerr_endline ("Searching..."^search_e#text);
       let search_text = search_e#text in
-      let open Agrep in
-      let page = notebook#current_page in
-      let model = (List.nth models page) in
-      model#get_filter#refilter();
-      ());
+      notebook#refilter());
 
-  
+  (****************************************************)
+  (* Context menu                                     *)
+  (****************************************************)
   (* Open selected files *)
   context_factory#add_item "Open"
-    ~callback:(fun _ ->
-      let page = notebook#current_page in
-      let model = (List.nth models page) in
-      List.iter (fun p ->
-          open_doc (model#get ~row:(model#get_row p) ~column:path))
-        model#get_view#selection#get_selected_rows);
+    ~callback:(fun _ -> notebook#open_document ());
 
   (* Open DOI of selected files *)
   context_factory#add_item "Open DOI"
-    ~callback:(fun _ -> prerr_endline "Open DOI: NYI");
+    ~callback:(fun _ -> notebook#open_doi ());
   
   (* Edit metadata for an entry *)
   context_factory#add_item "Edit Entry"
-    ~callback:(fun _ ->
-      let page = notebook#current_page in
-      let model = (List.nth models page) in
-      iter_cancel (fun p ->
-          let path = (model#get ~row:(model#get_row p) ~column:path) in
-          let doc = Db.get_document path in
-          let doc = (match (edit_document doc) with
-                     | None -> raise Cancel
-                     | Some doc -> doc) in
-          Db.set_document path doc;
-          model#set_entry (model#get_row p) doc)
-        model#get_view#selection#get_selected_rows);
+    ~callback:(fun _ -> notebook#edit_entry ());
   
   (* Search for metadata *)
   context_factory#add_item "Search Metadata"
@@ -602,15 +296,11 @@ let main () =
   (* Import files from directory *)
   file_factory#add_item "Import Files"
     ~callback:(fun () ->
-      let page = notebook#current_page in
-      import_dir (List.nth doc_types page) (List.nth models page);
-      ());
+      let (_,(doc_type, Some model)) = notebook#current_library () in
+      choose_fies doc_type model);
 
   file_factory#add_item "New Library"
-    ~callback:(fun () ->
-      try (ignore (new_library notebook)) with
-      | Cancel -> ()
-    );
+    ~callback:(fun () -> notebook#new_library);
   
   file_factory#add_separator ();
 

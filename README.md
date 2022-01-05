@@ -18,7 +18,8 @@ dune build
 ```
 
 ## Configure
-Edit `doculib_config.json`, where `"root"` should denote a path to the library's location, and `"data"` should denote a location to store the  database. It should suffice to replace `user` with your username.
+Edit `doculib_config.json`, where `"root"` should denote a path to the library's location.
+The database is stored in `$HOME/.doculib/data`. 
 
 ## Run
 ```

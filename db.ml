@@ -187,33 +187,39 @@ let print_documents library : unit =
   List.iter (fun d -> printf "%a@\n" pp_doc d) docs
 
 let get_library_root library : string =
-  List.assoc !libraries library
-  
-let get_libraries () : (string * string) list =
-  !libraries
+  fst (List.assoc !libraries library)
 
-let json_to_libs (json : Json.t) : (string * string) list =
+let get_library_doc_type library : string =
+  snd (List.assoc !libraries library)
+  
+let get_libraries () : string list =
+  List.map fst !libraries
+
+let json_to_libs (json : Json.t) : (string * (string * string)) list =
   (Json.raise_opt "Could not find entry `libraries`"
      (Json.get "libraries" json))
   |> Json.to_list
   |> List.map (fun json ->
          let name = Json.to_string (Json.raise_opt "Could not find entry `name`" (Json.get "name" json)) in
          let path = Json.to_string (Json.raise_opt "Could not find entry `path`" (Json.get "path" json)) in
-         (name,path))
+         let doc_type = Json.to_string (Json.raise_opt "Could not find entry `doc_type`" (Json.get "doc_type" json)) in
+         (name,(path,doc_type)))
 
-let libs_to_json (libs : (string * string) list) : Json.t =
-  let libs = (`List (List.map (fun (name,path) ->
+let libs_to_json (libs : (string * (string * string)) list) : Json.t =
+  let libs = (`List (List.map (fun (name,(path,doc_type)) ->
                          (`Assoc [("name",`String name);
-                                  ("path", `String path)])) libs)) in
+                                  ("path", `String path);
+                                  ("doc_type", `String doc_type)]))
+                       libs)) in
   (`Assoc [("libraries", libs)])
-   
-let add_library library root_path : unit =
+  
+let add_library library root_path doc_type : unit =
   (if (List.mem_assoc library !libraries) then
      raise LibraryExists
    else
      let json = Yojson.Basic.from_file libconfig in
      let libs = (json_to_libs json) in
-     let libs = (library,root_path) :: libs in
+     let libs = (library,(root_path,doc_type)) :: libs in
      let json = (libs_to_json libs) in
      let _ = Json.to_file libconfig json in
      libraries := libs)
@@ -224,5 +230,47 @@ let init () : unit =
                  ("Configuration file `"^libconfig^"` is missing!")));
   let json = Yojson.Basic.from_file libconfig in
   let libs = (json_to_libs json) in
-  (List.iter (fun (lib,path) -> prerr_endline (path^"/"^lib)) libs);
+  (List.iter (fun (lib,(path,doc_type)) -> prerr_endline (path^"/"^lib)) libs);
   libraries := libs
+
+
+
+let get_rel_path (path : string) : string =
+  (String.sub path (String.length !Db.root)
+     ((String.length path) - (String.length !Db.root)))
+  
+let get_doc_name (path : string) : string =
+  let s_path = (String.split_on_char '/' path) in
+  let name = (List.nth s_path ((List.length s_path) - 1)) in
+  let name = (String.split_on_char '.' name) in
+  (List.nth name 0)
+  
+let open_doc (rel_path : string) : unit =
+  let path = (!Db.root ^ rel_path) in
+  let ret = Sys.command ("xdg-open \""^path^"\"") in
+  (if ret > 0 then
+     prerr_endline (path ^ " could not be opened!"));
+  ()
+
+let rename_doc (rel_path : string) (new_name : string) : unit =
+  let path = (!Db.root ^ rel_path) in
+  let rpath = (List.tl (List.rev (String.split_on_char '/' path))) in
+  let new_path = (!Db.root ^ (String.concat "/" (List.rev (new_name :: rpath)))) in
+  (prerr_endline ("Old path: "^path));
+  (prerr_endline ("New path: "^new_path));
+  if (Sys.file_exists new_path) then
+    prerr_endline ("Cannot rename file - another file of the same name exists!")
+  else (Sys.rename path new_path)
+(* else (Sys.command ("mv \""^path^"\" \""^new_path^"\"") *)
+  
+let rec import_file (model : Model.model) (doc_type : string) (path : string) : unit =
+  if not (Sys.is_directory path) then
+    (let rel_path = get_rel_path path in
+     match (Db.import_file rel_path doc_type) with
+     | Some doc -> ignore (model#append_data doc_type [doc])
+     | None -> ())
+  else
+    (List.iter (fun name ->
+         let path = path^"/"^name in
+         import_file model doc_type path)
+       (Array.to_list (Sys.readdir path)))

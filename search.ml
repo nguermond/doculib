@@ -2,15 +2,25 @@
 open Cohttp
 open Cohttp_lwt_unix
 
-                          
-let get_database_name (doc_type : string) : string =
-  match doc_type with
-  | "book" -> "openlibrary.org"
-  | "article" -> "semanticscholar.org"
-  | _ -> "No such database"
+module DocType =
+  struct
+    type t = [`Article | `Book]
+
+    let to_string : t -> string = function
+      | `Article -> "article"
+      | `Book -> "book"
+
+    let of_string : string -> t = function
+      | "article" -> `Article
+      | "book" -> `Book
+  end
+               
+let get_database_name : DocType.t -> string = function
+  | `Book -> "openlibrary.org"
+  | `Article -> "semanticscholar.org"
 
 (* Open library *)
-let query_book_string (search_str : string) () : string Lwt.t =
+let query_book_string (search_str : string) : string Lwt.t =
   let url = "http://openlibrary.org/search.json?q=" in
   let fields = "&fields=title,author_name,first_publish_year,isbn" in
   let uri = (Uri.of_string (url ^ search_str ^ fields)) in
@@ -23,7 +33,7 @@ let query_book_string (search_str : string) () : string Lwt.t =
   body
 
 (* Semantic scholar *)
-let query_article_string (search_str : string) () : string Lwt.t =
+let query_article_string (search_str : string) : string Lwt.t =
   let url = "https://api.semanticscholar.org/graph/v1/paper/" in
   let query = "search?query=" in
   let fields = "&fields=authors,title,year,externalIds" in
@@ -86,7 +96,7 @@ let parse_book (doc_type : string) (book : Json.t) : Db.doc =
 
   
 let search_article (doc_type : string) (search_str : string) : Db.doc list =
-  let body = Lwt_main.run (query_article_string search_str ()) in
+  let body = Lwt_main.run (query_article_string search_str) in
   let json = Json.from_string body in
   let data = try Json.to_list (Json.raise_opt "Unexpected result" (Json.get "data" json)) with
              | Json.ParsingFailure err -> let json_pp = Json.pretty_to_string json in
@@ -97,7 +107,7 @@ let search_article (doc_type : string) (search_str : string) : Db.doc list =
 
 
 let search_book (doc_type : string) (search_str : string) : Db.doc list =
-  let body = Lwt_main.run (query_book_string search_str ()) in
+  let body = Lwt_main.run (query_book_string search_str) in
   let json = Json.from_string body in
   let data = try Json.to_list (Json.raise_opt "Unexpected result" (Json.get "docs" json)) with
              | Json.ParsingFailure err -> let json_pp = Json.pretty_to_string json in

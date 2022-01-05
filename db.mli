@@ -1,7 +1,5 @@
 
 
-val root : string ref
-
 type doc = {star : bool;
             title : string;
             authors : string list;
@@ -30,13 +28,18 @@ val set_attribute : string -> string -> attribute
              
 module Doc : Irmin.Contents.S with type t = doc
 
-val import_documents : string -> string -> unit -> doc list
 val import_file : string -> string -> doc option
-val get_documents : unit -> doc list
+val get_documents : string -> doc list
 val get_document : string -> doc
 val set_document : string -> doc -> unit
 val remove_document : string -> unit
 
 val edit_document : attribute -> doc -> doc
 
+
+val get_library_root : string -> string
+val get_library_doc_type : library -> string =
+val get_libraries : unit -> string list
+
+  
 val pp_doc : Format.formatter -> doc -> unit
