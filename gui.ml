@@ -21,17 +21,18 @@ let iter_cancel f lst : unit =
         
       
   
-let choose_files (doc_type : string) (model : Model.model) : unit =
+let choose_files (root_path : string) : doc list =
   let dialog = GWindow.file_chooser_dialog ~action:`OPEN ~title:"Import Documents" () in
-  dialog#set_current_folder !Db.root;
+  let root_path = ?? in
+  dialog#set_current_folder root_path;
   dialog#add_button_stock `CANCEL `CANCEL;
   dialog#add_button_stock `OPEN `OPEN;
   dialog#set_select_multiple true;
   (match dialog#run() with
    | `OPEN -> (match dialog#get_filenames with
                | [] -> failwith "No file name!"
-               | files -> List.iter (Db.import_file model doc_type) files)
-   | `DELETE_EVENT | `CANCEL -> ());
+               | files -> files)
+   | `DELETE_EVENT | `CANCEL -> raise Cancel);
   dialog#destroy()
 
 let choose_dir (title : string) : string option =
@@ -160,8 +161,43 @@ let edit_document (doc : Db.doc) : Db.doc option =
   dialog#destroy();
   ret
 
+let new_library () : string * string =
+  let dialog = GWindow.dialog ~title:"New Library" ~border_width:8 () in
+  let grid = GPack.grid  ~col_spacings:8 ~row_spacings:8 ~packing:dialog#vbox#pack () in
 
-    
+  let name_l = GMisc.label ~text:"Name" ~packing:(grid#attach ~left:0 ~top:0) () in
+  let name_e = GEdit.entry ~packing:(grid#attach ~left:1 ~top:0) () in
+  let root_path_l = GMisc.label ~text:"Location" ~packing:(grid#attach ~left:0 ~top:1) () in
+  let root_path_hbox = GPack.hbox ~spacing:8 ~packing:(grid#attach ~left:1 ~top:1) () in
+  let root_path_e = GMisc.label ~packing:(root_path_hbox#pack) () in
+  let root_path_b = GButton.button ~label:"Choose" ~packing:(root_path_hbox#pack) () in
+  let doc_type_l = GMisc.label ~text:"Type" ~packing:(grid#attach ~left:0 ~top:2) () in
+  let doc_type_c = GEdit.combo_box_text ~active:0 ~strings:["article"; "book"] ~packing:(grid#attach ~left:1 ~top:2)() in
+
+  root_path_b#connect#clicked ~callback:(fun () ->
+      let root_path =
+        match (choose_dir "Choose Library Location") with
+        | Some path -> path
+        | None -> "" in
+      root_path_e#set_text root_path);
+
+  dialog#add_button_stock `OK `OK;
+  dialog#add_button_stock `CANCEL `CANCEL;
+  
+  match (dialog#run()) with
+  | `OK ->
+     let name = name_e#text in
+     let doc_type = match GEdit.text_combo_get_active doc_type_c with
+       | None -> failwith "doc_type select: Not possible"
+       | Some s -> s in
+     dialog#destroy();
+     (name, doc_type)
+  | `CANCEL | `DELETE_EVENT ->
+     dialog#destroy();
+     raise Cancel
+
+
+  
 let main () =
   GMain.init();
   let icon = GdkPixbuf.from_file "icons/Gnome-colors-applications-office.svg" in
@@ -218,50 +254,36 @@ let main () =
   (****************************************************)
   (* Open selected files *)
   context_factory#add_item "Open"
-    ~callback:(fun _ -> notebook#open_document ());
+    ~callback:(fun _ ->
+      notebook#action_on_selected (fun library model row ->
+          Db.open_doc lib (model#get ~row ~column:Model.path))
+    );
 
   (* Open DOI of selected files *)
   context_factory#add_item "Open DOI"
-    ~callback:(fun _ -> notebook#open_doi ());
+    ~callback:(fun _ -> prerr_endline "NYI");
   
   (* Edit metadata for an entry *)
   context_factory#add_item "Edit Entry"
-    ~callback:(fun _ -> notebook#edit_entry ());
+    ~callback:(fun _ -> notebook#edit_selected edit_document);
   
   (* Search for metadata *)
   context_factory#add_item "Search Metadata"
     ~callback:(fun _ ->
-      let page = notebook#current_page in
-      let doc_type = (List.nth doc_types page) in
-      let model = (List.nth models page) in
-      (iter_cancel (fun p ->
-           let title = (model#get ~row:(model#get_row p) ~column:title) in
-           let path = (model#get ~row:(model#get_row p) ~column:path) in
-           let search_str =
-             (if title = "" then
-                (get_doc_name path)
-              else title) in
-           let search_str = Str.global_replace (Str.regexp "[-_.() ]+") " " search_str in
-           let doc = Db.get_document path in
-           let doc =
-             (match (search_metadata doc search_str) with
-              | None -> raise Cancel
-              | Some doc -> doc) in
-           Db.set_document path doc;
-           model#set_entry (model#get_row p) doc;
-           ())
-         model#get_view#selection#get_selected_rows));
+      notebook#edit_selected (fun doc ->
+          let serach_str = (if doc.title = "" then doc.path else doc.title) in
+          let search_str = Str.global_replace (Str.regexp "[-_.() ]+") " " search_str in
+          search_metadata doc search_str)
+    );
   
   (* Remove entry from database *)
   context_factory#add_item "Remove Entry"
     ~callback:(fun _ ->
-      let page = notebook#current_page in
-      let model = (List.nth models page) in
-      List.iter (fun row ->
+      notebook#action_on_selected (fun library model row ->
           let path = (model#get ~row ~column:path) in
-          let _ = Db.remove_document path in
+          Db.remove_document library path;
           ignore (model#remove row))
-        (List.map model#get_row model#get_view#selection#get_selected_rows));
+    );
 
   context_factory#add_separator ();
 
@@ -273,24 +295,23 @@ let main () =
   (* Delete physical file *)
   context_factory#add_item "Delete File"
     ~callback:(fun _ ->
-      let page = notebook#current_page in
-      let model = (List.nth models page) in
       (* Confirm deletion *)
       let confirm_dialog = GWindow.message_dialog ~title:"Delete Files"
-                        ~buttons:GWindow.Buttons.ok_cancel
-                        ~message:"Delete selected file(s)?"
-                        ~message_type:`QUESTION () in
+                             ~buttons:GWindow.Buttons.ok_cancel
+                             ~message:"Delete selected file(s)?"
+                             ~message_type:`QUESTION () in
+
       (* TODO: Window does not always close??? *)
       (match confirm_dialog#run() with
-       | `OK -> List.iter (fun row ->
-                    let rel_path = (model#get ~row ~column:path) in
-                    let _ = Db.remove_document rel_path in
-                    let _ = model#get_store#remove row in
-                    let path = !Db.root ^ rel_path in
+       | `OK -> notebook#action_on_selected (fun library model row ->
+                    let path = (model#get ~row ~column:path) in
+                    Db.remove_document library path;
+                    model#get_store#remove row;
+                    let full_path = (Db.get_full_path library path) in
                     ignore (Sys.remove path))
-                  (List.map model#get_row model#get_view#selection#get_selected_rows)
        | _ -> prerr_endline "Cancel");
-      confirm_dialog#destroy());
+      confirm_dialog#destroy()
+    );
       
 
   (* Import files from directory *)
@@ -300,7 +321,11 @@ let main () =
       choose_fies doc_type model);
 
   file_factory#add_item "New Library"
-    ~callback:(fun () -> notebook#new_library);
+    ~callback:(fun () ->
+      let (lib,doc_type) = new_library() in
+      notebook#add_library lib doc_type;
+      notebook#load_library lib doc_type
+    );
   
   file_factory#add_separator ();
 

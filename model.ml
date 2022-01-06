@@ -20,8 +20,11 @@ type column =
   Str : string GTree.column -> column
 | Bool : bool GTree.column -> column
 
+type row = Gtk.tree_iter
 
-class model filter store view = object (self)
+
+class model filter store view =
+object (self)
   val filter : GTree.model_filter = filter
   val mutable store : GTree.list_store = store
   val view : GTree.view = view
@@ -54,13 +57,12 @@ class model filter store view = object (self)
     store#set ~row ~column:tags (String.concat "; " doc.tags);
     store#set ~row ~column:path doc.path
     
-  method append_data (doc_type : string) (data : Db.doc list) : unit =
+  method append_data (library : string) (data : Db.doc list) : unit =
     List.iter
-      (fun entry ->
+      (fun doc ->
         let open Db in
-        (if entry.doc_type = doc_type then
-           let row = store#append () in
-           self#set_entry row entry))
+        let row = store#append () in
+        self#set_entry row doc
       data
 
   method update_model (doc_type : string) : unit =
@@ -118,8 +120,8 @@ class model filter store view = object (self)
         let title = col#title in
         let id = (match column with Str c -> c.index | Bool c -> c.index) in
         (if col#sort_order = `DESCENDING
-         then (prerr_endline "Desc"; col#set_sort_order `ASCENDING)
-         else (prerr_endline "Asc"; col#set_sort_order `DESCENDING));
+         then (col#set_sort_order `ASCENDING)
+         else (col#set_sort_order `DESCENDING));
         self#reset_sort_indicators ();
         col#set_sort_indicator true;
         store#set_sort_column_id id col#sort_order
@@ -145,6 +147,20 @@ class model filter store view = object (self)
              else false (* select on right click *)))
          else false))
 
+  method import_documents (library : string) (docs : doc list) : unit =
+    self#append_
+  (* TODO: optimize this by importing a list of files *)
+  method import_file (lib : string) (doc_type : string) (rel_path : string) : unit =
+    let rec import_file (rel_path : string) =
+      let path = Db.get_full_path lib rel_path in
+      if not (Sys.is_directory path) then
+        (match (Db.import_file lib rel_path doc_type) with
+         | Some doc -> ignore (self#append_data doc_type [doc])
+         | None -> ())
+      else
+        (List.iter (fun name -> import_file (rel_path^"/"^name))
+           (Array.to_list (Sys.readdir path)))
+    in (import_file rel_path)
 end
 
 
@@ -194,3 +210,6 @@ let make_document_list ?(height=400) ?(show_path=true) ?(multiple=false) ?(show_
   
   model#append_data doc_type data;
   model
+
+
+    

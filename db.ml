@@ -16,7 +16,7 @@ let config = Irmin_fs.config data
 (* The database is versioned, to prevent data loss upon upgrade. *)
 let current_branch = "1.0"
 let libconfig = home^"/.doculib/libraries.json"
-let libraries : ((string * string) list) ref = ref []
+let libraries : ((string * (string * string)) list) ref = ref []
 
 (* Example keys for branch "1.0" look like:
     Articles/path/to/article1.pdf
@@ -135,13 +135,13 @@ let add_document store library (doc : doc) : unit Lwt.t =
   let info = Irmin_unix.info "Add %s/%s" library doc.path in
   Store.set_exn store [library; doc.path] doc ~info
   
-let get_document library path : doc =
+let get_document ~library ~path : doc =
   Lwt_main.run
     (let* repo = Store.Repo.v config in
      let* store = Store.of_branch repo current_branch in
      Store.get store [library; path])
 
-let set_document library path (doc : doc) : unit =
+let set_document ~library ~path ~doc : unit =
   Lwt_main.run
     (let* repo = Store.Repo.v config in
      let* store = Store.of_branch repo current_branch in
@@ -149,7 +149,7 @@ let set_document library path (doc : doc) : unit =
      Store.set_exn store [library; path] doc ~info);
   ()
 
-let remove_document library path : unit =
+let remove_document ~library ~path : unit =
   Lwt_main.run
     (let* repo = Store.Repo.v config in
      let* store = Store.of_branch repo current_branch in
@@ -157,7 +157,7 @@ let remove_document library path : unit =
      Store.remove store [library; path] ~info);
   ()
 
-let import_file library path doc_type : doc option =
+let import_file ~library ~path ~doc_type : doc option =
   Lwt_main.run
     (let* repo = Store.Repo.v config in
      let* store = Store.of_branch repo current_branch in
@@ -172,7 +172,7 @@ let import_file library path doc_type : doc option =
         let* _ = add_document store library doc in
         Lwt.return (Some doc))
             
-let get_documents library : doc list =
+let get_documents ~library : doc list =
   Lwt_main.run
     (let* repo = Store.Repo.v config in
      let* store = Store.of_branch repo current_branch in
@@ -186,11 +186,11 @@ let print_documents library : unit =
   let docs = get_documents library in
   List.iter (fun d -> printf "%a@\n" pp_doc d) docs
 
-let get_library_root library : string =
-  fst (List.assoc !libraries library)
+let get_library_root ~library : string =
+  fst (List.assoc library !libraries)
 
-let get_library_doc_type library : string =
-  snd (List.assoc !libraries library)
+let get_library_doc_type ~library : string =
+  snd (List.assoc library !libraries)
   
 let get_libraries () : string list =
   List.map fst !libraries
@@ -213,13 +213,13 @@ let libs_to_json (libs : (string * (string * string)) list) : Json.t =
                        libs)) in
   (`Assoc [("libraries", libs)])
   
-let add_library library root_path doc_type : unit =
+let add_library ~library ~root ~doc_type : unit =
   (if (List.mem_assoc library !libraries) then
      raise LibraryExists
    else
      let json = Yojson.Basic.from_file libconfig in
      let libs = (json_to_libs json) in
-     let libs = (library,(root_path,doc_type)) :: libs in
+     let libs = (library,(root,doc_type)) :: libs in
      let json = (libs_to_json libs) in
      let _ = Json.to_file libconfig json in
      libraries := libs)
@@ -234,43 +234,26 @@ let init () : unit =
   libraries := libs
 
 
+let get_full_path (lib : string) (rel_path : string) : string =
+  let root = (get_library_root lib) in
+  let path = (root ^"/"^rel_path) in
+  prerr_endline ("Full path: "^path);
+  path
 
-let get_rel_path (path : string) : string =
-  (String.sub path (String.length !Db.root)
-     ((String.length path) - (String.length !Db.root)))
+(* let get_rel_path (path : string) : string =
+ *   (String.sub path (String.length !Db.root)
+ *      ((String.length path) - (String.length !Db.root))) *)
   
 let get_doc_name (path : string) : string =
   let s_path = (String.split_on_char '/' path) in
   let name = (List.nth s_path ((List.length s_path) - 1)) in
-  let name = (String.split_on_char '.' name) in
-  (List.nth name 0)
+  let names = (String.split_on_char '.' name) in
+  let tmp = (List.rev (List.tl (List.rev names))) in
+  (String.concat " " tmp)
   
-let open_doc (rel_path : string) : unit =
-  let path = (!Db.root ^ rel_path) in
+let open_doc (lib : string) (path : string) : unit =
+  let root = (get_library_root lib) in
+  let path = (root^"/"^path) in
   let ret = Sys.command ("xdg-open \""^path^"\"") in
   (if ret > 0 then
-     prerr_endline (path ^ " could not be opened!"));
-  ()
-
-let rename_doc (rel_path : string) (new_name : string) : unit =
-  let path = (!Db.root ^ rel_path) in
-  let rpath = (List.tl (List.rev (String.split_on_char '/' path))) in
-  let new_path = (!Db.root ^ (String.concat "/" (List.rev (new_name :: rpath)))) in
-  (prerr_endline ("Old path: "^path));
-  (prerr_endline ("New path: "^new_path));
-  if (Sys.file_exists new_path) then
-    prerr_endline ("Cannot rename file - another file of the same name exists!")
-  else (Sys.rename path new_path)
-(* else (Sys.command ("mv \""^path^"\" \""^new_path^"\"") *)
-  
-let rec import_file (model : Model.model) (doc_type : string) (path : string) : unit =
-  if not (Sys.is_directory path) then
-    (let rel_path = get_rel_path path in
-     match (Db.import_file rel_path doc_type) with
-     | Some doc -> ignore (model#append_data doc_type [doc])
-     | None -> ())
-  else
-    (List.iter (fun name ->
-         let path = path^"/"^name in
-         import_file model doc_type path)
-       (Array.to_list (Sys.readdir path)))
+     prerr_endline (path ^ " could not be opened!"))
