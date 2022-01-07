@@ -68,6 +68,6 @@ class model : GTree.model_filter -> GTree.list_store -> GTree.view ->
 val make_document_list : ?height:int -> ?show_path:bool -> ?multiple:bool -> ?show_stars:bool ->
                          ?editable:bool -> ?library:string ->
                          ?sort:(('a GTree.column) option) -> doc_type:string ->
-                         packing:packing -> (Db.doc list) -> model 
+                         packing:(GObj.widget -> unit) -> (Db.doc list) -> model 
 
                                                                                                                       

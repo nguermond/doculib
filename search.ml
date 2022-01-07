@@ -2,22 +2,12 @@
 open Cohttp
 open Cohttp_lwt_unix
 
-module DocType =
-  struct
-    type t = [`Article | `Book]
-
-    let to_string : t -> string = function
-      | `Article -> "article"
-      | `Book -> "book"
-
-    let of_string : string -> t = function
-      | "article" -> `Article
-      | "book" -> `Book
-  end
-               
-let get_database_name : DocType.t -> string = function
-  | `Book -> "openlibrary.org"
-  | `Article -> "semanticscholar.org"
+exception UnexpectedDocumentType of string
+                                  
+let get_database_name : string -> string = function
+  | "book" -> "openlibrary.org"
+  | "article" -> "semanticscholar.org"
+  | s -> raise (UnexpectedDocumentType s)
 
 (* Open library *)
 let query_book_string (search_str : string) : string Lwt.t =

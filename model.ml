@@ -78,11 +78,6 @@ object (self)
   method reset_model () : unit =
     store#clear()
 
-  (* method update_model (doc_type : string) : unit =
-   *   let data = Db.get_documents () in
-   *   store#clear();
-   *   self#append_data doc_type data *)
-
   method reset_sort_indicators () : unit =
     for i=0 to num_cols - 1 do
       (view#get_column i)#set_sort_indicator false;
@@ -164,26 +159,14 @@ object (self)
                 then true (* do not deselect *)
                 else false (* select on right click *)))
             else false)))
-
-  (* TODO: optimize this by importing a list of files *)
-  (* method import_file (lib : string) (doc_type : string) (rel_path : string) : unit =
-   *   let rec import_file (rel_path : string) =
-   *     let path = Db.get_full_path lib rel_path in
-   *     if not (Sys.is_directory path) then
-   *       (match (Db.import_file lib rel_path doc_type) with
-   *        | Some doc -> ignore (self#import_documents ~library [doc])
-   *        | None -> ())
-   *     else
-   *       (List.iter (fun name -> import_file (rel_path^"/"^name))
-   *          (Array.to_list (Sys.readdir path)))
-   *   in (import_file rel_path) *)
 end
 
 
                                   
-let make_document_list ?(height=400) ?(show_path=true) ?(multiple=false) ?(show_stars=true) ?(editable=false) ?(library:string = "")
+let make_document_list ?(height=400) ?(show_path=true) ?(multiple=false)
+      ?(show_stars=true) ?(editable=false) ?(library:string = "")
       ?(sort : ('a GTree.column) option=None) 
-      ~doc_type ~(packing:packing) data : model =
+      ~doc_type ~packing data : model =
   assert (library <> "" || (not show_stars && not editable));
   
   let swindow = GBin.scrolled_window

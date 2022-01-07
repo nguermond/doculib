@@ -3,11 +3,6 @@ open StdLabels
 open Gobject.Data
 
    
-exception Cancel
-            
-let iter_cancel f lst : unit =
-  try (List.iter f lst) with
-  | Cancel -> ()
         
       
   
@@ -24,7 +19,7 @@ let choose_files (library : string) (doc_type : string) : Db.doc list =
         (match dialog#get_filenames with
          | [] -> failwith "No file name!"
          | files -> (List.map (Db.get_rel_path ~library) files))
-     | `DELETE_EVENT | `CANCEL -> raise Cancel)
+     | `DELETE_EVENT | `CANCEL -> [])
   in
   dialog#destroy();
   (Db.import_files ~library ~doc_type files)
@@ -155,7 +150,7 @@ let edit_document (doc : Db.doc) : Db.doc option =
   dialog#destroy();
   ret
 
-let new_library () : string * string =
+let new_library () : (string * string) option =
   let dialog = GWindow.dialog ~title:"New Library" ~border_width:8 () in
   let grid = GPack.grid  ~col_spacings:8 ~row_spacings:8 ~packing:dialog#vbox#pack () in
 
@@ -185,10 +180,10 @@ let new_library () : string * string =
        | None -> failwith "doc_type select: Not possible"
        | Some s -> s in
      dialog#destroy();
-     (name, doc_type)
+     Some (name, doc_type)
   | `CANCEL | `DELETE_EVENT ->
      dialog#destroy();
-     raise Cancel
+     None
 
 
   
@@ -308,20 +303,22 @@ let main () =
       confirm_dialog#destroy()
     );
       
-
   (* Import files from directory *)
   file_factory#add_item "Import Files"
     ~callback:(fun () ->
-      let (library,(doc_type, model)) = notebook#current_library () in
-      let data = choose_files library doc_type in
-      model#import_documents data
+      let (library,lib) = notebook#current_library in
+      let data = choose_files library lib#get_doc_type in
+      lib#get_model#import_documents data
     );
 
+  (* Make new library tab *)
   file_factory#add_item "New Library"
     ~callback:(fun () ->
-      let (lib,doc_type) = new_library() in
-      notebook#add_library lib doc_type;
-      notebook#load_library lib doc_type
+      match new_library() with
+      | Some (library, doc_type) ->
+         notebook#add_library library doc_type;
+         notebook#load_library library
+      | None -> ()
     );
   
   file_factory#add_separator ();
