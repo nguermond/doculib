@@ -141,7 +141,7 @@ let get_document ~library ~path : doc =
      let* store = Store.of_branch repo current_branch in
      Store.get store [library; path])
 
-let set_document ~library ~path ~doc : unit =
+let set_document ~library ~path doc : unit =
   Lwt_main.run
     (let* repo = Store.Repo.v config in
      let* store = Store.of_branch repo current_branch in
@@ -157,7 +157,10 @@ let remove_document ~library ~path : unit =
      Store.remove store [library; path] ~info);
   ()
 
-let import_file ~library ~path ~doc_type : doc option =
+let get_rel_path ~library (path : string) : string =
+  Str.replace_first (Str.regexp (library^"/")) "" path
+  
+let import_file ~library ~doc_type path : doc option =
   Lwt_main.run
     (let* repo = Store.Repo.v config in
      let* store = Store.of_branch repo current_branch in
@@ -171,7 +174,10 @@ let import_file ~library ~path ~doc_type : doc option =
         let doc = (make_doc_from_file path doc_type) in
         let* _ = add_document store library doc in
         Lwt.return (Some doc))
-            
+
+let import_files ~library ~doc_type (paths : string list) : doc list =
+  List.filter_map (import_file ~library ~doc_type) paths
+  
 let get_documents ~library : doc list =
   Lwt_main.run
     (let* repo = Store.Repo.v config in
@@ -234,8 +240,8 @@ let init () : unit =
   libraries := libs
 
 
-let get_full_path (lib : string) (rel_path : string) : string =
-  let root = (get_library_root lib) in
+let get_full_path ~library (rel_path : string) : string =
+  let root = (get_library_root library) in
   let path = (root ^"/"^rel_path) in
   prerr_endline ("Full path: "^path);
   path
@@ -244,15 +250,15 @@ let get_full_path (lib : string) (rel_path : string) : string =
  *   (String.sub path (String.length !Db.root)
  *      ((String.length path) - (String.length !Db.root))) *)
   
-let get_doc_name (path : string) : string =
-  let s_path = (String.split_on_char '/' path) in
-  let name = (List.nth s_path ((List.length s_path) - 1)) in
-  let names = (String.split_on_char '.' name) in
-  let tmp = (List.rev (List.tl (List.rev names))) in
-  (String.concat " " tmp)
+(* let get_doc_name (path : string) : string =
+ *   let s_path = (String.split_on_char '/' path) in
+ *   let name = (List.nth s_path ((List.length s_path) - 1)) in
+ *   let names = (String.split_on_char '.' name) in
+ *   let tmp = (List.rev (List.tl (List.rev names))) in
+ *   (String.concat " " tmp) *)
   
-let open_doc (lib : string) (path : string) : unit =
-  let root = (get_library_root lib) in
+let open_doc ~library ~path : unit =
+  let root = (get_library_root library) in
   let path = (root^"/"^path) in
   let ret = Sys.command ("xdg-open \""^path^"\"") in
   (if ret > 0 then

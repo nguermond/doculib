@@ -4,16 +4,6 @@ open Gobject.Data
 
    
 exception Cancel
-exception LibraryDoesNotExist of string
-
-module List = struct
-  include List
-  let index (lst : 'a list) (x : 'a) : int option =
-    let ind = ref None in
-    (List.iteri (fun j y ->
-         (if (x = y) && (!ind = None) then ind := (Some j))) lst);
-    !ind
-end
             
 let iter_cancel f lst : unit =
   try (List.iter f lst) with
@@ -21,19 +11,23 @@ let iter_cancel f lst : unit =
         
       
   
-let choose_files (root_path : string) : doc list =
+let choose_files (library : string) (doc_type : string) : Db.doc list =
   let dialog = GWindow.file_chooser_dialog ~action:`OPEN ~title:"Import Documents" () in
-  let root_path = ?? in
+  let root_path = (Db.get_library_root ~library) in
   dialog#set_current_folder root_path;
   dialog#add_button_stock `CANCEL `CANCEL;
   dialog#add_button_stock `OPEN `OPEN;
   dialog#set_select_multiple true;
-  (match dialog#run() with
-   | `OPEN -> (match dialog#get_filenames with
-               | [] -> failwith "No file name!"
-               | files -> files)
-   | `DELETE_EVENT | `CANCEL -> raise Cancel);
-  dialog#destroy()
+  let files =
+    (match dialog#run() with
+     | `OPEN ->
+        (match dialog#get_filenames with
+         | [] -> failwith "No file name!"
+         | files -> (List.map (Db.get_rel_path ~library) files))
+     | `DELETE_EVENT | `CANCEL -> raise Cancel)
+  in
+  dialog#destroy();
+  (Db.import_files ~library ~doc_type files)
 
 let choose_dir (title : string) : string option =
   let dialog = GWindow.file_chooser_dialog ~action:`SELECT_FOLDER ~title () in
@@ -57,8 +51,8 @@ let search_metadata (default : Db.doc) (search_str : string) : Db.doc option =
   let search_e = GEdit.entry ~text:search_str ~packing:(hbox#add) () in
   let refresh_b = GButton.button ~label:"Refresh" ~packing:(hbox#pack ~from:`END) () in
 
-  let model = make_document_list ~height:380 ~show_path:false ~show_stars:false
-            default.doc_type dialog#vbox#pack docs in
+  let model = Model.make_document_list ~height:380 ~show_path:false ~show_stars:false
+                ~doc_type:default.doc_type ~packing:dialog#vbox#pack docs in
   
   let database_l1 = GButton.radio_button 
                       ~label:(Search.get_database_name "article")
@@ -80,8 +74,8 @@ let search_metadata (default : Db.doc) (search_str : string) : Db.doc option =
       (prerr_endline ("Searching "^search_type));
       let docs = Search.search_document default.doc_type search_type search_str in
       (prerr_endline ("Results: "^(string_of_int (List.length docs))));
-      model#get_store#clear();
-      model#append_data default.doc_type docs;
+      model#reset_model();
+      model#import_documents docs;
       ());
 
   dialog#add_button "Select" `OK;
@@ -95,12 +89,12 @@ let search_metadata (default : Db.doc) (search_str : string) : Db.doc option =
         let p = (List.nth selection 0) in
         let doc : Db.doc =
           { star = false;
-            title = (model#get ~row:(model#get_store#get_iter p) ~column:title);
+            title = (model#get ~row:(model#get_store#get_iter p) ~column:Model.Attr.title);
             authors = Str.split (Str.regexp "; +")
-                        (model#get ~row:(model#get_store#get_iter p) ~column:authors);
-            year = (model#get ~row:(model#get_store#get_iter p) ~column:year);
-            doi = (model#get ~row:(model#get_store#get_iter p) ~column:doi);
-            isbn = (model#get ~row:(model#get_store#get_iter p) ~column:isbn);
+                        (model#get ~row:(model#get_store#get_iter p) ~column:Model.Attr.authors);
+            year = (model#get ~row:(model#get_store#get_iter p) ~column:Model.Attr.year);
+            doi = (model#get ~row:(model#get_store#get_iter p) ~column:Model.Attr.doi);
+            isbn = (model#get ~row:(model#get_store#get_iter p) ~column:Model.Attr.isbn);
             tags = default.tags;
             doc_type = default.doc_type;
             path = default.path
@@ -228,7 +222,8 @@ let main () =
      ^"\\X      character escape");
   let filter_func = (fun (model : GTree.model) row ->
       let search_query = search_e#text in
-      let search_string = (String.concat " " (List.map (fun column -> model#get ~row ~column) [title; authors; tags; path])) in
+      let search_string = (String.concat " " (List.map (fun column -> model#get ~row ~column)
+                                                [Model.Attr.title; Model.Attr.authors; Model.Attr.tags; Model.Attr.path])) in
       let open Agrep in
       if search_query = "" then true
       else
@@ -238,9 +233,9 @@ let main () =
 
   (* Notebook *)
   let notebook = GPack.notebook ~packing:vbox#add () in
-  let notebook = new notebook notebook context_menu filter_func in
+  let notebook = new Notebook.notebook notebook context_menu filter_func in
   Db.init ();
-  let libraries = (List.map (fun lib -> (lib, Db.get_doc_type lib)) Db.get_libraries()) in
+  let libraries = (List.map (fun lib -> (lib, Db.get_library_doc_type lib)) (Db.get_libraries())) in
   notebook#init libraries;
   
 
@@ -256,7 +251,7 @@ let main () =
   context_factory#add_item "Open"
     ~callback:(fun _ ->
       notebook#action_on_selected (fun library model row ->
-          Db.open_doc lib (model#get ~row ~column:Model.path))
+          Db.open_doc ~library ~path:(model#get ~row ~column:Model.Attr.path))
     );
 
   (* Open DOI of selected files *)
@@ -271,7 +266,7 @@ let main () =
   context_factory#add_item "Search Metadata"
     ~callback:(fun _ ->
       notebook#edit_selected (fun doc ->
-          let serach_str = (if doc.title = "" then doc.path else doc.title) in
+          let search_str = (if doc.title = "" then doc.path else doc.title) in
           let search_str = Str.global_replace (Str.regexp "[-_.() ]+") " " search_str in
           search_metadata doc search_str)
     );
@@ -280,7 +275,7 @@ let main () =
   context_factory#add_item "Remove Entry"
     ~callback:(fun _ ->
       notebook#action_on_selected (fun library model row ->
-          let path = (model#get ~row ~column:path) in
+          let path = (model#get ~row ~column:Model.Attr.path) in
           Db.remove_document library path;
           ignore (model#remove row))
     );
@@ -304,7 +299,7 @@ let main () =
       (* TODO: Window does not always close??? *)
       (match confirm_dialog#run() with
        | `OK -> notebook#action_on_selected (fun library model row ->
-                    let path = (model#get ~row ~column:path) in
+                    let path = (model#get ~row ~column:Model.Attr.path) in
                     Db.remove_document library path;
                     model#get_store#remove row;
                     let full_path = (Db.get_full_path library path) in
@@ -317,8 +312,10 @@ let main () =
   (* Import files from directory *)
   file_factory#add_item "Import Files"
     ~callback:(fun () ->
-      let (_,(doc_type, Some model)) = notebook#current_library () in
-      choose_fies doc_type model);
+      let (library,(doc_type, model)) = notebook#current_library () in
+      let data = choose_files library doc_type in
+      model#import_documents data
+    );
 
   file_factory#add_item "New Library"
     ~callback:(fun () ->

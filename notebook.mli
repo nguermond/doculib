@@ -1,28 +1,26 @@
+exception LibraryDoesNotExist of string
 
-class notebook
-        (notebook : GPack.notebook)
-        (context_menu : GMenu.menu)
-        (filter_func : GTree.model -> Gtk.tree_iter -> bool)
-  = object
+                               
+class notebook : GPack.notebook -> GMenu.menu -> (GTree.model -> Gtk.tree_iter -> bool)
+  -> object
   val notebook : GPack.notebook
   val context_menu : GMenu.menu
   val filter_func : GTree.model -> Gtk.tree_iter -> bool
   val mutable libraries : (string * (string * (Model.model option))) list
                                                  
-  method init : ~libs:((string * string) list) -> unit
-  method add_library : ~lib:string -> ~doc_type:string -> unit
+  method init : ((string * string) list) -> unit
+  method add_library : library:string -> doc_type:string -> unit
 
   method refilter : unit -> unit
 
-  method get_index : ~lib:string -> int
+  method get_index : library:string -> int
 
-  method current_library : unit -> string * (Model.model option)
+  method current_library : unit -> string * (string * Model.model)
        
-  method set_model : ~lib:string -> ~model:model -> unit
+  method set_model : library:string -> model:Model.model -> unit
     
-  method load_library : ~lib:string -> ~doc_type:string -> unit
+  method load_library : library:string -> doc_type:string -> unit
 
-  method open_document : ~doc_opener:(string -> string -> unit) -> unit
-
-  method edit_entry : ~editor:(Db.doc -> Db.doc option) -> unit
+  method action_on_selected : action:(string -> Model.model -> Model.row -> unit) -> unit
+  method edit_selected : editor:(Db.doc -> Db.doc option) -> unit
 end
