@@ -6,6 +6,10 @@ A GUI for managing document metadata for books, textbooks, or articles.
 * metadata includes authors, title, publishing year, tags, bookmark, and DOI/ISBN
 * tag management (to be implemented)
 
+## Configuration
+Library configuration is stored in `$HOME/.doculib/libraries.json`.
+Metadata is stored in `$HOME/.doculib/data`.
+
 ## Dependencies
 Note this requires lablgtk3 (>= 3.1.2)
 ```
@@ -16,10 +20,6 @@ opam install dune lablgtk3 lwt irmin-unix tls
 ```
 dune build
 ```
-
-## Configure
-Edit `doculib_config.json`, where `"root"` should denote a path to the library's location.
-The database is stored in `$HOME/.doculib/data`. 
 
 ## Run
 ```
