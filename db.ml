@@ -1,18 +1,30 @@
 open Lwt.Syntax
 open Format
 
-exception InitializationFailure of string
+(* exception InitializationFailure of string *)
+exception LibraryExists
                                  
-(* We store an absolute path to a library,
- * and paths are relative to this path. 
- * The path to the file is also its key.
-*)
+(* We store an absolute path to each library, 
+ * and a path to a file is relative to this path. 
+ * The path to the file is also its key. 
+ * The purpose of having a path for every library is that
+ * an entire library can be relocated without having to modify entries. *)
+let home = (Sys.getenv "HOME")
+let data = home^"/.doculib/data"
+let config = Irmin_fs.config data
 
-(* TODO: Allow multiple roots *)
-let root = ref ""
-let data = ref ""
-         
-let config () = Irmin_fs.config !data
+(* The database is versioned, to prevent data loss upon upgrade. *)
+let current_branch = "1.0"
+let libconfig = home^"/.doculib/libraries.json"
+let libraries : ((string * (string * string)) list) ref = ref []
+
+(* Example keys for branch "1.0" look like:
+    Articles/path/to/article1.pdf
+    Articles/article2.djvu
+    Textbooks/path/to/textbook1.pdf
+    Textbooks/pathto/textbook2.pdf
+    EBooks/long/path/to/ebook1.pdf 
+*)
                     
 type doc = {star : bool;
             title : string;
@@ -119,93 +131,142 @@ let make_doc_from_file path doc_type : doc =
   }
 
 
-let add_document store (doc : doc) : unit Lwt.t =
-  let info = Irmin_unix.info "Added %s" doc.path in
-  Store.set_exn store [doc.path] doc ~info
-
-let get_document path : doc =
+let add_document store library (doc : doc) : unit Lwt.t =
+  let info = Irmin_unix.info "Add %s/%s" library doc.path in
+  Store.set_exn store [library; doc.path] doc ~info
+  
+let get_document ~library ~path : doc =
   Lwt_main.run
-    (let* repo = Store.Repo.v (config ()) in
-     let* store = Store.master repo in
-     Store.get store [path])
+    (let* repo = Store.Repo.v config in
+     let* store = Store.of_branch repo current_branch in
+     Store.get store [library; path])
 
-let set_document path (doc : doc) : unit =
+let set_document ~library ~path doc : unit =
   Lwt_main.run
-    (let* repo = Store.Repo.v (config ()) in
-     let* store = Store.master repo in
-     let info = Irmin_unix.info "Update %s" path in
-     Store.set_exn store [path]  doc ~info);
+    (let* repo = Store.Repo.v config in
+     let* store = Store.of_branch repo current_branch in
+     let info = Irmin_unix.info "Set %s/%s" library path in
+     Store.set_exn store [library; path] doc ~info);
   ()
 
-let remove_document path : unit =
+let remove_document ~library ~path : unit =
   Lwt_main.run
-    (let* repo = Store.Repo.v (config ()) in
-     let* store = Store.master repo in
-     let info = Irmin_unix.info "Removed %s" path in
-     Store.remove store [path] ~info);
+    (let* repo = Store.Repo.v config in
+     let* store = Store.of_branch repo current_branch in
+     let info = Irmin_unix.info "Remove %s/%s" library path in
+     Store.remove store [library; path] ~info);
   ()
 
-let import_file rel_path doc_type : doc option =
+let get_rel_path ~library (path : string) : string =
+  (Str.replace_first (Str.regexp (".*/"^library^"/")) "" path)
+  
+let import_file ~library ~doc_type path : doc option =
   Lwt_main.run
-    (let* repo = Store.Repo.v (config ()) in
-     let* store = Store.master repo in
-     let info = Irmin_unix.info "Adding %s" rel_path in
-     (* Check if key already exists! *)
-     let* exists_opt = (Store.find store [rel_path]) in
-     (match exists_opt with
-      | Some _ -> prerr_endline ("Key already exists: "^rel_path);
-                  Lwt.return None
-      | None ->
-         let doc = (make_doc_from_file rel_path doc_type) in
-         let* _ = add_document store doc in
-         Lwt.return (Some doc)))
-            
-let import_directory store path doc_type : (doc list) Lwt.t =
-  let files = Array.to_list (Sys.readdir ((!root)^path)) in
-  (Lwt_list.fold_left_s (fun docs name ->
-       let key = (path ^ name) in
-       (* Check if key already exists! *)
-       let* exists_opt = (Store.find store [key]) in
-       (match exists_opt with
-        | Some _ -> prerr_endline ("Key already exists: "^key);
-                    Lwt.return docs
-        | None ->
-           let doc = (make_doc_from_file key doc_type) in
-           let* _ = add_document store doc in
-           Lwt.return (doc::docs)))
-     [] files)
+    (let* repo = Store.Repo.v config in
+     let* store = Store.of_branch repo current_branch in
+     let info = Irmin_unix.info "Import %s/%s" library path in
+     let* exists_opt = (Store.find store [library; path]) in
+     match exists_opt with
+     | Some _ ->
+        prerr_endline ("Key already exists: "^library^"/"^path);
+        Lwt.return None
+     | None ->
+        let doc = (make_doc_from_file path doc_type) in
+        let* _ = add_document store library doc in
+        Lwt.return (Some doc))
 
-let get_documents () : doc list =
+let import_file ~store ~library ~doc_type path : (doc option) Lwt.t=
+  let info = Irmin_unix.info "Import %s/%s" library path in
+  let* exists_opt = (Store.find store [library; path]) in
+  match exists_opt with
+  | Some _ ->
+     prerr_endline ("Key already exists: "^library^"/"^path);
+     Lwt.return None
+  | None ->
+     let doc = (make_doc_from_file path doc_type) in
+     let* _ = add_document store library doc in
+     Lwt.return (Some doc)
+
+let import_files ~library ~doc_type (paths : string list) : doc list =
+  (let* repo = Store.Repo.v config in
+   let* store = Store.of_branch repo current_branch in
+   let n = (List.length paths) in
+   let i = ref 0 in
+   Lwt_list.filter_map_s (fun path ->
+       let load_percent = (100. *. ((float_of_int !i) /. (float_of_int n))) in
+       prerr_endline (string_of_float load_percent);
+       i := !i+1;
+       (import_file ~store ~library ~doc_type path))
+     paths)
+  |> Lwt_main.run
+  
+let get_documents ~library : doc list =
   Lwt_main.run
-    (let* repo = Store.Repo.v (config ()) in
-     let* store = Store.master repo in
-     let* kvs = Store.list store [] in
+    (let* repo = Store.Repo.v config in
+     let* store = Store.of_branch repo current_branch in
+     let* kvs = Store.list store [library] in
      (Lwt_list.fold_left_s (fun docs (key,tree) ->
-          let* doc = Store.get store [key] in
+          let* doc = Store.get store [library;key] in
           Lwt.return (doc::docs))
         [] kvs))
-
   
-let print_documents () =
-  let docs = get_documents () in
+let print_documents library : unit =
+  let docs = get_documents library in
   List.iter (fun d -> printf "%a@\n" pp_doc d) docs
+
+let get_library_root ~library : string =
+  fst (List.assoc library !libraries)
+
+let get_library_doc_type ~library : string =
+  snd (List.assoc library !libraries)
   
+let get_libraries () : string list =
+  List.map fst !libraries
 
-let import_documents path doc_type () : doc list =
-  Lwt_main.run
-    (let* repo = Store.Repo.v (config ()) in
-     let* t = Store.master repo in
-     let* docs = import_directory t path doc_type in
-     Lwt.return docs)
+let json_to_libs (json : Json.t) : (string * (string * string)) list =
+  (Json.raise_opt "Could not find entry `libraries`"
+     (Json.get "libraries" json))
+  |> Json.to_list
+  |> List.map (fun json ->
+         let name = Json.to_string (Json.raise_opt "Could not find entry `name`" (Json.get "name" json)) in
+         let path = Json.to_string (Json.raise_opt "Could not find entry `path`" (Json.get "path" json)) in
+         let doc_type = Json.to_string (Json.raise_opt "Could not find entry `doc_type`" (Json.get "doc_type" json)) in
+         (name,(path,doc_type)))
 
-let init () =
-  (if (not (Sys.file_exists "doculib_config.json")) then
-     raise (InitializationFailure "Configuration file `doculib_config.json` is missing!"));
-  let json = Yojson.Basic.from_file "doculib_config.json" in
-  let r = Json.to_string (Json.raise_opt "root not found" (Json.get "root" json)) in
-  let d = Json.to_string (Json.raise_opt "data not found" (Json.get "data" json)) in
-  prerr_endline ("Configuration:\n"^r^"\n"^d);
-  (if (not (Sys.file_exists r)) then
-     raise (InitializationFailure "Invalid 'root' path in `doculib_config.json`!"));
-  root := r;
-  data := d
+let libs_to_json (libs : (string * (string * string)) list) : Json.t =
+  let libs = (`List (List.map (fun (name,(path,doc_type)) ->
+                         (`Assoc [("name",`String name);
+                                  ("path", `String path);
+                                  ("doc_type", `String doc_type)]))
+                       libs)) in
+  (`Assoc [("libraries", libs)])
+  
+let add_library ~library ~root ~doc_type : unit =
+  (if (List.mem_assoc library !libraries) then
+     raise LibraryExists
+   else
+     let json = Yojson.Basic.from_file libconfig in
+     let libs = (json_to_libs json) in
+     let libs = (library,(root,doc_type)) :: libs in
+     let json = (libs_to_json libs) in
+     let _ = Json.to_file libconfig json in
+     libraries := libs)
+          
+let init () : unit =
+  (if (not (Sys.file_exists libconfig)) then
+     let json = (libs_to_json []) in
+     Json.to_file libconfig json);
+  let json = Yojson.Basic.from_file libconfig in
+  let libs = (json_to_libs json) in
+  libraries := libs
+
+
+let get_full_path ~library (rel_path : string) : string =
+  let root = (get_library_root library) in
+  (root ^"/"^rel_path)
+  
+let open_doc ~library ~path : unit =
+  let path = (get_full_path ~library path) in
+  let ret = Sys.command ("xdg-open \""^path^"\"") in
+  (if ret > 0 then
+     prerr_endline (path ^ " could not be opened!"))
