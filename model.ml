@@ -70,7 +70,6 @@ object (self)
   method import_documents (data : Db.doc list) : unit =
     List.iter
       (fun doc ->
-        let open Db in
         let row = store#append () in
         self#set_entry ~row doc)
       data

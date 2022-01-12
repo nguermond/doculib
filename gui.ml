@@ -2,11 +2,16 @@
 open StdLabels
 open Gobject.Data
 
-   
-        
-      
+let rec get_files ~library (path : string) : string list =
+  if not (Sys.is_directory path) then
+    [Db.get_rel_path ~library path]
+  else
+    (List.flatten
+       (List.map (fun name -> get_files ~library (path^"/"^name))
+          (Array.to_list (Sys.readdir path))))
+
   
-let choose_files (library : string) (doc_type : string) : Db.doc list =
+let choose_files (library : string) : string list =
   let dialog = GWindow.file_chooser_dialog ~action:`OPEN ~title:"Import Documents" () in
   let root_path = (Db.get_library_root ~library) in
   dialog#set_current_folder root_path;
@@ -18,12 +23,14 @@ let choose_files (library : string) (doc_type : string) : Db.doc list =
      | `OPEN ->
         (match dialog#get_filenames with
          | [] -> failwith "No file name!"
-         | files -> (List.map (Db.get_rel_path ~library) files))
+         | files -> List.flatten (List.map (get_files ~library) files))
      | `DELETE_EVENT | `CANCEL -> [])
   in
   dialog#destroy();
-  (Db.import_files ~library ~doc_type files)
+  files
 
+
+  
 let choose_dir (title : string) : string option =
   let dialog = GWindow.file_chooser_dialog ~action:`SELECT_FOLDER ~title () in
   dialog#add_button_stock `CANCEL `CANCEL;
@@ -160,9 +167,10 @@ let new_library () : (string * string * string) option =
   let root_path_hbox = GPack.hbox ~spacing:8 ~packing:(grid#attach ~left:1 ~top:1) () in
   let root_path_e = GMisc.label ~packing:(root_path_hbox#pack) () in
   let root_path_b = GButton.button ~label:"Choose" ~packing:(root_path_hbox#pack) () in
-  let doc_type_l = GMisc.label ~text:"Type" ~packing:(grid#attach ~left:0 ~top:2) () in
-  let doc_type_c = GEdit.combo_box_text ~active:0 ~strings:["article"; "book"] ~packing:(grid#attach ~left:1 ~top:2)() in
-
+  let import_dir_check = GButton.check_button ~label:"import directory" ~packing:(grid#attach ~left:1 ~top:2) () in
+  let doc_type_l = GMisc.label ~text:"Type" ~packing:(grid#attach ~left:0 ~top:3) () in
+  let doc_type_combo = GEdit.combo_box_text ~active:0 ~strings:["article"; "book"] ~packing:(grid#attach ~left:1 ~top:3)() in
+  
   root_path_b#connect#clicked ~callback:(fun () ->
       let root_path =
         match (choose_dir "Choose Library Location") with
@@ -176,10 +184,13 @@ let new_library () : (string * string * string) option =
   match (dialog#run()) with
   | `OK ->
      let name = name_e#text in
-     let doc_type = match GEdit.text_combo_get_active doc_type_c with
+     let doc_type = match GEdit.text_combo_get_active doc_type_combo with
        | None -> failwith "doc_type select: Not possible"
        | Some s -> s in
      let root_path = root_path_e#text in
+     (if import_dir_check#active then
+        let files = (get_files ~library:name root_path) in
+        ignore (Db.import_files ~library:name ~doc_type files));
      dialog#destroy();
      Some (name, doc_type, root_path)
   | `CANCEL | `DELETE_EVENT ->
@@ -263,7 +274,7 @@ let main () =
     ~callback:(fun _ ->
       notebook#edit_selected (fun doc ->
           let search_str = (if doc.title = "" then doc.path else doc.title) in
-          let search_str = Str.global_replace (Str.regexp "[-_.() ]+") " " search_str in
+          let search_str = Str.global_replace (Str.regexp "\\(.pdf\\)\\|\\(.djvu\\)\\|[-_\\.() ]+") " " search_str in
           search_metadata doc search_str)
     );
   
@@ -308,7 +319,8 @@ let main () =
   file_factory#add_item "Import Files"
     ~callback:(fun () ->
       let (library,lib) = notebook#current_library in
-      let data = choose_files library lib#get_doc_type in
+      let files = choose_files library in
+      let data = (Db.import_files ~library ~doc_type:(lib#get_doc_type) files) in
       lib#get_model#import_documents data
     );
 

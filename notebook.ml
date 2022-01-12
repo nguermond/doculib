@@ -42,17 +42,20 @@ class notebook notebook context_menu filter_func = object (self)
   val mutable libraries : (string * library) list = []
    
   method add_library ~library ~doc_type : unit =
+    (prerr_endline ("Adding library "^library));
     let label = (GMisc.label ~text:library ()) in
     let page = (GPack.vbox ~border_width:8 ~spacing:8
                   ~packing:(fun w ->
-                    ignore (notebook#append_page ~tab_label:(label#coerce) w)) ()) in
+                    ignore (notebook#prepend_page ~tab_label:(label#coerce) w)) ()) in
     let lib = new library library doc_type page in
     libraries <- (library, lib) :: libraries
 
   method init (libs : (string * string) list) : unit =
+    (List.iter (fun (library,doc_type) -> self#add_library ~library ~doc_type) libs);
     notebook#connect#switch_page ~callback:(fun index ->
+        prerr_endline ("Index:"^ (string_of_int index)^ "->"^(fst (List.nth libraries index)));
         (self#load_library (fst (List.nth libraries index))));
-    List.iter (fun (library,doc_type) -> self#add_library ~library ~doc_type) libs
+    (if (List.length libs) > 0 then self#load_library (fst (self#current_library)))
 
   method get_index ~library : int =
     match (List.assoc_index libraries library) with
@@ -74,6 +77,7 @@ class notebook notebook context_menu filter_func = object (self)
       libraries
     
   method load_library ~library : unit =
+    (prerr_endline ("Loading library "^library));
     let lib = (List.assoc library libraries) in
     if lib#is_loaded then () else
       let library = lib#get_name in

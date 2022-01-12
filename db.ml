@@ -1,7 +1,7 @@
 open Lwt.Syntax
 open Format
 
-exception InitializationFailure of string
+(* exception InitializationFailure of string *)
 exception LibraryExists
                                  
 (* We store an absolute path to each library, 
@@ -158,7 +158,7 @@ let remove_document ~library ~path : unit =
   ()
 
 let get_rel_path ~library (path : string) : string =
-  Str.replace_first (Str.regexp (library^"/")) "" path
+  (Str.replace_first (Str.regexp (".*/"^library^"/")) "" path)
   
 let import_file ~library ~doc_type path : doc option =
   Lwt_main.run
@@ -175,8 +175,30 @@ let import_file ~library ~doc_type path : doc option =
         let* _ = add_document store library doc in
         Lwt.return (Some doc))
 
+let import_file ~store ~library ~doc_type path : (doc option) Lwt.t=
+  let info = Irmin_unix.info "Import %s/%s" library path in
+  let* exists_opt = (Store.find store [library; path]) in
+  match exists_opt with
+  | Some _ ->
+     prerr_endline ("Key already exists: "^library^"/"^path);
+     Lwt.return None
+  | None ->
+     let doc = (make_doc_from_file path doc_type) in
+     let* _ = add_document store library doc in
+     Lwt.return (Some doc)
+
 let import_files ~library ~doc_type (paths : string list) : doc list =
-  List.filter_map (import_file ~library ~doc_type) paths
+  (let* repo = Store.Repo.v config in
+   let* store = Store.of_branch repo current_branch in
+   let n = (List.length paths) in
+   let i = ref 0 in
+   Lwt_list.filter_map_s (fun path ->
+       let load_percent = (100. *. ((float_of_int !i) /. (float_of_int n))) in
+       prerr_endline (string_of_float load_percent);
+       i := !i+1;
+       (import_file ~store ~library ~doc_type path))
+     paths)
+  |> Lwt_main.run
   
 let get_documents ~library : doc list =
   Lwt_main.run
@@ -184,7 +206,7 @@ let get_documents ~library : doc list =
      let* store = Store.of_branch repo current_branch in
      let* kvs = Store.list store [library] in
      (Lwt_list.fold_left_s (fun docs (key,tree) ->
-          let* doc = Store.get store [key] in
+          let* doc = Store.get store [library;key] in
           Lwt.return (doc::docs))
         [] kvs))
   
@@ -231,35 +253,20 @@ let add_library ~library ~root ~doc_type : unit =
      libraries := libs)
           
 let init () : unit =
-  (if (not (Sys.file_exists libconfig))
-   then raise (InitializationFailure
-                 ("Configuration file `"^libconfig^"` is missing!")));
+  (if (not (Sys.file_exists libconfig)) then
+     let json = (libs_to_json []) in
+     Json.to_file libconfig json);
   let json = Yojson.Basic.from_file libconfig in
   let libs = (json_to_libs json) in
-  (List.iter (fun (lib,(path,doc_type)) -> prerr_endline (path^"/"^lib)) libs);
   libraries := libs
 
 
 let get_full_path ~library (rel_path : string) : string =
   let root = (get_library_root library) in
-  let path = (root ^"/"^rel_path) in
-  prerr_endline ("Full path: "^path);
-  path
-
-(* let get_rel_path (path : string) : string =
- *   (String.sub path (String.length !Db.root)
- *      ((String.length path) - (String.length !Db.root))) *)
-  
-(* let get_doc_name (path : string) : string =
- *   let s_path = (String.split_on_char '/' path) in
- *   let name = (List.nth s_path ((List.length s_path) - 1)) in
- *   let names = (String.split_on_char '.' name) in
- *   let tmp = (List.rev (List.tl (List.rev names))) in
- *   (String.concat " " tmp) *)
+  (root ^"/"^rel_path)
   
 let open_doc ~library ~path : unit =
-  let root = (get_library_root library) in
-  let path = (root^"/"^path) in
+  let path = (get_full_path ~library path) in
   let ret = Sys.command ("xdg-open \""^path^"\"") in
   (if ret > 0 then
      prerr_endline (path ^ " could not be opened!"))
