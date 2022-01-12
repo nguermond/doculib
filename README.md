@@ -7,7 +7,7 @@ A GUI for managing document metadata for books, textbooks, or articles.
 * tag management (to be implemented)
 
 ## Dependencies
-Note this requires lablgtk3 (>= 2.18.12)
+Note this requires lablgtk3 (>= 3.1.2)
 ```
 opam install dune lablgtk3 lwt irmin-unix tls
 ```
