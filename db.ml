@@ -25,7 +25,10 @@ let libraries : ((string * (string * string)) list) ref = ref []
     Textbooks/pathto/textbook2.pdf
     EBooks/long/path/to/ebook1.pdf 
 *)
-                    
+
+
+let info = Irmin_unix.info ""
+  
 type doc = {star : bool;
             title : string;
             authors : string list;
@@ -76,24 +79,24 @@ let edit_document (field : attribute) (doc : doc) : doc =
   
   
 let pp_doc ppf (d : doc) =
-  (fprintf ppf "%s%s%s%s%s%s%s%s%s"
+  (fprintf ppf "{@\n%s%s%s%s%s%s%s%s%s}"
      (if d.star = false then ""
-      else (sprintf "Starred"))
+      else (asprintf "  Starred@\n"))
      (if d.title = "" then ""
-      else (sprintf "Title: %s@\n" d.title))
+      else (sprintf "  Title: %s@\n" d.title))
      (if d.authors = [] then ""
-      else (sprintf "Author(s): %s@\n" (String.concat "; " d.authors)))
+      else (sprintf "  Author(s): %s@\n" (String.concat "; " d.authors)))
      (if d.doi = "" then ""
-      else (sprintf "DOI: %s@\n" d.doi))
+      else (sprintf "  DOI: %s@\n" d.doi))
      (if d.isbn = "" then ""
-      else (sprintf "ISBN: %s@\n" d.isbn))
+      else (sprintf "  ISBN: %s@\n" d.isbn))
      (if d.year = "" then ""
-      else (sprintf "Year: %s@\n" d.year))
+      else (sprintf "  Year: %s@\n" d.year))
      (if d.tags = [] then ""
-      else (sprintf "Tags: %s@\n" (String.concat "; " d.tags)))
-     (sprintf "Path: %s@\n" d.path)
-     (sprintf "Document Type: %s@\n" d.doc_type))
-
+      else (sprintf "  Tags: %s@\n" (String.concat "; " d.tags)))
+     (sprintf "  Path: %s@\n" d.path)
+     (sprintf "  Document Type: %s@\n" d.doc_type))
+  
 module Doc = struct
   type t = doc
 
@@ -132,7 +135,6 @@ let make_doc_from_file path doc_type : doc =
 
 
 let add_document store library (doc : doc) : unit Lwt.t =
-  let info = Irmin_unix.info "Add %s/%s" library doc.path in
   Store.set_exn store [library; doc.path] doc ~info
   
 let get_document ~library ~path : doc =
@@ -145,7 +147,6 @@ let set_document ~library ~path doc : unit =
   Lwt_main.run
     (let* repo = Store.Repo.v config in
      let* store = Store.of_branch repo current_branch in
-     let info = Irmin_unix.info "Set %s/%s" library path in
      Store.set_exn store [library; path] doc ~info);
   ()
 
@@ -153,7 +154,6 @@ let remove_document ~library ~path : unit =
   Lwt_main.run
     (let* repo = Store.Repo.v config in
      let* store = Store.of_branch repo current_branch in
-     let info = Irmin_unix.info "Remove %s/%s" library path in
      Store.remove store [library; path] ~info);
   ()
 
@@ -164,7 +164,6 @@ let import_file ~library ~doc_type path : doc option =
   Lwt_main.run
     (let* repo = Store.Repo.v config in
      let* store = Store.of_branch repo current_branch in
-     let info = Irmin_unix.info "Import %s/%s" library path in
      let* exists_opt = (Store.find store [library; path]) in
      match exists_opt with
      | Some _ ->
@@ -176,7 +175,6 @@ let import_file ~library ~doc_type path : doc option =
         Lwt.return (Some doc))
 
 let import_file ~store ~library ~doc_type path : (doc option) Lwt.t=
-  let info = Irmin_unix.info "Import %s/%s" library path in
   let* exists_opt = (Store.find store [library; path]) in
   match exists_opt with
   | Some _ ->
@@ -193,8 +191,8 @@ let import_files ~library ~doc_type (paths : string list) : doc list =
    let n = (List.length paths) in
    let i = ref 0 in
    Lwt_list.filter_map_s (fun path ->
-       let load_percent = (100. *. ((float_of_int !i) /. (float_of_int n))) in
-       prerr_endline (string_of_float load_percent);
+       let load = ((float_of_int !i) /. (float_of_int n)) in
+       prerr_endline (string_of_float load);
        i := !i+1;
        (import_file ~store ~library ~doc_type path))
      paths)

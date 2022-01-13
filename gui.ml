@@ -29,7 +29,10 @@ let choose_files (library : string) : string list =
   dialog#destroy();
   files
 
-
+(* TODO: Show progress bar *)
+let import_files ~library ~doc_type (files : string list) : Db.doc list =
+  (Db.import_files ~library ~doc_type files)
+  
   
 let choose_dir (title : string) : string option =
   let dialog = GWindow.file_chooser_dialog ~action:`SELECT_FOLDER ~title () in
@@ -190,7 +193,7 @@ let new_library () : (string * string * string) option =
      let root_path = root_path_e#text in
      (if import_dir_check#active then
         let files = (get_files ~library:name root_path) in
-        ignore (Db.import_files ~library:name ~doc_type files));
+        ignore (import_files ~library:name ~doc_type files));
      dialog#destroy();
      Some (name, doc_type, root_path)
   | `CANCEL | `DELETE_EVENT ->
@@ -320,7 +323,7 @@ let main () =
     ~callback:(fun () ->
       let (library,lib) = notebook#current_library in
       let files = choose_files library in
-      let data = (Db.import_files ~library ~doc_type:(lib#get_doc_type) files) in
+      let data = (import_files ~library ~doc_type:(lib#get_doc_type) files) in
       lib#get_model#import_documents data
     );
 
