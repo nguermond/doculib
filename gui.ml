@@ -2,6 +2,8 @@
 open StdLabels
 open Gobject.Data
 
+let icon_path = "icons/Gnome-colors-applications-office.svg"
+
 let rec get_files ~library (path : string) : string list =
   if not (Sys.is_directory path) then
     [Db.get_rel_path ~library path]
@@ -44,6 +46,8 @@ let choose_dir (title : string) : string option =
      | `DELETE_EVENT | `CANCEL -> None) in
   dialog#destroy();
   path
+
+
 
   
 let search_metadata (default : Db.doc) (search_str : string) : Db.doc option =
@@ -164,15 +168,15 @@ let new_library () : (string * string * string) option =
   let dialog = GWindow.dialog ~title:"New Library" ~border_width:8 () in
   let grid = GPack.grid  ~col_spacings:8 ~row_spacings:8 ~packing:dialog#vbox#pack () in
 
-  let name_l = GMisc.label ~text:"Name" ~packing:(grid#attach ~left:0 ~top:0) () in
-  let name_e = GEdit.entry ~packing:(grid#attach ~left:1 ~top:0) () in
-  let root_path_l = GMisc.label ~text:"Location" ~packing:(grid#attach ~left:0 ~top:1) () in
-  let root_path_hbox = GPack.hbox ~spacing:8 ~packing:(grid#attach ~left:1 ~top:1) () in
+  (* let name_l = GMisc.label ~text:"Name" ~packing:(grid#attach ~left:0 ~top:0) () in
+   * let name_e = GEdit.entry ~packing:(grid#attach ~left:1 ~top:0) () in *)
+  let root_path_l = GMisc.label ~text:"Location" ~packing:(grid#attach ~left:0 ~top:0) () in
+  let root_path_hbox = GPack.hbox ~spacing:8 ~packing:(grid#attach ~left:1 ~top:0) () in
   let root_path_e = GMisc.label ~packing:(root_path_hbox#pack) () in
   let root_path_b = GButton.button ~label:"Choose" ~packing:(root_path_hbox#pack) () in
-  let import_dir_check = GButton.check_button ~label:"import directory" ~packing:(grid#attach ~left:1 ~top:2) () in
-  let doc_type_l = GMisc.label ~text:"Type" ~packing:(grid#attach ~left:0 ~top:3) () in
-  let doc_type_combo = GEdit.combo_box_text ~active:0 ~strings:["article"; "book"] ~packing:(grid#attach ~left:1 ~top:3)() in
+  let import_dir_check = GButton.check_button ~label:"import directory" ~packing:(grid#attach ~left:1 ~top:1) () in
+  let doc_type_l = GMisc.label ~text:"Type" ~packing:(grid#attach ~left:0 ~top:2) () in
+  let doc_type_combo = GEdit.combo_box_text ~active:0 ~strings:["article"; "book"] ~packing:(grid#attach ~left:1 ~top:2)() in
   
   root_path_b#connect#clicked ~callback:(fun () ->
       let root_path =
@@ -186,11 +190,12 @@ let new_library () : (string * string * string) option =
   
   match (dialog#run()) with
   | `OK ->
-     let name = name_e#text in
      let doc_type = match GEdit.text_combo_get_active doc_type_combo with
        | None -> failwith "doc_type select: Not possible"
        | Some s -> s in
      let root_path = root_path_e#text in
+     let key = (String.split_on_char '/' root_path) in
+     let name = (List.nth key ((List.length key) - 1)) in
      (if import_dir_check#active then
         let files = (get_files ~library:name root_path) in
         ignore (import_files ~library:name ~doc_type files));
@@ -204,10 +209,13 @@ let new_library () : (string * string * string) option =
   
 let main () =
   GMain.init();
-  let icon = GdkPixbuf.from_file "icons/Gnome-colors-applications-office.svg" in
-  let window = GWindow.window ~title:"DocuLib" ~icon () in
+  let window = GWindow.window ~title:"DocuLib" () in
+  (try
+     let icon = GdkPixbuf.from_file icon_path in
+     window#set_icon (Some icon)
+   with _ -> prerr_endline "Could not find icon");
   let vbox = GPack.vbox ~packing:window#add () in
-
+  
   (* Toplevel menu *)
   let menubar = GMenu.menu_bar ~packing:vbox#pack () in
   let factory = new GMenu.factory menubar in

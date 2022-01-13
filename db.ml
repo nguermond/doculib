@@ -10,12 +10,13 @@ exception LibraryExists
  * The purpose of having a path for every library is that
  * an entire library can be relocated without having to modify entries. *)
 let home = (Sys.getenv "HOME")
-let data = home^"/.doculib/data"
+let configdir = home^"/.doculib"
+let data = configdir^"/data"
 let config = Irmin_fs.config data
 
 (* The database is versioned, to prevent data loss upon upgrade. *)
 let current_branch = "1.0"
-let libconfig = home^"/.doculib/libraries.json"
+let libconfig = configdir^"/libraries.json"
 let libraries : ((string * (string * string)) list) ref = ref []
 
 (* Example keys for branch "1.0" look like:
@@ -251,9 +252,13 @@ let add_library ~library ~root ~doc_type : unit =
      libraries := libs)
           
 let init () : unit =
+  (if (not (Sys.file_exists configdir)) then
+     (prerr_endline "configuration directory does not exist: creating...";
+      Sys.mkdir configdir 0o755));
   (if (not (Sys.file_exists libconfig)) then
-     let json = (libs_to_json []) in
-     Json.to_file libconfig json);
+     (prerr_endline "configuration file does not exist: creating...";
+      let json = (libs_to_json []) in
+      Json.to_file libconfig json));
   let json = Yojson.Basic.from_file libconfig in
   let libs = (json_to_libs json) in
   libraries := libs

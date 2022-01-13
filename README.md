@@ -11,6 +11,10 @@ Library configuration is stored in `$HOME/.doculib/libraries.json`.
 Metadata is stored in `$HOME/.doculib/data`.
 
 ## Dependencies
+```
+sudo apt install libev-dev libgtk-3-0
+```
+
 Note this requires lablgtk3 (>= 3.1.2)
 ```
 opam install dune lablgtk3 lwt irmin-unix tls
