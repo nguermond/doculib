@@ -94,16 +94,16 @@ let search_metadata (default : Db.doc) (search_str : string) : Db.doc option =
   let ret =
     (match dialog#run() with
      | `OK ->
-        let selection = (model#get_view#selection#get_selected_rows) in
+        let selection = (model#get_selected_rows) in
         let p = (List.nth selection 0) in
         let doc : Db.doc =
           { star = false;
-            title = (model#get ~row:(model#get_store#get_iter p) ~column:Model.Attr.title);
+            title = (model#get ~row:(model#get_row p) ~column:Model.Attr.title);
             authors = Str.split (Str.regexp "; +")
-                        (model#get ~row:(model#get_store#get_iter p) ~column:Model.Attr.authors);
-            year = (model#get ~row:(model#get_store#get_iter p) ~column:Model.Attr.year);
-            doi = (model#get ~row:(model#get_store#get_iter p) ~column:Model.Attr.doi);
-            isbn = (model#get ~row:(model#get_store#get_iter p) ~column:Model.Attr.isbn);
+                        (model#get ~row:(model#get_row p) ~column:Model.Attr.authors);
+            year = (model#get ~row:(model#get_row p) ~column:Model.Attr.year);
+            doi = (model#get ~row:(model#get_row p) ~column:Model.Attr.doi);
+            isbn = (model#get ~row:(model#get_row p) ~column:Model.Attr.isbn);
             tags = default.tags;
             doc_type = default.doc_type;
             path = default.path
@@ -319,7 +319,7 @@ let main () =
        | `OK -> notebook#action_on_selected (fun library model row ->
                     let path = (model#get ~row ~column:Model.Attr.path) in
                     Db.remove_document library path;
-                    model#get_store#remove row;
+                    model#remove row;
                     let full_path = (Db.get_full_path library path) in
                     ignore (Sys.remove path))
        | _ -> prerr_endline "Cancel");

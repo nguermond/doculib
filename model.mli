@@ -28,15 +28,6 @@ module Attr :
 
 class model : GTree.model_filter -> GTree.list_store -> GTree.view ->
   object
-    val filter : GTree.model_filter
-    val mutable store : GTree.list_store
-    val view : GTree.view
-    val mutable num_cols : int
-
-    method get_filter : GTree.model_filter
-    method get_store : GTree.list_store
-    method get_view : GTree.view
-         
     method get_row : Gtk.tree_path -> row
          
     method set : 'a. row:row -> column:('a GTree.column) -> 'a -> unit
@@ -58,9 +49,9 @@ class model : GTree.model_filter -> GTree.list_store -> GTree.view ->
     (* Handle click events *)
     method handle_click_events : context_menu:GMenu.menu -> unit
 
-    (* TODO: optimize this by importing a list of files *)
-    (* method import_file : lib:string -> doc_type:string -> path:string -> unit *)
-
+    method refilter : unit -> unit
+    method set_visible_func : (GTree.model -> Gtk.tree_iter -> bool) -> unit
+    method get_selected_rows : Gtk.tree_path list
   end
 
 

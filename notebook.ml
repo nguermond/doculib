@@ -79,7 +79,7 @@ class notebook notebook context_menu filter_func = object (self)
       (match library with
        | None -> self#current_library
        | Some library -> (library, self#get_library ~library))
-    in lib#get_model#get_filter#refilter()
+    in lib#get_model#refilter()
 
   method private set_model ~library ~model : unit =
     List.iter (fun (name, lib) ->
@@ -98,14 +98,14 @@ class notebook notebook context_menu filter_func = object (self)
       let model = (Model.make_document_list ~multiple:true ~sort:(Some Model.Attr.star)
                      ~editable:true ~library ~doc_type ~packing:page#add data) in
       model#handle_click_events ~context_menu;
-      model#get_filter#set_visible_func filter_func;
+      model#set_visible_func filter_func;
       self#set_model library model
 
   method action_on_selected ~action : unit =
     let (library,lib) = self#current_library in
     List.iter (fun p ->
         (action library lib#get_model (lib#get_model#get_row p)))
-      lib#get_model#get_view#selection#get_selected_rows
+      lib#get_model#get_selected_rows
 
   method edit_selected ~editor : unit =
     let (library,lib) = self#current_library in
@@ -118,6 +118,6 @@ class notebook notebook context_menu filter_func = object (self)
                    | Some doc -> doc) in
         Db.set_document ~library ~path doc;
         model#set_entry (model#get_row p) doc)
-      model#get_view#selection#get_selected_rows
+      model#get_selected_rows
 
 end

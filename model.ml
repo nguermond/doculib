@@ -39,10 +39,6 @@ object (self)
   val mutable store : GTree.list_store = store
   val view : GTree.view = view
   val mutable num_cols = 0
-
-  method get_filter = filter
-  method get_store = store
-  method get_view = view
                   
   method get_row p =
     (store#get_iter (filter#convert_path_to_child_path p))
@@ -158,6 +154,16 @@ object (self)
                 then true (* do not deselect *)
                 else false (* select on right click *)))
             else false)))
+
+  method refilter () : unit =
+    filter#refilter()
+    
+  method set_visible_func (f : GTree.model -> Gtk.tree_iter -> bool) : unit =
+    filter#set_visible_func f
+
+  method get_selected_rows : Gtk.tree_path list =
+    view#selection#get_selected_rows
+    
 end
 
 
