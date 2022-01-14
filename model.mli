@@ -1,14 +1,8 @@
 
 
-type cell_renderer =
-  CellRenderer : ((#GTree.cell_renderer) * (string * 'b GTree.column) list) -> cell_renderer
-
-type column =
-  Str : string GTree.column -> column
-| Bool : bool GTree.column -> column
-
-type packing = ?from:Gtk.Tags.pack_type -> ?expand:bool -> ?fill:bool -> ?padding:int -> GObj.widget -> unit
-
+type cell_renderer
+type column
+type packing
 type row = Gtk.tree_iter
 
 module Attr :
@@ -30,12 +24,11 @@ class model : GTree.model_filter -> GTree.list_store -> GTree.view ->
   object
     method get_row : Gtk.tree_path -> row
          
-    method set : 'a. row:row -> column:('a GTree.column) -> 'a -> unit
     method get : 'a. row:row -> column:('a GTree.column) -> 'a
 
-    method remove : row:Gtk.tree_iter -> unit
+    method remove : row:row -> unit
       
-    method set_entry : row:Gtk.tree_iter -> Db.doc -> unit
+    method set_entry : row:row -> Db.doc -> unit
       
     method import_documents : (Db.doc list) -> unit
          
@@ -50,7 +43,7 @@ class model : GTree.model_filter -> GTree.list_store -> GTree.view ->
     method handle_click_events : context_menu:GMenu.menu -> unit
 
     method refilter : unit -> unit
-    method set_visible_func : (GTree.model -> Gtk.tree_iter -> bool) -> unit
+    method set_visible_func : (GTree.model -> row -> bool) -> unit
     method get_selected_rows : Gtk.tree_path list
   end
 

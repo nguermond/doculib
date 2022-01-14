@@ -43,9 +43,6 @@ object (self)
   method get_row p =
     (store#get_iter (filter#convert_path_to_child_path p))
 
-  method set : 'a. row:Gtk.tree_iter -> column:('a GTree.column) -> 'a -> unit =
-    store#set
-
   method get : 'a. row:Gtk.tree_iter -> column:('a GTree.column) -> 'a =
     store#get
 
