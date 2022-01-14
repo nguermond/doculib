@@ -240,6 +240,7 @@ let main () =
      ^"\\X      character escape");
   let filter_func = (fun (model : GTree.model) row ->
       let search_query = search_e#text in
+      prerr_endline ("Searching query: "^search_query);
       let search_string = (String.concat " " (List.map (fun column -> model#get ~row ~column)
                                                 [Model.Attr.title; Model.Attr.authors; Model.Attr.tags; Model.Attr.path])) in
       let open Agrep in
@@ -259,7 +260,6 @@ let main () =
 
   (* Search on edit *)
   search_e#connect#changed ~callback:(fun _ ->
-      let search_text = search_e#text in
       notebook#refilter());
 
   (****************************************************)

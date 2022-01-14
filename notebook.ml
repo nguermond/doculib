@@ -52,12 +52,17 @@ class notebook notebook context_menu filter_func = object (self)
 
   method init (libs : (string * string) list) : unit =
     (List.iter (fun (library,doc_type) -> self#add_library ~library ~doc_type) libs);
+
+    (* On page switch *)
     notebook#connect#switch_page ~callback:(fun index ->
-        prerr_endline ("Index:"^ (string_of_int index)^ "->"^(fst (List.nth libraries index)));
-        (self#load_library (fst (List.nth libraries index))));
+        let (library,lib) = (List.nth libraries index) in
+        prerr_endline ("Index:"^ (string_of_int index)^ "->"^library);
+        (self#load_library library);
+        self#refilter ~library:(Some library) ()
+      );
     (if (List.length libs) > 0 then self#load_library (fst (self#current_library)))
 
-  method get_index ~library : int =
+  method private get_index ~library : int =
     match (List.assoc_index libraries library) with
     | None -> raise (LibraryDoesNotExist library)
     | Some i -> i
@@ -65,12 +70,18 @@ class notebook notebook context_menu filter_func = object (self)
   method current_library : string * library =
     let page = notebook#current_page in
     (List.nth libraries page)
-    
-  method refilter () : unit =
-    let (_,lib) = self#current_library in
-    lib#get_model#get_filter#refilter()
 
-  method set_model ~library ~model : unit =
+  method private get_library ~library : library =
+    List.assoc library libraries
+    
+  method refilter ?(library=None) () : unit =
+    let (library,lib) =
+      (match library with
+       | None -> self#current_library
+       | Some library -> (library, self#get_library ~library))
+    in lib#get_model#get_filter#refilter()
+
+  method private set_model ~library ~model : unit =
     List.iter (fun (name, lib) ->
         if library = name then
           lib#set_model model)
