@@ -2,7 +2,7 @@
 open StdLabels
 open Gobject.Data
 
-let icon_path = "icons/Gnome-colors-applications-office.svg"
+let icon_path = Db.configdir^"/icons/Gnome-colors-applications-office.svg"
 
 let rec get_files ~library (path : string) : string list =
   if not (Sys.is_directory path) then
