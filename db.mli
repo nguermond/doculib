@@ -1,4 +1,4 @@
-
+val configdir : string
 
 type doc = {star : bool;
             title : string;
