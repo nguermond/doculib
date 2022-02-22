@@ -26,8 +26,6 @@ val init : unit -> unit
   
 val set_attribute : string -> string -> attribute
              
-module Doc : Irmin.Contents.S with type t = doc
-
 val import_files : library:string -> doc_type:string -> (string list) ->  doc list
 
   
