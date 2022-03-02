@@ -164,7 +164,7 @@ let edit_document (doc : Db.doc) : Db.doc option =
   dialog#destroy();
   ret
 
-let new_library () : (string * string * string) option =
+let new_library () : (string * string * string * bool) option =
   let dialog = GWindow.dialog ~title:"New Library" ~border_width:8 () in
   let grid = GPack.grid  ~col_spacings:8 ~row_spacings:8 ~packing:dialog#vbox#pack () in
 
@@ -196,11 +196,8 @@ let new_library () : (string * string * string) option =
      let root_path = root_path_e#text in
      let key = (String.split_on_char '/' root_path) in
      let name = (List.nth key ((List.length key) - 1)) in
-     (if import_dir_check#active then
-        let files = (get_files ~library:name root_path) in
-        ignore (import_files ~library:name ~doc_type files));
      dialog#destroy();
-     Some (name, doc_type, root_path)
+     Some (name, doc_type, root_path, import_dir_check#active)
   | `CANCEL | `DELETE_EVENT ->
      dialog#destroy();
      None
@@ -339,10 +336,15 @@ let main () =
   file_factory#add_item "New Library"
     ~callback:(fun () ->
       match new_library() with
-      | Some (library, doc_type, root) ->
+      | Some (library, doc_type, root, import_dir) ->
          notebook#add_library library doc_type;
+         prerr_endline "Adding library in DB";
+         Db.add_library ~library ~doc_type ~root;
+         (if import_dir then
+            let files = (get_files ~library root) in
+            ignore (import_files ~library ~doc_type files));
+         prerr_endline "Loading library in NB";
          notebook#load_library library;
-         Db.add_library ~library ~doc_type ~root
       | None -> ()
     );
   

@@ -159,7 +159,18 @@ let json_to_doc path (json : Json.t) : doc =
     path = path;
     doc_type = (to_string (raise_opt "" (get "doc_type" json)))
   }
-  
+
+let make_dirs (dirs : string list) : unit =
+  let rec make_dirs_ path dirs : unit =
+    prerr_endline ("Making dir: " ^ path);
+    (if Sys.file_exists path then ()
+     else (Sys.mkdir path 0o755));
+    match dirs with
+    | [] -> failwith "Not a full path"
+    | [name] -> prerr_endline name; ()
+    | dir::dirs -> make_dirs_ (path^"/"^dir) dirs
+  in (make_dirs_ store dirs)
+            
 (* Store document as
  * store/library/path.json
  *)  
@@ -167,6 +178,8 @@ let add_document store library (doc : doc) : unit =
   let name = (store^"/"^library^"/"^doc.path^".json") in
   (print_endline ("adding "^name));
   let json = doc_to_json doc in
+  let dirs = (Str.split (Str.regexp "/") (library^"/"^doc.path)) in
+  (make_dirs dirs);
   (Json.to_file name json)
   
 let get_document ~library ~path : doc =
@@ -187,7 +200,8 @@ let remove_document ~library ~path : unit =
   Sys.remove name
  
 let get_rel_path ~library (path : string) : string =
-  (Str.replace_first (Str.regexp (".*/"^library^"/")) "" path)
+  (Str.replace_first (Str.regexp (".json")) ""
+     (Str.replace_first (Str.regexp (".*/"^library^"/")) "" path))
 
 let import_file ~library ~doc_type path : doc option =
   let name = (store^"/"^library^"/"^path^".json") in

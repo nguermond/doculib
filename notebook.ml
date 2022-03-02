@@ -55,10 +55,12 @@ class notebook notebook context_menu filter_func = object (self)
 
     (* On page switch *)
     notebook#connect#switch_page ~callback:(fun index ->
-        let (library,lib) = (List.nth libraries index) in
-        prerr_endline ("Index:"^ (string_of_int index)^ "->"^library);
-        (self#load_library library);
-        self#refilter ~library:(Some library) ()
+        if (List.length libs) > 0 then
+          (let (library,lib) = (List.nth libraries index) in
+           prerr_endline ("Index:"^ (string_of_int index)^ "->"^library);
+           (self#load_library library);
+           self#refilter ~library:(Some library) ())
+        else ()
       );
     (if (List.length libs) > 0 then self#load_library (fst (self#current_library)))
 
