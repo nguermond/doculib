@@ -99,29 +99,6 @@ let pp_doc ppf (d : doc) =
      (sprintf "  Path: %s@\n" d.path)
      (sprintf "  Document Type: %s@\n" d.doc_type))
   
-(* module Doc = struct
- *   type t = doc
- * 
- *   let t =
- *     let open Irmin.Type in
- *     record "doc" (fun star title authors doi isbn year tags path doc_type ->
- *         {star; title; authors; doi; isbn; year; tags; path; doc_type})
- *     |+ field "star" bool (fun t -> t.star)
- *     |+ field "title" string (fun t -> t.title)
- *     |+ field "authors" (list string) (fun t -> t.authors)
- *     |+ field "doi" string (fun t -> t.doi)
- *     |+ field "isbn" string (fun t -> t.isbn)
- *     |+ field "year" string (fun t -> t.year)
- *     |+ field "tags" (list string) (fun t -> t.tags)
- *     |+ field "path" string (fun t -> t.path)
- *     |+ field "doc_type" string (fun t -> t.doc_type)
- *     |> sealr
- * 
- *   let merge = Irmin.Merge.(option (idempotent t))
- * end
- * 
- * module Store = Irmin_unix.FS.KV(Doc) *)
-
 
 let make_doc_from_file path doc_type : doc =
   {star=false;
