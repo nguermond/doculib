@@ -7,7 +7,8 @@ A GUI for managing document metadata for books, textbooks, or articles.
 ## Features
 * search for metadata on [openlibrary.org](https://openlibrary.org/) and [semanticscholar.org](https://www.semanticscholar.org/)
 * metadata includes authors, title, publishing year, tags, bookmark, and DOI/ISBN
-* tag management (to be implemented)
+* error permissive search
+* fancy tag management (to be implemented)
 
 ## Configuration
 Library configuration is stored in `$HOME/.doculib/libraries.json`.
