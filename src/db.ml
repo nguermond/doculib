@@ -259,6 +259,9 @@ let init () : unit =
   (if (not (Sys.file_exists configdir)) then
      (prerr_endline "configuration directory does not exist: creating...";
       Sys.mkdir configdir 0o755));
+  (if (not (Sys.file_exists data)) then
+     (prerr_endline "data directory does not exist: creating...";
+      Sys.mkdir data 0o755));
   (if (not (Sys.file_exists store)) then
      (prerr_endline "store directory does not exist: creating...";
       Sys.mkdir store 0o755));
