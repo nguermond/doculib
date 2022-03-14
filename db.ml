@@ -28,8 +28,6 @@ let store = data^"/"^current_branch
     EBooks/long/path/to/ebook1.pdf 
 *)
 
-
-let info = Irmin_unix.info ""
   
 type doc = {star : bool;
             title : string;
@@ -151,7 +149,7 @@ let make_dirs (dirs : string list) : unit =
 (* Store document as
  * store/library/path.json
  *)  
-let add_document store library (doc : doc) : unit =
+let add_document ~library (doc : doc) : unit =
   let name = (store^"/"^library^"/"^doc.path^".json") in
   (print_endline ("adding "^name));
   let json = doc_to_json doc in
@@ -188,7 +186,7 @@ let import_file ~library ~doc_type path : doc option =
       None)
    else
      (let doc = (make_doc_from_file path doc_type) in
-      let _ = add_document store library doc in
+      let _ = add_document ~library doc in
       (Some doc)))
 
 let import_files ~library ~doc_type (paths : string list) : doc list =

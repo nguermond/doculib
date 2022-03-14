@@ -7,5 +7,8 @@
  (libraries
   lablgtk3
   lwt
-  irmin-unix
+  yojson
+  cohttp
+  cohttp-lwt-unix
+  str
   agrep))	

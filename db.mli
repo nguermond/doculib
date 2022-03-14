@@ -33,7 +33,8 @@ val get_documents : library:string -> doc list
 val get_document : library:string -> path:string -> doc
 val set_document : library:string -> path:string -> doc -> unit
 val remove_document : library:string -> path:string -> unit
-
+val add_document : library:string -> doc -> unit
+  
 val edit_document : attribute -> doc -> doc
 
 val get_rel_path : library:string -> string -> string
