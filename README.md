@@ -8,7 +8,6 @@ A GUI for managing document metadata for books, textbooks, or articles.
 * search for metadata on [openlibrary.org](https://openlibrary.org/) and [semanticscholar.org](https://www.semanticscholar.org/)
 * metadata includes authors, title, publishing year, tags, bookmark, and DOI/ISBN
 * error permissive search
-* fancy tag management (to be implemented)
 
 ## Configuration
 Library configuration is stored in `$HOME/.doculib/libraries.json`.
@@ -33,3 +32,7 @@ dune build
 ```
 dune exec ./doculib.exe
 ```
+
+## To be (maybe) implemented
+* fancy tag management (synonyms, subtags...)
+* local compressed zbMath library for faster metadata search
