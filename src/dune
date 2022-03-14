@@ -1,0 +1,20 @@
+(library
+  (name doculib_gui)
+  (libraries
+    lablgtk3
+    lwt
+    yojson
+    cohttp
+    cohttp-lwt-unix
+    str
+    agrep)
+  (modules
+    Gui Db Search Json Model Notebook Utilities)
+  )
+
+(env
+  (dev
+    (flags
+		:standard -w
+	  	-3-6-7-10-24-26-27-32-33-35
+    	-no-strict-sequence)))
