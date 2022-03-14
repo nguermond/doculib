@@ -12,12 +12,13 @@ exception LibraryExists
 let home = (Sys.getenv "HOME")
 let configdir = home^"/.doculib"
 let data = configdir^"/data"
-let config = Irmin_fs.config data
 
 (* The database is versioned, to prevent data loss upon upgrade. *)
-let current_branch = "1.0"
+let current_branch = "2.0"
 let libconfig = configdir^"/libraries.json"
 let libraries : ((string * (string * string)) list) ref = ref []
+
+let store = data^"/"^current_branch
 
 (* Example keys for branch "1.0" look like:
     Articles/path/to/article1.pdf
@@ -27,8 +28,6 @@ let libraries : ((string * (string * string)) list) ref = ref []
     EBooks/long/path/to/ebook1.pdf 
 *)
 
-
-let info = Irmin_unix.info ""
   
 type doc = {star : bool;
             title : string;
@@ -98,29 +97,6 @@ let pp_doc ppf (d : doc) =
      (sprintf "  Path: %s@\n" d.path)
      (sprintf "  Document Type: %s@\n" d.doc_type))
   
-module Doc = struct
-  type t = doc
-
-  let t =
-    let open Irmin.Type in
-    record "doc" (fun star title authors doi isbn year tags path doc_type ->
-        {star; title; authors; doi; isbn; year; tags; path; doc_type})
-    |+ field "star" bool (fun t -> t.star)
-    |+ field "title" string (fun t -> t.title)
-    |+ field "authors" (list string) (fun t -> t.authors)
-    |+ field "doi" string (fun t -> t.doi)
-    |+ field "isbn" string (fun t -> t.isbn)
-    |+ field "year" string (fun t -> t.year)
-    |+ field "tags" (list string) (fun t -> t.tags)
-    |+ field "path" string (fun t -> t.path)
-    |+ field "doc_type" string (fun t -> t.doc_type)
-    |> sealr
-
-  let merge = Irmin.Merge.(option (idempotent t))
-end
-
-module Store = Irmin_unix.FS.KV(Doc)
-
 
 let make_doc_from_file path doc_type : doc =
   {star=false;
@@ -134,80 +110,106 @@ let make_doc_from_file path doc_type : doc =
    doc_type=doc_type
   }
 
+let doc_to_json (doc : doc) : Json.t =
+  `Assoc [("star", `Bool doc.star);
+          ("title", `String doc.title);
+          ("authors", `List (List.map (fun x -> `String x) doc.authors));
+          ("doi", `String doc.doi);
+          ("isbn", `String doc.isbn);
+          ("year", `String doc.year);
+          ("tags", `List (List.map (fun x -> `String x) doc.tags));
+          ("doc_type", `String doc.doc_type)]
 
-let add_document store library (doc : doc) : unit Lwt.t =
-  Store.set_exn store [library; doc.path] doc ~info
+let json_to_doc path (json : Json.t) : doc =
+  let open Json in
+  { star = (to_bool (raise_opt "" (get "star" json)));
+    title = (to_string (raise_opt "" (get "title" json)));
+    authors = (List.map to_string
+                 (to_list (raise_opt "" (get "authors" json))));
+    doi = (to_string (raise_opt "" (get "doi" json)));
+    isbn = (to_string (raise_opt "" (get "isbn" json)));
+    year = (to_string (raise_opt "" (get "year" json)));
+    tags = (List.map to_string
+              (to_list (raise_opt "" (get "tags" json))));
+    path = path;
+    doc_type = (to_string (raise_opt "" (get "doc_type" json)))
+  }
+
+let make_dirs (dirs : string list) : unit =
+  let rec make_dirs_ path dirs : unit =
+    prerr_endline ("Making dir: " ^ path);
+    (if Sys.file_exists path then ()
+     else (Sys.mkdir path 0o755));
+    match dirs with
+    | [] -> failwith "Not a full path"
+    | [name] -> prerr_endline name; ()
+    | dir::dirs -> make_dirs_ (path^"/"^dir) dirs
+  in (make_dirs_ store dirs)
+            
+(* Store document as
+ * store/library/path.json
+ *)  
+let add_document ~library (doc : doc) : unit =
+  let name = (store^"/"^library^"/"^doc.path^".json") in
+  (print_endline ("adding "^name));
+  let json = doc_to_json doc in
+  let dirs = (Str.split (Str.regexp "/") (library^"/"^doc.path)) in
+  (make_dirs dirs);
+  (Json.to_file name json)
   
 let get_document ~library ~path : doc =
-  Lwt_main.run
-    (let* repo = Store.Repo.v config in
-     let* store = Store.of_branch repo current_branch in
-     Store.get store [library; path])
-
-let set_document ~library ~path doc : unit =
-  Lwt_main.run
-    (let* repo = Store.Repo.v config in
-     let* store = Store.of_branch repo current_branch in
-     Store.set_exn store [library; path] doc ~info);
-  ()
-
-let remove_document ~library ~path : unit =
-  Lwt_main.run
-    (let* repo = Store.Repo.v config in
-     let* store = Store.of_branch repo current_branch in
-     Store.remove store [library; path] ~info);
-  ()
-
-let get_rel_path ~library (path : string) : string =
-  (Str.replace_first (Str.regexp (".*/"^library^"/")) "" path)
+  let name = (store^"/"^library^"/"^path^".json") in
+  print_endline ("getting "^name);
+  let json = (Json.from_file name) in
+  (json_to_doc path json)
   
-let import_file ~library ~doc_type path : doc option =
-  Lwt_main.run
-    (let* repo = Store.Repo.v config in
-     let* store = Store.of_branch repo current_branch in
-     let* exists_opt = (Store.find store [library; path]) in
-     match exists_opt with
-     | Some _ ->
-        prerr_endline ("Key already exists: "^library^"/"^path);
-        Lwt.return None
-     | None ->
-        let doc = (make_doc_from_file path doc_type) in
-        let* _ = add_document store library doc in
-        Lwt.return (Some doc))
+let set_document ~library ~path doc : unit =
+  let name = (store^"/"^library^"/"^path^".json") in
+  (print_endline ("setting "^name));
+  let json = doc_to_json doc in
+  (Json.to_file name json)
+  
+let remove_document ~library ~path : unit =
+  let name = (store^"/"^library^"/"^path^".json") in
+  print_endline ("removing "^ name);
+  Sys.remove name
+ 
+let get_rel_path ~library (path : string) : string =
+  (Str.replace_first (Str.regexp (".json")) ""
+     (Str.replace_first (Str.regexp (".*/"^library^"/")) "" path))
 
-let import_file ~store ~library ~doc_type path : (doc option) Lwt.t=
-  let* exists_opt = (Store.find store [library; path]) in
-  match exists_opt with
-  | Some _ ->
-     prerr_endline ("Key already exists: "^library^"/"^path);
-     Lwt.return None
-  | None ->
-     let doc = (make_doc_from_file path doc_type) in
-     let* _ = add_document store library doc in
-     Lwt.return (Some doc)
+let import_file ~library ~doc_type path : doc option =
+  let name = (store^"/"^library^"/"^path^".json") in
+  prerr_endline ("importing file: "^name);
+  (if (Sys.file_exists name) then
+     (prerr_endline ("Key already exists: "^library^"/"^path);
+      None)
+   else
+     (let doc = (make_doc_from_file path doc_type) in
+      let _ = add_document ~library doc in
+      (Some doc)))
 
 let import_files ~library ~doc_type (paths : string list) : doc list =
-  (let* repo = Store.Repo.v config in
-   let* store = Store.of_branch repo current_branch in
-   let n = (List.length paths) in
-   let i = ref 0 in
-   Lwt_list.filter_map_s (fun path ->
-       let load = ((float_of_int !i) /. (float_of_int n)) in
-       prerr_endline (string_of_float load);
-       i := !i+1;
-       (import_file ~store ~library ~doc_type path))
-     paths)
-  |> Lwt_main.run
-  
+  let n = (List.length paths) in
+  let i = ref 0 in
+  List.filter_map (fun path ->
+      let load = ((float_of_int !i) /. (float_of_int n)) in
+      prerr_endline (string_of_float load);
+      i := !i+1;
+      (import_file ~library ~doc_type path))
+    paths
+
+
 let get_documents ~library : doc list =
-  Lwt_main.run
-    (let* repo = Store.Repo.v config in
-     let* store = Store.of_branch repo current_branch in
-     let* kvs = Store.list store [library] in
-     (Lwt_list.fold_left_s (fun docs (key,tree) ->
-          let* doc = Store.get store [library;key] in
-          Lwt.return (doc::docs))
-        [] kvs))
+  let rec get_files (full_path : string) : doc list =
+    (if not (Sys.is_directory full_path) then
+       (let path = get_rel_path ~library full_path in
+        [get_document ~library ~path])
+     else
+       (List.flatten
+          (List.map (fun name -> get_files (full_path^"/"^name))
+             (Array.to_list (Sys.readdir full_path)))))
+  in (get_files (store^"/"^library))
   
 let print_documents library : unit =
   let docs = get_documents library in
@@ -249,12 +251,17 @@ let add_library ~library ~root ~doc_type : unit =
      let libs = (library,(root,doc_type)) :: libs in
      let json = (libs_to_json libs) in
      let _ = Json.to_file libconfig json in
+     (prerr_endline "creating library...";
+      Sys.mkdir (store^"/"^library) 0o755);
      libraries := libs)
           
 let init () : unit =
   (if (not (Sys.file_exists configdir)) then
      (prerr_endline "configuration directory does not exist: creating...";
       Sys.mkdir configdir 0o755));
+  (if (not (Sys.file_exists store)) then
+     (prerr_endline "store directory does not exist: creating...";
+      Sys.mkdir store 0o755));
   (if (not (Sys.file_exists libconfig)) then
      (prerr_endline "configuration file does not exist: creating...";
       let json = (libs_to_json []) in

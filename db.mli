@@ -26,8 +26,6 @@ val init : unit -> unit
   
 val set_attribute : string -> string -> attribute
              
-module Doc : Irmin.Contents.S with type t = doc
-
 val import_files : library:string -> doc_type:string -> (string list) ->  doc list
 
   
@@ -35,7 +33,8 @@ val get_documents : library:string -> doc list
 val get_document : library:string -> path:string -> doc
 val set_document : library:string -> path:string -> doc -> unit
 val remove_document : library:string -> path:string -> unit
-
+val add_document : library:string -> doc -> unit
+  
 val edit_document : attribute -> doc -> doc
 
 val get_rel_path : library:string -> string -> string

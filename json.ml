@@ -22,6 +22,11 @@ let to_int (json : t) : int =
   | _ -> let pp = pretty_to_string json in
          raise (ParsingFailure ("Not an int:"^pp))
 
+let to_bool (json : t) : bool =
+  match json with
+  | `Bool b -> b
+  | _ -> raise (ParsingFailure "Not a bool")
+         
 let to_string (json : t) : string =
   match json with
   | `String s -> s
