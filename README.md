@@ -10,28 +10,24 @@ A GUI for managing document metadata for books, textbooks, or articles.
 * error permissive search
 
 ## Configuration
-Library configuration is stored in `$HOME/.doculib/libraries.json`.
-Metadata is stored in `$HOME/.doculib/data`.
+Metadata for DocuLib is tored in `$HOME/.doculib/`.
 
-## Dependencies
+## How to build from source:
+1. Install [opam](https://opam.ocaml.org/)
+2. Install OCaml >= 4.12.0:
 ```
-sudo apt install libev-dev libgtk-3-0
+opam switch create 4.12.0 && eval $(opam env)
 ```
-
-Note this requires lablgtk3 (>= 3.1.2)
+2. Install system dependencies:
 ```
-opam install dune lablgtk3 lwt irmin-unix tls
+sudo apt install libgmp-dev pkg-config libcairo2-dev libexpat1-dev libgtk-3-dev
 ```
-
-## Compile
+3. Install Ocaml dependencies:
 ```
-dune build
+opam install dune cohttp-lwt-unix yojson lablgtk3.3.1.2
 ```
-
-## Run
-```
-dune exec ./doculib.exe
-```
+4. Compile with `dune build`
+5. Run with `dune exec ./doculib.exe`
 
 ## To be (maybe) implemented
 * fancy tag management (synonyms, subtags...)
