@@ -29,7 +29,7 @@ tar -xzf doculib_x86_64_v1.0.0.tar.gz
 ```
 cd 1.0.0 && sudo sh ./install.sh
 ```
-4. Run: `doculib`.
+4. Run: `doculib &`.
 
 ## Build from source (unix):
 1. Install [opam](https://opam.ocaml.org/)

@@ -4,7 +4,7 @@ open Utilities
 exception LibraryDoesNotExist of string
 exception ModelNotLoaded of string
 exception Cancel
-
+exception NoLibrary
                                       
 let iter_cancel f lst : unit =
   try (List.iter f lst) with
@@ -69,9 +69,10 @@ class notebook notebook context_menu filter_func = object (self)
     | None -> raise (LibraryDoesNotExist library)
     | Some i -> i
 
-  method current_library : string * library =
+  method current_library : (string * library) =
     let page = notebook#current_page in
-    (List.nth libraries page)
+    try (List.nth libraries page) with
+      _ -> raise NoLibrary
 
   method private get_library ~library : library =
     List.assoc library libraries

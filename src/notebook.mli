@@ -1,6 +1,7 @@
 
 exception LibraryDoesNotExist of string
 exception ModelNotLoaded of string
+exception NoLibrary
 
 class library : string -> string -> GPack.box ->
   object      

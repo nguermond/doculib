@@ -47,8 +47,14 @@ let choose_dir (title : string) : string option =
   dialog#destroy();
   path
 
-
-
+let error_dialog (msg : string) : unit =
+  let error_dialog = GWindow.message_dialog ~title:"Error"
+                       ~buttons:GWindow.Buttons.ok
+                       ~message:msg
+                       ~message_type:`ERROR () in
+  (match error_dialog#run() with
+   | _ -> error_dialog#destroy()
+  )
   
 let search_metadata (default : Db.doc) (search_str : string) : Db.doc option =
   let docs = Search.search_document default.doc_type default.doc_type search_str in
@@ -326,10 +332,13 @@ let main () =
   (* Import files from directory *)
   file_factory#add_item "Import Files"
     ~callback:(fun () ->
-      let (library,lib) = notebook#current_library in
-      let files = choose_files library in
-      let data = (import_files ~library ~doc_type:(lib#get_doc_type) files) in
-      lib#get_model#import_documents data
+      try
+        let (library,lib) = notebook#current_library in
+        let files = choose_files library in
+        let data = (import_files ~library ~doc_type:(lib#get_doc_type) files) in
+        lib#get_model#import_documents data
+      with
+        Notebook.NoLibrary -> (error_dialog "Library must be created first!")
     );
 
   (* Make new library tab *)
