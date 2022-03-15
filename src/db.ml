@@ -280,6 +280,5 @@ let get_full_path ~library (rel_path : string) : string =
   
 let open_doc ~library ~path : unit =
   let path = (get_full_path ~library path) in
-  let ret = Sys.command ("xdg-open \""^path^"\"") in
-  (if ret > 0 then
-     prerr_endline (path ^ " could not be opened!"))
+  (Utilities.Sys.xopen path)
+  

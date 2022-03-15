@@ -277,7 +277,12 @@ let main () =
 
   (* Open DOI of selected files *)
   context_factory#add_item "Open DOI"
-    ~callback:(fun _ -> prerr_endline "NYI");
+    ~callback:(fun _ ->
+      notebook#action_on_selected (fun library model row ->
+          let doi = (model#get ~row ~column:Model.Attr.doi) in
+          (if doi = "" then (error_dialog "No DOI for selected entry!")
+           else Utilities.Sys.xopen ("https://www.doi.org/" ^ (model#get ~row ~column:Model.Attr.doi))))
+    );
   
   (* Edit metadata for an entry *)
   context_factory#add_item "Edit Entry"
@@ -288,6 +293,7 @@ let main () =
     ~callback:(fun _ ->
       notebook#edit_selected (fun doc ->
           let search_str = (if doc.title = "" then doc.path else doc.title) in
+          (* TODO: only supports pdf and djvu, but any file extension should work...? *)
           let search_str = Str.global_replace (Str.regexp "\\(.pdf\\)\\|\\(.djvu\\)\\|[-_\\.() ]+") " " search_str in
           search_metadata doc search_str)
     );
@@ -306,7 +312,8 @@ let main () =
   (* Rename physical file *)
   context_factory#add_item "Rename File"
     ~callback:(fun _ ->
-      print_endline "Rename File: To be implemented..."; ());
+      (error_dialog "Rename File: Not yet implemented")
+    );
   
   (* Delete physical file *)
   context_factory#add_item "Delete File"

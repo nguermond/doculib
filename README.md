@@ -1,10 +1,11 @@
 # DocuLib
 A GUI for managing document metadata for books, textbooks, or articles.
 
-![screenshot](/icons/screenshot.png)
+![screenshot.png](/icons/screenshot.png)
 
 
 ## Features
+* multiple libraries (and two document types - book/article)
 * search for metadata on [openlibrary.org](https://openlibrary.org/) and [semanticscholar.org](https://www.semanticscholar.org/)
 * metadata includes authors, title, publishing year, tags, bookmark, and DOI/ISBN
 * error permissive search
