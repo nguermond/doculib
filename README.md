@@ -1,7 +1,6 @@
 # DocuLib
-A GUI for managing document metadata for books, textbooks, or articles.
-
 ![screenshot.png](/icons/screenshot.png)
+A GUI for managing document metadata for books, textbooks, or articles.
 
 
 ## Features
@@ -11,26 +10,26 @@ A GUI for managing document metadata for books, textbooks, or articles.
 * error permissive search
 
 ## Configuration
-Metadata for DocuLib is tored in `$HOME/.doculib/`.
+Metadata for DocuLib is stored in `$HOME/.doculib/`.
 
 ## Install from binary (linux):
-1. Install system dependencies:
+1. Download binary:
 ```
-sudo apt install libev-dev libgtk-3-0
+wget https://github.com/nguermond/doculib/releases/download/v1.0.0/doculib-linux-x86_64-v1.0.0.tar.gz
 ```
-2. Download binary:
+2. Extract:
 ```
-wget https://github.com/nguermond/doculib/releases/download/v1.0.0/doculib_x86_64_v1.0.0.tar.gz
+tar -xzf doculib-linux-x86_64-v1.0.0.tar.gz
 ```
-3. Extract:
+3. Install (into `/usr/local/bin`):
 ```
-tar -xzf doculib_x86_64_v1.0.0.tar.gz
+cd doculib-linux-x86_64-v1.0.0 && sudo ./install.sh
 ```
-4. Install (into /usr/local/bin):
-```
-cd 1.0.0 && sudo sh ./install.sh
-```
-4. Run: `doculib &`.
+4. Run: `doculib`
+
+## Install from binary (Windows):
+1. Install linux
+2. Follow instructions above
 
 ## Build from source (unix):
 1. Install [opam](https://opam.ocaml.org/)
@@ -42,12 +41,14 @@ opam switch create 4.12.0 && eval $(opam env)
 ```
 sudo apt install libgmp-dev pkg-config libcairo2-dev libexpat1-dev libgtk-3-dev
 ```
-4. Install Ocaml dependencies:
+4. Get source:
 ```
-opam install dune cohttp-lwt-unix yojson lablgtk3.3.1.2
+git clone https://github.com/nguermond/doculib.git
 ```
-5. Compile with `dune build`
-6. Run with `dune exec ./doculib.exe`
+5. Install:
+```
+cd doculib && opam install .
+```
 
 ## To be (maybe) implemented
 * fancy tag management (synonyms, subtags...)
