@@ -1,9 +1,9 @@
 (lang dune 2.9)
 (name doculib)
-(version 1.0.0)
+(version 1.0.1)
 
 (generate_opam_files true)
-(source (uri https://github.com/nguermond/doculib/tree/v1.0.0))
+(source (uri https://github.com/nguermond/doculib/archive/refs/tags/v1.0.1.tar.gz))
 (license GPL-3.0)
 (authors "Nathan Guermond")
 (maintainers "nguermond@protonmail.com")
