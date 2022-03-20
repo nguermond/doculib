@@ -2,53 +2,49 @@
 ![screenshot.png](/icons/screenshot.png)
 A GUI for managing document metadata for books, textbooks, or articles.
 
-
 ## Features
 * multiple libraries (and two document types - book/article)
 * search for metadata on [openlibrary.org](https://openlibrary.org/) and [semanticscholar.org](https://www.semanticscholar.org/)
 * metadata includes authors, title, publishing year, tags, bookmark, and DOI/ISBN
 * error permissive search
 
+## Usage
+Each library points to a unique directory. You can choose whether to automatically keep track of all items in that directory to the library,
+or add items manually. The default search query is the name of the file.
+The type of the library determines the following:
+* "book": store ISBN and search on [openlibrary.org](https://openlibrary.org), it works best to name files by author and title
+* "article": store DOI and search on [semanticscholar.org](https://semanticscholar.org), it works best to name files by title only
+
+Example directory structure is as follows:
+* Library "Textbooks" (type: book):
+```
+/home/user/Libraries/Textbooks
+> example0.pdf
+> math/example1.pdf
+> math/example2.djvu
+> cs/example3.ps
+```
+* Library "Articles" (type: article):
+```
+/home/user/Libraries/Articles
+> example0.pdf
+> example1.pdf
+```
+* Library "eBooks" (type: book):
+```
+/home/user/other/path/eBooks
+> path/to/example0.epub
+> example1.mobi
+```
+
+## Installation
+See [INSTALL](./INSTALL.md).
+
+## Build from source
+See [BUILD](./BUILD.md).
+
 ## Configuration
 Metadata for DocuLib is stored in `$HOME/.doculib/`.
-
-## Install from binary (linux):
-1. Download binary:
-```
-wget https://github.com/nguermond/doculib/releases/download/v1.0.0/doculib-linux-x86_64-v1.0.0.tar.gz
-```
-2. Extract:
-```
-tar -xzf doculib-linux-x86_64-v1.0.0.tar.gz
-```
-3. Install (into `/usr/local/bin`):
-```
-cd doculib-linux-x86_64-v1.0.0 && sudo ./install.sh
-```
-4. Run: `doculib`
-
-## Install from binary (Windows):
-1. Install linux
-2. Follow instructions above
-
-## Build from source (unix):
-1. Install [opam](https://opam.ocaml.org/)
-2. Install OCaml >= 4.12.0:
-```
-opam switch create 4.12.0 && eval $(opam env)
-```
-3. Install system dependencies:
-```
-sudo apt install libgmp-dev pkg-config libcairo2-dev libexpat1-dev libgtk-3-dev
-```
-4. Get source:
-```
-git clone https://github.com/nguermond/doculib.git
-```
-5. Install:
-```
-cd doculib && opam install .
-```
 
 ## To be (maybe) implemented
 * fancy tag management (synonyms, subtags...)
