@@ -180,7 +180,7 @@ let new_library () : (string * string * string * bool) option =
   let root_path_hbox = GPack.hbox ~spacing:8 ~packing:(grid#attach ~left:1 ~top:0) () in
   let root_path_e = GMisc.label ~packing:(root_path_hbox#pack) () in
   let root_path_b = GButton.button ~label:"Choose" ~packing:(root_path_hbox#pack) () in
-  let import_dir_check = GButton.check_button ~label:"import directory" ~packing:(grid#attach ~left:1 ~top:1) () in
+  let import_dir_check = GButton.check_button ~label:"import all files" ~packing:(grid#attach ~left:1 ~top:1) () in
   let doc_type_l = GMisc.label ~text:"Type" ~packing:(grid#attach ~left:0 ~top:2) () in
   let doc_type_combo = GEdit.combo_box_text ~active:0 ~strings:["article"; "book"] ~packing:(grid#attach ~left:1 ~top:2)() in
   
@@ -335,7 +335,15 @@ let main () =
        | _ -> prerr_endline "Cancel");
       confirm_dialog#destroy()
     );
-      
+
+  (****************************************************)
+
+  (* Refresh library *)
+  file_factory#add_item "Refresh Library"
+    ~callback:(fun () ->
+      (error_dialog "Refresh Library: Not yet implemented")
+    );
+  
   (* Import files from directory *)
   file_factory#add_item "Import Files"
     ~callback:(fun () ->
@@ -362,6 +370,18 @@ let main () =
          prerr_endline "Loading library in NB";
          notebook#load_library library;
       | None -> ()
+    );
+
+  (* Rename library *)
+  file_factory#add_item "Rename Library"
+    ~callback:(fun () ->
+      (error_dialog "Rename Library: Not yet implemented:\nManually edit '~/.doculib/libraries.json'\nand rename '~/.doculib/data/X.X/library'.")
+    );
+  
+  (* Delete library *)
+  file_factory#add_item "Delete Library"
+    ~callback:(fun () ->
+      (error_dialog "Delete Library: Not yet implemented:\nManually edit '~/.doculib/libraries.json'\nand delete '~/.doculib/data/X.X/library'.")
     );
   
   file_factory#add_separator ();

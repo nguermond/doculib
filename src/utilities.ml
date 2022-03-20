@@ -4,12 +4,13 @@ module Sys =
     include Sys
     let xopen (str : string) : unit =
       (* Linux *)
-      let ret = Sys.command ("xdg-open \""^str^"\"") in
-      if ret > 0 then
+      if (Sys.command ("xdg-open \""^str^"\"")) > 0 then
         (* MacOS *)
-        let ret = (Sys.command ("open \""^str^"\"")) in
-        if ret > 0 then
-          prerr_endline (str ^ " could not be opened!")
+        (if (Sys.command ("open \""^str^"\"")) > 0 then
+           prerr_endline (str ^ " could not be opened!"))
+
+    let hash (file : string) : string =
+      (Digest.file file)
   end
 
 module List =
