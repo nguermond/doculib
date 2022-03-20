@@ -20,7 +20,7 @@ module Attr :
   end
 
 
-class model : GTree.model_filter -> GTree.list_store -> GTree.view ->
+class model : Db.db -> GTree.model_filter -> GTree.list_store -> GTree.view ->
   object
     method get_row : Gtk.tree_path -> row
          
@@ -49,7 +49,7 @@ class model : GTree.model_filter -> GTree.list_store -> GTree.view ->
 
 
     
-val make_document_list : ?height:int -> ?show_path:bool -> ?multiple:bool -> ?show_stars:bool ->
+val make_document_list : db:Db.db -> ?height:int -> ?show_path:bool -> ?multiple:bool -> ?show_stars:bool ->
                          ?editable:bool -> ?library:string ->
                          ?sort:(('a GTree.column) option) -> doc_type:string ->
                          packing:(GObj.widget -> unit) -> (Db.doc list) -> model 

@@ -13,7 +13,7 @@ class library : string -> string -> GPack.box ->
     method set_model : Model.model -> unit
   end
                                
-class notebook : GPack.notebook -> GMenu.menu -> (GTree.model -> Model.row -> bool)
+class notebook : GPack.notebook -> Db.db -> GMenu.menu -> (GTree.model -> Model.row -> bool)
   -> object
   val mutable libraries : (string * library) list
                                                  

@@ -35,8 +35,9 @@ class library library doc_type page =
       | None -> false
   end
   
-class notebook notebook context_menu filter_func = object (self)
+class notebook notebook db context_menu filter_func = object (self)
   val notebook : GPack.notebook = notebook
+  val db : Db.db = db
   val context_menu : GMenu.menu = context_menu
   val filter_func : GTree.model -> Gtk.tree_iter -> bool = filter_func
   val mutable libraries : (string * library) list = []
@@ -97,8 +98,8 @@ class notebook notebook context_menu filter_func = object (self)
       let library = lib#get_name in
       let doc_type = lib#get_doc_type in
       let page = lib#get_page in
-      let data = (Db.get_documents ~library) in
-      let model = (Model.make_document_list ~multiple:true ~sort:(Some Model.Attr.star)
+      let data = (db#get_documents ~library) in
+      let model = (Model.make_document_list ~db:db ~multiple:true ~sort:(Some Model.Attr.star)
                      ~editable:true ~library ~doc_type ~packing:page#add data) in
       model#handle_click_events ~context_menu;
       model#set_visible_func filter_func;
@@ -115,11 +116,11 @@ class notebook notebook context_menu filter_func = object (self)
     let model = lib#get_model in
     iter_cancel (fun p ->
         let path = (model#get ~row:(model#get_row p) ~column:Model.Attr.path) in
-        let doc = Db.get_document ~library ~path in
+        let doc = db#get_document ~library ~path in
         let doc = (match (editor doc) with
                    | None -> raise Cancel
                    | Some doc -> doc) in
-        Db.set_document ~library ~path doc;
+        db#set_document ~library ~path doc;
         model#set_entry (model#get_row p) doc)
       model#get_selected_rows
 

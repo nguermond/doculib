@@ -13,9 +13,8 @@ let rec get_files ~library (path : string) : string list =
           (Array.to_list (Sys.readdir path))))
 
   
-let choose_files (library : string) : string list =
+let choose_files (root_path : string) (library : string) : string list =
   let dialog = GWindow.file_chooser_dialog ~action:`OPEN ~title:"Import Documents" () in
-  let root_path = (Db.get_library_root ~library) in
   dialog#set_current_folder root_path;
   dialog#add_button_stock `CANCEL `CANCEL;
   dialog#add_button_stock `OPEN `OPEN;
@@ -30,10 +29,6 @@ let choose_files (library : string) : string list =
   in
   dialog#destroy();
   files
-
-(* TODO: Show progress bar *)
-let import_files ~library ~doc_type (files : string list) : Db.doc list =
-  (Db.import_files ~library ~doc_type files)
   
   
 let choose_dir (title : string) : string option =
@@ -56,7 +51,7 @@ let error_dialog (msg : string) : unit =
    | _ -> error_dialog#destroy()
   )
   
-let search_metadata (default : Db.doc) (search_str : string) : Db.doc option =
+let search_metadata ~db (default : Db.doc) (search_str : string) : Db.doc option =
   let docs = Search.search_document default.doc_type default.doc_type search_str in
   let dialog = GWindow.dialog ~title:"Search for Metadata"
                  ~width:800 ~height:400 () in
@@ -66,7 +61,7 @@ let search_metadata (default : Db.doc) (search_str : string) : Db.doc option =
   let search_e = GEdit.entry ~text:search_str ~packing:(hbox#add) () in
   let refresh_b = GButton.button ~label:"Refresh" ~packing:(hbox#pack ~from:`END) () in
 
-  let model = Model.make_document_list ~height:380 ~show_path:false ~show_stars:false
+  let model = Model.make_document_list ~db ~height:380 ~show_path:false ~show_stars:false
                 ~doc_type:default.doc_type ~packing:dialog#vbox#pack docs in
   
   let database_l1 = GButton.radio_button 
@@ -253,11 +248,17 @@ let main () =
         (string_match pat ~numerrs:(if (String.length search_string > 2) then 1 else 0) search_string)
     ) in
 
+  (* Database *)
+  Db.init();
+  let db = new Db.db Db.current_branch in
+  
   (* Notebook *)
   let notebook = GPack.notebook ~packing:vbox#add () in
-  let notebook = new Notebook.notebook notebook context_menu filter_func in
-  Db.init ();
-  let libraries = (List.map (fun lib -> (lib, Db.get_library_doc_type lib)) (Db.get_libraries())) in
+  let notebook = new Notebook.notebook notebook db context_menu filter_func in
+
+  
+  
+  let libraries = (List.map (fun lib -> (lib, db#get_library_doc_type lib)) (db#get_libraries())) in
   notebook#init libraries;
   
 
@@ -272,7 +273,7 @@ let main () =
   context_factory#add_item "Open"
     ~callback:(fun _ ->
       notebook#action_on_selected (fun library model row ->
-          Db.open_doc ~library ~path:(model#get ~row ~column:Model.Attr.path))
+          db#open_doc ~library ~path:(model#get ~row ~column:Model.Attr.path))
     );
 
   (* Open DOI of selected files *)
@@ -295,7 +296,7 @@ let main () =
           let search_str = (if doc.title = "" then doc.path else doc.title) in
           (* TODO: only supports pdf and djvu, but any file extension should work...? *)
           let search_str = Str.global_replace (Str.regexp "\\(.pdf\\)\\|\\(.djvu\\)\\|[-_\\.() ]+") " " search_str in
-          search_metadata doc search_str)
+          search_metadata db doc search_str)
     );
   
   (* Remove entry from database *)
@@ -303,7 +304,7 @@ let main () =
     ~callback:(fun _ ->
       notebook#action_on_selected (fun library model row ->
           let path = (model#get ~row ~column:Model.Attr.path) in
-          Db.remove_document library path;
+          db#remove_document library path;
           ignore (model#remove row))
     );
 
@@ -328,9 +329,9 @@ let main () =
       (match confirm_dialog#run() with
        | `OK -> notebook#action_on_selected (fun library model row ->
                     let path = (model#get ~row ~column:Model.Attr.path) in
-                    Db.remove_document library path;
+                    db#remove_document library path;
                     model#remove row;
-                    let full_path = (Db.get_full_path library path) in
+                    let full_path = (db#get_full_path library path) in
                     ignore (Sys.remove path))
        | _ -> prerr_endline "Cancel");
       confirm_dialog#destroy()
@@ -349,8 +350,9 @@ let main () =
     ~callback:(fun () ->
       try
         let (library,lib) = notebook#current_library in
-        let files = choose_files library in
-        let data = (import_files ~library ~doc_type:(lib#get_doc_type) files) in
+        let root_path = (db#get_library_root ~library) in
+        let files = choose_files root_path library in
+        let data = (db#import_files ~library ~doc_type:(lib#get_doc_type) files) in
         lib#get_model#import_documents data
       with
         Notebook.NoLibrary -> (error_dialog "Library must be created first!")
@@ -363,10 +365,10 @@ let main () =
       | Some (library, doc_type, root, import_dir) ->
          notebook#add_library library doc_type;
          prerr_endline "Adding library in DB";
-         Db.add_library ~library ~doc_type ~root;
+         db#add_library ~library ~doc_type ~root;
          (if import_dir then
             let files = (get_files ~library root) in
-            ignore (import_files ~library ~doc_type files));
+            ignore (db#import_files ~library ~doc_type files));
          prerr_endline "Loading library in NB";
          notebook#load_library library;
       | None -> ()

@@ -14,9 +14,9 @@ exception LibraryExists
 let branches = ["2.1"; "2.0"]
 let current_branch = "2.0"
 
-val configdir : string = (Sys.getenv "HOME")^"/.doculib"
-val datadir : string = configdir^"/data"
-val libconfig : string = configdir^"/libraries.json"
+let configdir : string = (Sys.getenv "HOME")^"/.doculib"
+let datadir : string = configdir^"/data"
+let libconfig : string = configdir^"/libraries.json"
 
 
 type doc = {star : bool;
@@ -156,14 +156,15 @@ class db branch =
 object (self)
   val store : string = datadir^"/"^branch
   val mutable libraries : ((string * (string * string)) list) =
+    let store = (datadir^"/"^branch) in
     (if (not (Sys.file_exists store)) then
        (prerr_endline "store directory does not exist: creating...";
         Sys.mkdir store 0o755));
     let json = Yojson.Basic.from_file libconfig in
-    let libs = (json_to_libs json) in
+    (json_to_libs json)
     
   (* TODO: move to utilities *)
-  method make_dirs (dirs : string list) : unit =
+  method private make_dirs (dirs : string list) : unit =
     let rec make_dirs_ path dirs : unit =
       (* prerr_endline ("Making dir: " ^ path); *)
       (if Sys.file_exists path then ()
@@ -173,15 +174,16 @@ object (self)
       | [name] -> prerr_endline name; ()
       | dir::dirs -> make_dirs_ (path^"/"^dir) dirs
     in (make_dirs_ store dirs)
+     
 
 (* Store document metadata as
  * store/library/path.json *)  
-  method add_document ~library (doc : doc) : unit =
+  method private add_document ~library (doc : doc) : unit =
     let name = (store^"/"^library^"/"^doc.path^".json") in
     (* (print_endline ("adding "^name)); *)
     let json = doc_to_json doc in
     let dirs = (Str.split (Str.regexp "/") (library^"/"^doc.path)) in
-    (make_dirs dirs);
+    (self#make_dirs dirs);
     (Json.to_file name json)
   
   method get_document ~library ~path : doc =
@@ -201,7 +203,7 @@ object (self)
     (* print_endline ("removing "^ name); *)
     Sys.remove name
  
-  method import_file ~library ~doc_type path : doc option =
+  method private import_file ~library ~doc_type path : doc option =
     let name = (store^"/"^library^"/"^path^".json") in
     (* prerr_endline ("importing file: "^name); *)
     (if (Sys.file_exists name) then
@@ -209,7 +211,7 @@ object (self)
         None)
      else
        (let doc = (make_doc_from_file path doc_type) in
-        let _ = add_document ~library doc in
+        let _ = self#add_document ~library doc in
         (Some doc)))
 
   method import_files ~library ~doc_type (paths : string list) : doc list =
@@ -234,7 +236,7 @@ object (self)
                (Array.to_list (Sys.readdir full_path)))))
     in (get_files (store^"/"^library))
   
-  method print_documents library : unit =
+  method private print_documents library : unit =
     let docs = self#get_documents library in
     List.iter (fun d -> printf "%a@\n" pp_doc d) docs
     
@@ -272,18 +274,19 @@ end
   
 let update_db (version : string) (json : Json.t) : unit =
   (printf "Updating version %s to version %s@\n" version current_branch);
+  failwith "NYI"
   (* 1. update libraries.json
      2. migrate each library
    *)
-  failwith "NYI"
+
   
 let init () : unit =
   (if (not (Sys.file_exists configdir)) then
      (prerr_endline "configuration directory does not exist: creating...";
       Sys.mkdir configdir 0o755));
-  (if (not (Sys.file_exists data)) then
+  (if (not (Sys.file_exists datadir)) then
      (prerr_endline "data directory does not exist: creating...";
-      Sys.mkdir data 0o755));
+      Sys.mkdir datadir 0o755));
   (if (not (Sys.file_exists libconfig)) then
      (prerr_endline "configuration file does not exist: creating...";
       let json = (libs_to_json current_branch []) in

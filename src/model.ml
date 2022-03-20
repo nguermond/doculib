@@ -33,8 +33,9 @@ module Attr =
   end
 
 
-class model filter store view =
+class model db filter store view =
 object (self)
+  val db : Db.db = db
   val filter : GTree.model_filter = filter
   val mutable store : GTree.list_store = store
   val view : GTree.view = view
@@ -101,10 +102,10 @@ object (self)
               let row = (self#get_row p) in
               let path = (store#get ~row ~column:Attr.path) in
               let key = (Attr.get_name (col.index)) in
-              let doc = Db.get_document ~library ~path in
+              let doc = db#get_document ~library ~path in
               let doc = Db.edit_document (Db.set_attribute key str) doc in
               (prerr_endline (Format.asprintf "%a" Db.pp_doc doc));
-              Db.set_document ~library ~path doc;
+              db#set_document ~library ~path doc;
               store#set ~row ~column:col str
             );
           GTree.view_column ~title ~renderer:(renderer,values) ()
@@ -165,7 +166,7 @@ end
 
 
                                   
-let make_document_list ?(height=400) ?(show_path=true) ?(multiple=false)
+let make_document_list ~db ?(height=400) ?(show_path=true) ?(multiple=false)
       ?(show_stars=true) ?(editable=false) ?(library:string = "")
       ?(sort : ('a GTree.column) option=None) 
       ~doc_type ~packing data : model =
@@ -179,7 +180,7 @@ let make_document_list ?(height=400) ?(show_path=true) ?(multiple=false)
   let filter = (GTree.model_filter store) in
   let view = GTree.view ~reorderable:true
                ~model:filter ~packing:swindow#add() in
-  let model = (new model filter store view) in
+  let model = (new model db filter store view) in
 
   view#set_enable_grid_lines `HORIZONTAL;
   (if multiple then view#selection#set_mode `MULTIPLE);
@@ -190,9 +191,9 @@ let make_document_list ?(height=400) ?(show_path=true) ?(multiple=false)
       let row = (model#get_row p) in
       let value = (not (store#get ~row ~column:Attr.star)) in
       let path = model#get ~row ~column:Attr.path in
-      let doc = Db.get_document ~library ~path in
+      let doc = db#get_document ~library ~path in
       let doc = Db.edit_document (Star value) doc in
-      Db.set_document ~library ~path doc;
+      db#set_document ~library ~path doc;
       store#set ~row ~column:Attr.star value);
   let star_cell_renderer = Some (CellRenderer (renderer,values)) in
   
