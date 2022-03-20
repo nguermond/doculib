@@ -3,9 +3,13 @@ module Sys =
   struct
     include Sys
     let xopen (str : string) : unit =
+      (* Linux *)
       let ret = Sys.command ("xdg-open \""^str^"\"") in
-      (if ret > 0 then
-         prerr_endline (str ^ " could not be opened!"))
+      if ret > 0 then
+        (* MacOS *)
+        let ret = (Sys.command ("open \""^str^"\"")) in
+        if ret > 0 then
+          prerr_endline (str ^ " could not be opened!")
   end
 
 module List =
