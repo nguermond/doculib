@@ -3,7 +3,7 @@
 (version 1.0.1)
 
 (generate_opam_files true)
-(source (uri https://github.com/nguermond/doculib/archive/refs/tags/v1.0.1.tar.gz))
+(source (github nguermond/doculib))
 (license GPL-3.0)
 (authors "Nathan Guermond")
 (maintainers "nguermond@protonmail.com")
@@ -14,4 +14,6 @@
   dune
   cohttp-lwt-unix
   yojson
-  (lablgtk3 (>= 3.1.2))))
+  (lablgtk3 (>= 3.1.2))
+  (ocaml (>= 4.12.0))
+  ))
