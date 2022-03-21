@@ -24,3 +24,6 @@ val default : ([> `Null] as 'a) -> 'a option -> 'a
 val to_file : ?len:int -> ?std:bool -> string -> t -> unit
 
 val from_file : ?buf:Bi_outbuf.t -> ?fname:string -> ?lnum:int -> string -> t
+
+val add_entry : string -> t -> t -> t
+val remove_entry : string -> t -> t

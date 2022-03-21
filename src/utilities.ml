@@ -10,7 +10,7 @@ module Sys =
            prerr_endline (str ^ " could not be opened!"))
 
     let hash (file : string) : string =
-      (Digest.file file)
+      (Digest.to_hex (Digest.file file))
   end
 
 module List =

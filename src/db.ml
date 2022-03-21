@@ -12,7 +12,7 @@ exception LibraryExists
 
 (* The database is versioned, to prevent data loss upon upgrade. *)
 let branches = ["2.1"; "2.0"]
-let current_branch = "2.0"
+let current_branch = "2.1"
 
 let configdir : string = (Sys.getenv "HOME")^"/.doculib"
 let datadir : string = configdir^"/data"
@@ -28,6 +28,7 @@ type doc = {star : bool;
             tags : string list;
             path : string;
             doc_type : string;
+            hash : string;
            }
 
 type attribute =  Star of bool
@@ -39,10 +40,14 @@ type attribute =  Star of bool
                 | Tags of string list
                 | Path of string
                 | DocType of string
+                | Hash of string
                            
 let set_attribute (field : string) (value : string) : attribute =
   match field with
-  | "star" -> Star (match value with "true" -> true | "false" -> false | _ -> failwith "Cannot set Star attribute")
+  | "star" -> Star (match value with
+                      "true" -> true
+                    | "false" -> false
+                    | _ -> failwith "Cannot set Star attribute")
   | "title" -> Title value
   | "authors" -> Authors (Str.split (Str.regexp "; +") value)
   | "year" -> Year value
@@ -51,6 +56,7 @@ let set_attribute (field : string) (value : string) : attribute =
   | "tags" -> Tags (Str.split (Str.regexp "; +") value)
   | "path" -> Path value
   | "doc_type" -> DocType value
+  | "hash" -> Hash value
   | _ -> failwith "Not a field"
 
 let edit_document (field : attribute) (doc : doc) : doc =
@@ -62,11 +68,12 @@ let edit_document (field : attribute) (doc : doc) : doc =
    year = (match field with Year v -> v | _ -> doc.year);
    tags = (match field with Tags v -> v | _ -> doc.tags);
    path = (match field with Path v -> v | _ -> doc.path);
-   doc_type = (match field with DocType v -> v | _ -> doc.doc_type)
+   doc_type = (match field with DocType v -> v | _ -> doc.doc_type);
+   hash = (match field with Hash v -> v | _ -> doc.hash);
   }         
   
 let pp_doc ppf (d : doc) =
-  (fprintf ppf "{@\n%s%s%s%s%s%s%s%s%s}"
+  (fprintf ppf "{@\n%s%s%s%s%s%s%s%s%s%s}"
      (if d.star = false then ""
       else (asprintf "  Starred@\n"))
      (if d.title = "" then ""
@@ -82,7 +89,9 @@ let pp_doc ppf (d : doc) =
      (if d.tags = [] then ""
       else (sprintf "  Tags: %s@\n" (String.concat "; " d.tags)))
      (sprintf "  Path: %s@\n" d.path)
-     (sprintf "  Document Type: %s@\n" d.doc_type))
+     (sprintf "  Document Type: %s@\n" d.doc_type)
+     (sprintf "  Hash: %s@\n" d.hash)
+  )
 
                
 let make_doc_from_file path doc_type : doc =
@@ -94,7 +103,8 @@ let make_doc_from_file path doc_type : doc =
    year="";
    tags=[];
    path=path;
-   doc_type=doc_type
+   doc_type=doc_type;
+   hash="";
   }
 
 let doc_to_json (doc : doc) : Json.t =
@@ -105,7 +115,9 @@ let doc_to_json (doc : doc) : Json.t =
           ("isbn", `String doc.isbn);
           ("year", `String doc.year);
           ("tags", `List (List.map (fun x -> `String x) doc.tags));
-          ("doc_type", `String doc.doc_type)]
+          ("doc_type", `String doc.doc_type);
+          ("hash", `String doc.hash);
+    ]
 
 let json_to_doc path (json : Json.t) : doc =
   let open Json in
@@ -119,7 +131,8 @@ let json_to_doc path (json : Json.t) : doc =
     tags = (List.map to_string
               (to_list (raise_opt "" (get "tags" json))));
     path = path;
-    doc_type = (to_string (raise_opt "" (get "doc_type" json)))
+    doc_type = (to_string (raise_opt "" (get "doc_type" json)));
+    hash = (to_string (default (`String "") (get "hash" json)));
   }
 
 
@@ -137,10 +150,18 @@ let json_to_libs (json : Json.t) : (string * (string * string)) list =
          let doc_type = Json.to_string (Json.raise_opt "Could not find entry `doc_type`" (Json.get "doc_type" json)) in
          (name,(path,doc_type)))
 
-let get_lib_version (json : Json.t) : string =
+let get_lib_version () : string =
+  let json = Yojson.Basic.from_file libconfig in
   Json.to_string
     (Json.raise_opt "Could not find entry `version`"
        (Json.get "version" json))
+
+let set_lib_version (version : string) : unit =
+  let json = Yojson.Basic.from_file libconfig in
+  let json = (Json.remove_entry "version" json) in
+  let json = (Json.add_entry "version" (`String version) json) in
+  (Json.to_file libconfig json)
+  
 
 let libs_to_json (version : string) (libs : (string * (string * string)) list) : Json.t =
   let libs = (`List (List.map (fun (name,(path,doc_type)) ->
@@ -150,6 +171,11 @@ let libs_to_json (version : string) (libs : (string * (string * string)) list) :
                        libs)) in
   (`Assoc [("version",`String version);
            ("libraries", libs)])
+
+let init_lib_config () : unit =
+  let json = (libs_to_json current_branch []) in
+  (Json.to_file libconfig json)
+
 
    
 class db branch =
@@ -178,7 +204,7 @@ object (self)
 
 (* Store document metadata as
  * store/library/path.json *)  
-  method private add_document ~library (doc : doc) : unit =
+  method add_document ~library (doc : doc) : unit =
     let name = (store^"/"^library^"/"^doc.path^".json") in
     (* (print_endline ("adding "^name)); *)
     let json = doc_to_json doc in
@@ -262,7 +288,7 @@ object (self)
        raise LibraryExists
      else
        let json = Yojson.Basic.from_file libconfig in
-       let version = (get_lib_version json) in
+       let version = (get_lib_version ()) in
        let libs = (json_to_libs json) in
        let libs = (library,(root,doc_type)) :: libs in
        let json = (libs_to_json version libs) in
@@ -272,28 +298,5 @@ object (self)
        libraries <- libs)
 end
   
-let update_db (version : string) (json : Json.t) : unit =
-  (printf "Updating version %s to version %s@\n" version current_branch);
-  failwith "NYI"
-  (* 1. update libraries.json
-     2. migrate each library
-   *)
-
-  
-let init () : unit =
-  (if (not (Sys.file_exists configdir)) then
-     (prerr_endline "configuration directory does not exist: creating...";
-      Sys.mkdir configdir 0o755));
-  (if (not (Sys.file_exists datadir)) then
-     (prerr_endline "data directory does not exist: creating...";
-      Sys.mkdir datadir 0o755));
-  (if (not (Sys.file_exists libconfig)) then
-     (prerr_endline "configuration file does not exist: creating...";
-      let json = (libs_to_json current_branch []) in
-      Json.to_file libconfig json));
-  let json = Yojson.Basic.from_file libconfig in
-  let version = (get_lib_version json) in
-  (if version <> current_branch then
-     (update_db version json))
 
   

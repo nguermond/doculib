@@ -1,6 +1,8 @@
 
 val current_branch : string
 val configdir : string
+val datadir : string
+val libconfig : string
 
 type doc = {star : bool;
             title : string;
@@ -11,42 +13,32 @@ type doc = {star : bool;
             tags : string list;
             path : string;
             doc_type : string;
+            hash : string;
            }
 
-type attribute =
-  Star of bool
-| Title of string
-| Authors of string list
-| Doi of string
-| Isbn of string
-| Year of string
-| Tags of string list
-| Path of string
-| DocType of string
-
-val init : unit -> unit
+type attribute =  Star of bool
+                | Title of string
+                | Authors of string list
+                | Doi of string
+                | Isbn of string
+                | Year of string
+                | Tags of string list
+                | Path of string
+                | DocType of string
+                | Hash of string
   
 val set_attribute : string -> string -> attribute
-             
-
-  
-
-(* val add_document : library:string -> doc -> unit *)
-  
-
+    
 val get_rel_path : library:string -> string -> string
-
-
-
-
-  
 val pp_doc : Format.formatter -> doc -> unit
 val edit_document : attribute -> doc -> doc
 
+val set_lib_version : string -> unit
+val init_lib_config : unit -> unit
+val get_lib_version : unit -> string
 
 
-
-                                                                                 
+                                                                           
 class db : string ->
 object
   val store : string
@@ -56,6 +48,8 @@ object
   method get_documents : library:string -> doc list
     
   method set_document : library:string -> path:string -> doc -> unit
+
+  method add_document : library:string -> doc -> unit
 
   method remove_document : library:string -> path:string -> unit
 

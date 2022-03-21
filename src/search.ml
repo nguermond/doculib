@@ -57,6 +57,7 @@ let parse_article (doc_type : string) (article : Json.t) : Db.doc =
                       tags = [];
                       path = "";
                       doc_type = doc_type;
+                      hash = "";
                      }
   in doc
 
@@ -81,6 +82,7 @@ let parse_book (doc_type : string) (book : Json.t) : Db.doc =
                       tags = [];
                       path = "";
                       doc_type = doc_type;
+                      hash = "";
                      }
   in doc
 

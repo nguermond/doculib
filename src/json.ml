@@ -43,3 +43,14 @@ let default d (x : 'a option) : 'a =
   | None 
   | Some `Null -> d
   | Some x -> x
+
+
+let add_entry (k : string) (v : t) (json : t) : t =
+  match json with
+  | `Assoc kv_lst -> (`Assoc ((k,v)::kv_lst))
+  | _ -> raise (ParsingFailure "Not an association list")
+
+let remove_entry (k : string) (json : t) : t =
+  match json with
+  | `Assoc kv_lst -> (`Assoc (List.remove_assoc k kv_lst))
+  | _ -> raise (ParsingFailure "Not an association list")

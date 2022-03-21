@@ -107,7 +107,8 @@ let search_metadata ~db (default : Db.doc) (search_str : string) : Db.doc option
             isbn = (model#get ~row:(model#get_row p) ~column:Model.Attr.isbn);
             tags = default.tags;
             doc_type = default.doc_type;
-            path = default.path
+            path = default.path;
+            hash = default.hash;
           } in Some doc
      | `CANCEL -> None
      | `DELETE_EVENT -> Some default) in
@@ -158,7 +159,8 @@ let edit_document (doc : Db.doc) : Db.doc option =
                     isbn = isbn#text;
                     tags = (Str.split (Str.regexp "; +") tags#text);
                     doc_type = doc.doc_type;
-                    path = doc.path
+                    path = doc.path;
+                    hash = doc.hash;
                   } in Some doc
              | `CANCEL -> None
              | `DELETE_EVENT -> Some doc) in
@@ -249,7 +251,7 @@ let main () =
     ) in
 
   (* Database *)
-  Db.init();
+  Update_db.init();
   let db = new Db.db Db.current_branch in
   
   (* Notebook *)
