@@ -3,6 +3,7 @@ open Cohttp
 open Cohttp_lwt_unix
 
 exception UnexpectedDocumentType of string
+exception SearchFailure of string
                                   
 let get_database_name : string -> string = function
   | "book" -> "openlibrary.org"
@@ -90,11 +91,16 @@ let parse_book (doc_type : string) (book : Json.t) : Db.doc =
 let search_article (doc_type : string) (search_str : string) : Db.doc list =
   let body = Lwt_main.run (query_article_string search_str) in
   let json = Json.from_string body in
-  let data = try Json.to_list (Json.raise_opt "Unexpected result" (Json.get "data" json)) with
-             | Json.ParsingFailure err -> let json_pp = Json.pretty_to_string json in
-                                     (prerr_endline err);
-                                     (prerr_endline ("Failed to parse JSON:\n"^json_pp));
-                                     raise (Json.ParsingFailure "Parse failure")
+  let data =
+    (try Json.to_list (Json.raise_opt "Unexpected result" (Json.get "data" json)) with
+     | Json.ParsingFailure err ->
+        (let msg = (try (Json.to_string (Json.raise_opt "" (Json.get "message" json)))
+                    with _ ->
+                      let json_pp = Json.pretty_to_string json in
+                      (prerr_endline err);
+                      (prerr_endline ("Failed to parse JSON:\n"^json_pp));
+                      raise (Json.ParsingFailure "Parse failure")) in
+         raise (SearchFailure ("semanticscholar.org: "^msg))))
   in (List.map (parse_article doc_type) data)                 
 
 

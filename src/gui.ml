@@ -195,7 +195,10 @@ let manage_libraries ~db ~notebook : unit =
   )
   
 let search_metadata ~db (default : Db.doc) (search_str : string) : Db.doc option =
-  let docs = Search.search_document default.doc_type default.doc_type search_str in
+  let docs =
+    (try Search.search_document default.doc_type default.doc_type search_str with
+      Search.SearchFailure msg -> (error_dialog msg);[]) in
+       
   let dialog = GWindow.dialog ~title:"Search for Metadata"
                  ~width:800 ~height:400 () in
 
@@ -226,7 +229,8 @@ let search_metadata ~db (default : Db.doc) (search_str : string) : Db.doc option
   refresh_b#connect#clicked ~callback:(fun () ->
       let search_str = search_e#text in
       let search_type = (if database_l1#active then "article" else "book") in
-      let docs = Search.search_document default.doc_type search_type search_str in
+      let docs = (try Search.search_document default.doc_type search_type search_str with
+                    Search.SearchFailure msg -> (error_dialog msg); []) in
       model#reset_model();
       model#import_documents docs;
       ());
@@ -398,9 +402,11 @@ let main () =
   context_factory#add_item "Search Metadata"
     ~callback:(fun _ ->
       notebook#edit_selected (fun doc ->
-          let search_str = (if doc.title = "" then doc.path else doc.title) in
-          (* TODO: only supports pdf and djvu, but any file extension should work...? *)
-          let search_str = Str.global_replace (Str.regexp "\\(.pdf\\)\\|\\(.djvu\\)\\|[-_\\.() ]+") " " search_str in
+          let search_str =
+            (if doc.title = "" then
+               (Str.global_replace (Str.regexp ("\\(.*/\\)\\|\\(\\..*\\)\\|[-_\\()]")) "" doc.path)
+             else doc.title) in
+          (* let search_str = Str.global_replace (Str.regexp "\\(.pdf\\)\\|\\(.djvu\\)\\|[-_\\.() ]+") " " search_str in *)
           search_metadata db doc search_str)
     );
   
