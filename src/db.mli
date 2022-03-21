@@ -1,4 +1,6 @@
 
+exception LibraryExists
+        
 val current_branch : string
 val configdir : string
 val datadir : string
@@ -63,5 +65,6 @@ object
 
   method get_full_path : library:string -> string -> string
 
-  method open_doc : library:string -> path:string -> unit 
+  method open_doc : library:string -> path:string -> unit
+  method check_library_integrity : library:string -> unit
 end

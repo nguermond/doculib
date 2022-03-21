@@ -3,6 +3,7 @@ open Format
 
 (* exception InitializationFailure of string *)
 exception LibraryExists
+(* exception FileNotFound of string *)
                                  
 (* We store an absolute path to each library, 
  * and a path to a file is relative to this path. 
@@ -190,7 +191,7 @@ object (self)
     (json_to_libs json)
     
   (* TODO: move to utilities *)
-  method private make_dirs (dirs : string list) : unit =
+  method private make_dirs (path : string) : unit =
     let rec make_dirs_ path dirs : unit =
       (* prerr_endline ("Making dir: " ^ path); *)
       (if Sys.file_exists path then ()
@@ -199,42 +200,35 @@ object (self)
       | [] -> failwith "Not a full path"
       | [name] -> prerr_endline name; ()
       | dir::dirs -> make_dirs_ (path^"/"^dir) dirs
-    in (make_dirs_ store dirs)
+    in (make_dirs_ store (Str.split (Str.regexp "/") path))
      
 
 (* Store document metadata as
  * store/library/path.json *)  
   method add_document ~library (doc : doc) : unit =
     let name = (store^"/"^library^"/"^doc.path^".json") in
-    (* (print_endline ("adding "^name)); *)
     let json = doc_to_json doc in
-    let dirs = (Str.split (Str.regexp "/") (library^"/"^doc.path)) in
-    (self#make_dirs dirs);
+    (self#make_dirs (library^"/"^doc.path));
     (Json.to_file name json)
   
   method get_document ~library ~path : doc =
     let name = (store^"/"^library^"/"^path^".json") in
-    (* print_endline ("getting "^name); *)
     let json = (Json.from_file name) in
     (json_to_doc path json)
   
   method set_document ~library ~path doc : unit =
     let name = (store^"/"^library^"/"^path^".json") in
-    (* (print_endline ("setting "^name)); *)
     let json = doc_to_json doc in
     (Json.to_file name json)
   
   method remove_document ~library ~path : unit =
     let name = (store^"/"^library^"/"^path^".json") in
-    (* print_endline ("removing "^ name); *)
     Sys.remove name
  
   method private import_file ~library ~doc_type path : doc option =
     let name = (store^"/"^library^"/"^path^".json") in
-    (* prerr_endline ("importing file: "^name); *)
     (if (Sys.file_exists name) then
-       ((* prerr_endline ("Key already exists: "^library^"/"^path); *)
-        None)
+       None
      else
        (let doc = (make_doc_from_file path doc_type) in
         let _ = self#add_document ~library doc in
@@ -293,9 +287,29 @@ object (self)
        let libs = (library,(root,doc_type)) :: libs in
        let json = (libs_to_json version libs) in
        let _ = Json.to_file libconfig json in
-       (prerr_endline "creating library...";
-        Sys.mkdir (store^"/"^library) 0o755);
+       (prerr_endline ("Creating library: "^library));
+       (Sys.mkdir (store^"/"^library) 0o755);
        libraries <- libs)
+
+  method check_library_integrity ~library : unit =
+    (prerr_endline ("Checking integrity of library: "^library));
+    let docs = self#get_documents ~library in
+    List.iter (fun doc ->
+        let full_path = self#get_full_path ~library doc.path in
+        if (not (Sys.file_exists full_path)) then
+          ((prerr_endline ("Misplaced file: "^full_path));
+           (prerr_endline ("Searching: "^store));
+           let root_path = (self#get_library_root ~library) in
+           match (Utilities.Sys.find_file doc.hash root_path) with
+           | Some path ->
+              prerr_endline ("Found new location: "^path);
+              let rel_path = (get_rel_path ~library path) in
+              let new_doc = (edit_document (Path rel_path) doc) in
+              (self#make_dirs (library^"/"^new_doc.path));
+              (self#set_document ~library ~path:new_doc.path new_doc);
+              (self#remove_document ~library ~path:doc.path)
+           | None -> prerr_endline ("Could not find file: ^"^full_path^"\n It was either placed in a different library or deleted!")))
+      docs
 end
   
 

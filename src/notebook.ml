@@ -58,7 +58,7 @@ class notebook notebook db context_menu filter_func = object (self)
     notebook#connect#switch_page ~callback:(fun index ->
         if (List.length libs) > 0 then
           (let (library,lib) = (List.nth libraries index) in
-           prerr_endline ("Index:"^ (string_of_int index)^ "->"^library);
+           (* prerr_endline ("Index:"^ (string_of_int index)^ "->"^library); *)
            (self#load_library library);
            self#refilter ~library:(Some library) ())
         else ()
@@ -95,6 +95,7 @@ class notebook notebook db context_menu filter_func = object (self)
     (prerr_endline ("Loading library "^library));
     let lib = (List.assoc library libraries) in
     if lib#is_loaded then () else
+      let _ = (db#check_library_integrity ~library) in
       let library = lib#get_name in
       let doc_type = lib#get_doc_type in
       let page = lib#get_page in

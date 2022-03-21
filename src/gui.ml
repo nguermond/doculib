@@ -81,9 +81,9 @@ let search_metadata ~db (default : Db.doc) (search_str : string) : Db.doc option
   refresh_b#connect#clicked ~callback:(fun () ->
       let search_str = search_e#text in
       let search_type = (if database_l1#active then "article" else "book") in
-      (prerr_endline ("Searching "^search_type));
+      (* (prerr_endline ("Searching "^search_type)); *)
       let docs = Search.search_document default.doc_type search_type search_str in
-      (prerr_endline ("Results: "^(string_of_int (List.length docs))));
+      (* (prerr_endline ("Results: "^(string_of_int (List.length docs)))); *)
       model#reset_model();
       model#import_documents docs;
       ());
@@ -240,7 +240,7 @@ let main () =
      ^"\\X      character escape");
   let filter_func = (fun (model : GTree.model) row ->
       let search_query = search_e#text in
-      prerr_endline ("Searching query: "^search_query);
+      (* prerr_endline ("Searching query: "^search_query); *)
       let search_string = (String.concat " " (List.map (fun column -> model#get ~row ~column)
                                                 [Model.Attr.title; Model.Attr.authors; Model.Attr.tags; Model.Attr.path])) in
       let open Agrep in
@@ -365,14 +365,14 @@ let main () =
     ~callback:(fun () ->
       match new_library() with
       | Some (library, doc_type, root, import_dir) ->
-         notebook#add_library library doc_type;
-         prerr_endline "Adding library in DB";
-         db#add_library ~library ~doc_type ~root;
-         (if import_dir then
-            let files = (get_files ~library root) in
-            ignore (db#import_files ~library ~doc_type files));
-         prerr_endline "Loading library in NB";
-         notebook#load_library library;
+         (try db#add_library ~library ~doc_type ~root
+          with Db.LibraryExists -> (error_dialog "Library already exists!")
+          | _ -> 
+             notebook#add_library library doc_type;
+             (if import_dir then
+                let files = (get_files ~library root) in
+                ignore (db#import_files ~library ~doc_type files));
+             notebook#load_library library)
       | None -> ()
     );
 

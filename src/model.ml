@@ -104,7 +104,7 @@ object (self)
               let key = (Attr.get_name (col.index)) in
               let doc = db#get_document ~library ~path in
               let doc = Db.edit_document (Db.set_attribute key str) doc in
-              (prerr_endline (Format.asprintf "%a" Db.pp_doc doc));
+              (* (prerr_endline (Format.asprintf "%a" Db.pp_doc doc)); *)
               db#set_document ~library ~path doc;
               store#set ~row ~column:col str
             );

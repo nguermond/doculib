@@ -10,7 +10,11 @@ open Db
 
 exception InternalError of string
 
-(* Version 2.0 -> Version 2.1 *)
+(* Version 2.0 -> Version 2.1
+ * Changes:
+ * - add the md5 hash value of each document,
+ *   this way it can easily be found if moved or renamed
+*)
 module V2_0_to_2_1 =
   struct
     let old_db () = new Db.db "2.0"
