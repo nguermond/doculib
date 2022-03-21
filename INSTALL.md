@@ -7,7 +7,7 @@ wget https://github.com/nguermond/doculib/releases/download/vX.X.X/doculib-linux
 ```
 tar -xzf doculib-linux-x86_64-vX.X.X.tar.gz
 ```
-3. Install (into `/usr/local/bin`):
+3. Install (into `$HOME/.local/bin`):
 ```
 cd doculib-linux-x86_64-vX.X.X && sudo ./install.sh
 ```

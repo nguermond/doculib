@@ -9,11 +9,12 @@
 (maintainers "nguermond@protonmail.com")
 (package
  (name doculib)
- (synopsis "A GUI for tagging and managing document metadata for books, textbooks, or articles.")
+ (synopsis "A GUI for tagging and managing document metadata for books, textbooks, or articles")
  (depends
   dune
   cohttp-lwt-unix
   yojson
   (lablgtk3 (>= 3.1.2))
   (ocaml (>= 4.12.0))
+  tls
   ))

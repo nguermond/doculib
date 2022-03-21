@@ -2,7 +2,7 @@
 opam-version: "2.0"
 version: "1.0.1"
 synopsis:
-  "A GUI for tagging and managing document metadata for books, textbooks, or articles."
+  "A GUI for tagging and managing document metadata for books, textbooks, or articles"
 maintainer: ["nguermond@protonmail.com"]
 authors: ["Nathan Guermond"]
 license: "GPL-3.0"
@@ -14,6 +14,7 @@ depends: [
   "yojson"
   "lablgtk3" {>= "3.1.2"}
   "ocaml" {>= "4.12.0"}
+  "tls"
   "odoc" {with-doc}
 ]
 build: [
