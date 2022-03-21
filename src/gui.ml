@@ -365,14 +365,13 @@ let main () =
     ~callback:(fun () ->
       match new_library() with
       | Some (library, doc_type, root, import_dir) ->
-         (try db#add_library ~library ~doc_type ~root
-          with Db.LibraryExists -> (error_dialog "Library already exists!")
-          | _ -> 
-             notebook#add_library library doc_type;
-             (if import_dir then
-                let files = (get_files ~library root) in
-                ignore (db#import_files ~library ~doc_type files));
-             notebook#load_library library)
+         (try (db#add_library ~library ~doc_type ~root;
+               notebook#add_library library doc_type;
+               (if import_dir then
+                  let files = (get_files ~library root) in
+                  ignore (db#import_files ~library ~doc_type files));
+               notebook#load_library library)
+          with Db.LibraryExists -> (error_dialog "Library already exists!"))
       | None -> ()
     );
 
