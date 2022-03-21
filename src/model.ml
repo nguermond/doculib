@@ -85,11 +85,9 @@ object (self)
     let col : (GTree.view_column) =
       (match cell_renderer, column with
        | None, Str col ->
-          (* TODO: There is a bug in which height of the first entry
-           * readjusts after mouseover *)
           let renderer,values = (GTree.cell_renderer_text
                                    [`EDITABLE editable;
-                                    `HEIGHT 36; (* 18 * number of lines *)
+                                    (* `HEIGHT 36; (\* 18 * number of lines *\) *)
                                     `WRAP_WIDTH width;
                                     `WRAP_MODE `WORD_CHAR],
                                  ["text",col]) in

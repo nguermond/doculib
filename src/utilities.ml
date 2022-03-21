@@ -1,5 +1,5 @@
 
-
+exception InternalError of string
 
 module Sys =
   struct
@@ -9,7 +9,7 @@ module Sys =
       if (Sys.command ("xdg-open \""^str^"\"")) > 0 then
         (* MacOS *)
         (if (Sys.command ("open \""^str^"\"")) > 0 then
-           prerr_endline (str ^ " could not be opened!"))
+           (raise (InternalError (str ^ " could not be opened!"))))
 
     let hash (file : string) : string =
       (Digest.to_hex (Digest.file file))
@@ -26,6 +26,11 @@ module Sys =
                   (Some full_path) else None)))
           (Array.to_list (Sys.readdir full_path))
       in (find_file_ full_path)
+
+    let rmdir (str : string) : unit =
+      if (Sys.command ("rm -r \""^str^"\"")) > 0 then
+        (raise (InternalError ("Could not remove directory: "^str)));
+      
   end
 
 module List =

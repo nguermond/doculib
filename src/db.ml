@@ -3,6 +3,7 @@ open Format
 
 (* exception InitializationFailure of string *)
 exception LibraryExists
+exception InvalidLibrary
 (* exception FileNotFound of string *)
                                  
 (* We store an absolute path to each library, 
@@ -278,18 +279,33 @@ object (self)
     List.map fst libraries
   
   method add_library ~library ~root ~doc_type : unit =
+    (if (library = "" || root = "") then
+       raise InvalidLibrary);
     (if (List.mem_assoc library libraries) then
-       raise LibraryExists
-     else
-       let json = Yojson.Basic.from_file libconfig in
-       let version = (get_lib_version ()) in
-       let libs = (json_to_libs json) in
-       let libs = (library,(root,doc_type)) :: libs in
-       let json = (libs_to_json version libs) in
-       let _ = Json.to_file libconfig json in
-       (prerr_endline ("Creating library: "^library));
-       (Sys.mkdir (store^"/"^library) 0o755);
-       libraries <- libs)
+       raise LibraryExists);
+    let json = Yojson.Basic.from_file libconfig in
+    let version = (get_lib_version ()) in
+    let libs = (json_to_libs json) in
+    let libs = (library,(root,doc_type)) :: libs in
+    let json = (libs_to_json version libs) in
+    let _ = Json.to_file libconfig json in
+    (prerr_endline ("Creating library: "^library^" -> "^root));
+    (Sys.mkdir (store^"/"^library) 0o755);
+    libraries <- libs
+
+  method remove_library ~library : unit =
+    (* delete ~/.doculib/data/2.1/library *)
+    (prerr_endline ("Removing: "^(store^"/"^library)));
+    (Utilities.Sys.rmdir (store^"/"^library));
+    (* remove entry in ~/.doculib/libraries.json *)
+    let json = Yojson.Basic.from_file libconfig in
+    let version = (get_lib_version ()) in
+    let libs = (json_to_libs json) in
+    let libs = List.remove_assoc library libs in
+    let json = (libs_to_json version libs) in
+    let _ = Json.to_file libconfig json in
+    libraries <- libs
+    
 
   method check_library_integrity ~library : unit =
     (prerr_endline ("Checking integrity of library: "^library));
@@ -305,8 +321,7 @@ object (self)
               prerr_endline ("Found new location: "^path);
               let rel_path = (get_rel_path ~library path) in
               let new_doc = (edit_document (Path rel_path) doc) in
-              (self#make_dirs (library^"/"^new_doc.path));
-              (self#set_document ~library ~path:new_doc.path new_doc);
+              (self#add_document ~library new_doc);
               (self#remove_document ~library ~path:doc.path)
            | None -> prerr_endline ("Could not find file: ^"^full_path^"\n It was either placed in a different library or deleted!")))
       docs

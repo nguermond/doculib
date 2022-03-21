@@ -50,6 +50,149 @@ let error_dialog (msg : string) : unit =
   (match error_dialog#run() with
    | _ -> error_dialog#destroy()
   )
+
+  
+let new_library ~(db:Db.db) ~(notebook:Notebook.notebook) : (string * string) option =
+  let dialog = GWindow.dialog ~title:"New Library" ~border_width:8 ~width:500 ~height:200 () in
+  let grid = GPack.grid  ~col_spacings:8 ~row_spacings:8 ~packing:dialog#vbox#pack () in
+
+  (* let name_l = GMisc.label ~text:"Name" ~packing:(grid#attach ~left:0 ~top:0) () in
+   * let name_e = GEdit.entry ~packing:(grid#attach ~left:1 ~top:0) () in *)
+  let root_path_l = GMisc.label ~text:"Location" ~packing:(grid#attach ~left:0 ~top:0) () in
+  let root_path_hbox = GPack.hbox ~spacing:8 ~packing:(grid#attach ~left:1 ~top:0) () in
+  let root_path_e = GMisc.label ~packing:(root_path_hbox#pack) () in
+  let root_path_b = GButton.button ~label:"Choose" ~packing:(root_path_hbox#pack) () in
+  let import_dir_check = GButton.check_button ~label:"import all files" ~packing:(grid#attach ~left:1 ~top:1) () in
+  let doc_type_l = GMisc.label ~text:"Type" ~packing:(grid#attach ~left:0 ~top:2) () in
+  let doc_type_combo = GEdit.combo_box_text ~active:0 ~strings:["article"; "book"] ~packing:(grid#attach ~left:1 ~top:2)() in
+  
+  root_path_b#connect#clicked ~callback:(fun () ->
+      let root_path =
+        match (choose_dir "Choose Library Location") with
+        | Some path -> path
+        | None -> "" in
+      root_path_e#set_text root_path);
+
+  dialog#add_button_stock `OK `OK;
+  dialog#add_button_stock `CANCEL `CANCEL;
+  
+  (match (dialog#run()) with
+   | `OK ->
+      let doc_type = match GEdit.text_combo_get_active doc_type_combo with
+        | None -> failwith "doc_type select: Not possible"
+        | Some s -> s in
+      let root = root_path_e#text in
+      let key = (String.split_on_char '/' root) in
+      let library = (List.nth key ((List.length key) - 1)) in
+      dialog#destroy();
+      let import_dir = import_dir_check#active in
+      (try
+         (db#add_library ~library ~doc_type ~root;
+          notebook#add_library library doc_type;
+          (if import_dir then
+             let files = (get_files ~library root) in
+             ignore (db#import_files ~library ~doc_type files));
+          notebook#load_library library;
+          (Some (library, root)))
+       with Db.LibraryExists
+            -> (error_dialog "Library already exists!");
+               None
+          | Db.InvalidLibrary -> None
+      )
+   | `CANCEL | `DELETE_EVENT ->
+      dialog#destroy();
+      None
+  )
+
+  
+let manage_libraries ~db ~notebook : unit =
+  let dialog = GWindow.dialog ~title:"Manage Libraries"
+                 ~width:500 ~height:200 () in
+
+  let swindow = GBin.scrolled_window ~height:200 ~shadow_type:`ETCHED_IN ~hpolicy:`AUTOMATIC
+                  ~vpolicy:`AUTOMATIC ~packing:(dialog#vbox#pack) () in
+  let open Gobject.Data in
+  let columns = new GTree.column_list in
+  let name = columns#add string in
+  let path = columns#add string in
+
+  let store = GTree.list_store columns in
+  let view = GTree.view ~model:store ~packing:swindow#add() in
+
+  view#set_enable_grid_lines `HORIZONTAL;
+  
+  let name_renderer,name_values = (GTree.cell_renderer_text
+                                     [`EDITABLE true;
+                                      `WRAP_WIDTH 200;
+                                      `WRAP_MODE `WORD_CHAR],
+                                   ["text",name]) in
+  let path_renderer,path_values = (GTree.cell_renderer_text
+                                     [`EDITABLE false;
+                                      `WRAP_WIDTH 300;
+                                      `WRAP_MODE `WORD_CHAR],
+                                   ["text",path]) in
+          
+  (* 2 rows of text *)
+  name_renderer#set_fixed_height_from_font 2;
+          
+  (* save cell edits *)
+  name_renderer#connect#edited ~callback:(fun p str ->
+      (prerr_endline ("Editing: "^str));
+    );
+
+  let name_col = GTree.view_column ~title:"Library" ~renderer:(name_renderer,name_values) () in
+  let path_col = GTree.view_column ~title:"Path" ~renderer:(path_renderer,path_values) () in
+  name_col#set_reorderable(true);
+
+  view#append_column name_col;
+  view#append_column path_col;
+  
+  List.iter (fun library ->
+      let row = store#append() in
+      let root_path = db#get_library_root ~library in
+      store#set ~row ~column:name library;
+      store#set ~row ~column:path root_path;
+    ) (db#get_libraries());
+
+  let hbox = GPack.hbox ~border_width:8 ~spacing:8 ~packing:(dialog#vbox#pack)() in  
+
+  let add_b = GButton.button ~label:"Add" ~packing:(hbox#pack ~from:`END) () in
+  let move_b = GButton.button ~label:"Move" ~packing:(hbox#pack ~from:`END) () in
+  let remove_b = GButton.button ~label:"Remove" ~packing:(hbox#pack ~from:`END) () in
+
+  add_b#connect#clicked ~callback:(fun () ->
+      match (new_library ~db ~notebook) with
+      | Some (library,root) ->
+         let row = store#append() in
+         store#set ~row ~column:name library;
+         store#set ~row ~column:path root;
+      | None -> ()
+    );
+
+  remove_b#connect#clicked ~callback:(fun() ->
+      let p = (List.nth (view#selection#get_selected_rows) 0) in
+      let row = (store#get_iter p) in
+      let library = (store#get ~row ~column:name) in
+      
+      let confirm_dialog = GWindow.message_dialog ~title:"Confirm Removal"
+                             ~buttons:GWindow.Buttons.ok_cancel
+                             ~message:("Remove Library: "^library^"?")
+                             ~message_type:`QUESTION () in
+      (match confirm_dialog#run() with
+       | `OK -> (notebook#remove_library ~library);
+                ignore (store#remove row)
+       | _ -> ());
+      confirm_dialog#destroy()
+    );
+
+  move_b#connect#clicked ~callback:(fun () ->
+      (error_dialog "Not yet implemented")
+    );
+  
+  dialog#add_button "Ok" `OK;
+  (match dialog#run() with
+   | _ -> dialog#destroy()
+  )
   
 let search_metadata ~db (default : Db.doc) (search_str : string) : Db.doc option =
   let docs = Search.search_document default.doc_type default.doc_type search_str in
@@ -59,19 +202,21 @@ let search_metadata ~db (default : Db.doc) (search_str : string) : Db.doc option
   let hbox = GPack.hbox ~border_width:8 ~spacing:8 ~packing:(dialog#vbox#pack)() in  
   let search_l = GMisc.label ~text:"Query:" ~packing:(hbox#pack) () in
   let search_e = GEdit.entry ~text:search_str ~packing:(hbox#add) () in
-  let refresh_b = GButton.button ~label:"Refresh" ~packing:(hbox#pack ~from:`END) () in
 
-  let model = Model.make_document_list ~db ~height:380 ~show_path:false ~show_stars:false
-                ~doc_type:default.doc_type ~packing:dialog#vbox#pack docs in
-  
+  let radio_hbox = GPack.hbox ~border_width:8 ~spacing:8 ~packing:(dialog#vbox#pack)() in
+  let refresh_b = GButton.button ~label:"Refresh" ~packing:(radio_hbox#pack ~from:`END) () in
   let database_l1 = GButton.radio_button 
                       ~label:(Search.get_database_name "article")
-                      ~packing:(dialog#action_area#pack ~from:`START) () in
+                      ~packing:(radio_hbox#pack ~from:`END) () in
   let database_l2 = GButton.radio_button
                       ~group:database_l1#group
                       ~label:(Search.get_database_name "book")
-                      ~packing:(dialog#action_area#pack ~from:`START) () in
+                      ~packing:(radio_hbox#pack ~from:`END) () in
 
+  
+  let model = Model.make_document_list ~db ~height:380 ~show_path:false ~show_stars:false
+                ~doc_type:default.doc_type ~packing:dialog#vbox#pack docs in
+  
   (match default.doc_type with
    | "article" -> database_l1#set_active true
    | "book" -> database_l2#set_active true
@@ -81,9 +226,7 @@ let search_metadata ~db (default : Db.doc) (search_str : string) : Db.doc option
   refresh_b#connect#clicked ~callback:(fun () ->
       let search_str = search_e#text in
       let search_type = (if database_l1#active then "article" else "book") in
-      (* (prerr_endline ("Searching "^search_type)); *)
       let docs = Search.search_document default.doc_type search_type search_str in
-      (* (prerr_endline ("Results: "^(string_of_int (List.length docs)))); *)
       model#reset_model();
       model#import_documents docs;
       ());
@@ -166,46 +309,6 @@ let edit_document (doc : Db.doc) : Db.doc option =
              | `DELETE_EVENT -> Some doc) in
   dialog#destroy();
   ret
-
-let new_library () : (string * string * string * bool) option =
-  let dialog = GWindow.dialog ~title:"New Library" ~border_width:8 () in
-  let grid = GPack.grid  ~col_spacings:8 ~row_spacings:8 ~packing:dialog#vbox#pack () in
-
-  (* let name_l = GMisc.label ~text:"Name" ~packing:(grid#attach ~left:0 ~top:0) () in
-   * let name_e = GEdit.entry ~packing:(grid#attach ~left:1 ~top:0) () in *)
-  let root_path_l = GMisc.label ~text:"Location" ~packing:(grid#attach ~left:0 ~top:0) () in
-  let root_path_hbox = GPack.hbox ~spacing:8 ~packing:(grid#attach ~left:1 ~top:0) () in
-  let root_path_e = GMisc.label ~packing:(root_path_hbox#pack) () in
-  let root_path_b = GButton.button ~label:"Choose" ~packing:(root_path_hbox#pack) () in
-  let import_dir_check = GButton.check_button ~label:"import all files" ~packing:(grid#attach ~left:1 ~top:1) () in
-  let doc_type_l = GMisc.label ~text:"Type" ~packing:(grid#attach ~left:0 ~top:2) () in
-  let doc_type_combo = GEdit.combo_box_text ~active:0 ~strings:["article"; "book"] ~packing:(grid#attach ~left:1 ~top:2)() in
-  
-  root_path_b#connect#clicked ~callback:(fun () ->
-      let root_path =
-        match (choose_dir "Choose Library Location") with
-        | Some path -> path
-        | None -> "" in
-      root_path_e#set_text root_path);
-
-  dialog#add_button_stock `OK `OK;
-  dialog#add_button_stock `CANCEL `CANCEL;
-  
-  match (dialog#run()) with
-  | `OK ->
-     let doc_type = match GEdit.text_combo_get_active doc_type_combo with
-       | None -> failwith "doc_type select: Not possible"
-       | Some s -> s in
-     let root_path = root_path_e#text in
-     let key = (String.split_on_char '/' root_path) in
-     let name = (List.nth key ((List.length key) - 1)) in
-     dialog#destroy();
-     Some (name, doc_type, root_path, import_dir_check#active)
-  | `CANCEL | `DELETE_EVENT ->
-     dialog#destroy();
-     None
-
-
   
 let main () =
   GMain.init();
@@ -344,6 +447,7 @@ let main () =
   (* Refresh library *)
   file_factory#add_item "Refresh Library"
     ~callback:(fun () ->
+      (* notebook#refresh_library *)
       (error_dialog "Refresh Library: Not yet implemented")
     );
   
@@ -362,29 +466,12 @@ let main () =
 
   (* Make new library tab *)
   file_factory#add_item "New Library"
-    ~callback:(fun () ->
-      match new_library() with
-      | Some (library, doc_type, root, import_dir) ->
-         (try (db#add_library ~library ~doc_type ~root;
-               notebook#add_library library doc_type;
-               (if import_dir then
-                  let files = (get_files ~library root) in
-                  ignore (db#import_files ~library ~doc_type files));
-               notebook#load_library library)
-          with Db.LibraryExists -> (error_dialog "Library already exists!"))
-      | None -> ()
+    ~callback:(fun () -> ignore (new_library ~db ~notebook)
     );
 
-  (* Rename library *)
-  file_factory#add_item "Rename Library"
-    ~callback:(fun () ->
-      (error_dialog "Rename Library: Not yet implemented:\nManually edit '~/.doculib/libraries.json'\nand rename '~/.doculib/data/X.X/library'.")
-    );
-  
-  (* Delete library *)
-  file_factory#add_item "Delete Library"
-    ~callback:(fun () ->
-      (error_dialog "Delete Library: Not yet implemented:\nManually edit '~/.doculib/libraries.json'\nand delete '~/.doculib/data/X.X/library'.")
+  (* Manage libraries *)
+  file_factory#add_item "Manage Libraries"
+    ~callback:(fun () -> (manage_libraries ~db ~notebook)
     );
   
   file_factory#add_separator ();

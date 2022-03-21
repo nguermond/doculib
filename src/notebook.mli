@@ -19,6 +19,7 @@ class notebook : GPack.notebook -> Db.db -> GMenu.menu -> (GTree.model -> Model.
                                                  
   method init : ((string * string) list) -> unit
   method add_library : library:string -> doc_type:string -> unit
+  method remove_library : library:string -> unit
   method load_library : library:string -> unit
 
   (* TODO: should not be public *)

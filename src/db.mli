@@ -1,5 +1,6 @@
 
 exception LibraryExists
+exception InvalidLibrary
         
 val current_branch : string
 val configdir : string
@@ -59,6 +60,8 @@ object
   method get_libraries : unit -> string list
   method get_library_doc_type : library:string -> string
   method add_library : library:string -> root:string -> doc_type:string -> unit
+  method remove_library : library:string -> unit
+       
   method get_library_root : library:string -> string
   method import_files : library:string -> doc_type:string -> (string list) ->  doc list
 

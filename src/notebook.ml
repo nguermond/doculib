@@ -50,7 +50,13 @@ class notebook notebook db context_menu filter_func = object (self)
                     ignore (notebook#prepend_page ~tab_label:(label#coerce) w)) ()) in
     let lib = new library library doc_type page in
     libraries <- (library, lib) :: libraries
-
+    
+  method remove_library ~library : unit =
+    (prerr_endline ("Removing library "^library));
+    (db#remove_library library);
+    notebook#remove_page (self#get_index ~library);
+    libraries <- (List.remove_assoc library libraries)
+    
   method init (libs : (string * string) list) : unit =
     (List.iter (fun (library,doc_type) -> self#add_library ~library ~doc_type) libs);
 
@@ -124,5 +130,4 @@ class notebook notebook db context_menu filter_func = object (self)
         db#set_document ~library ~path doc;
         model#set_entry (model#get_row p) doc)
       model#get_selected_rows
-
 end
