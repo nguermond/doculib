@@ -68,9 +68,20 @@ object (self)
         self#set_entry ~row doc)
       data
 
+  (* method flag_entry doc : unit =
+   *   store#for_each (fun p _ ->
+   *       let row = self#get_row p in
+   *       if doc.path = (store#get ~row ~column:Attr.path) then *)
+          
+
   method reset_model () : unit =
     store#clear()
 
+  (* method set_height () : unit =
+   *   for i=0 to num_cols - 1 do
+   *     (view#get_column i)#get_cell_renderer#set_fixed_height_from_font 2;
+   *   done *)
+    
   method reset_sort_indicators () : unit =
     for i=0 to num_cols - 1 do
       (view#get_column i)#set_sort_indicator false;
@@ -87,7 +98,8 @@ object (self)
        | None, Str col ->
           let renderer,values = (GTree.cell_renderer_text
                                    [`EDITABLE editable;
-                                    (* `HEIGHT 36; (\* 18 * number of lines *\) *)
+                                    (* TODO: We should be able to get rid of this... *)
+                                    `HEIGHT 36; (* 18 * number of lines *)
                                     `WRAP_WIDTH width;
                                     `WRAP_MODE `WORD_CHAR],
                                  ["text",col]) in

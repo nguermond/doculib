@@ -96,7 +96,7 @@ let pp_doc ppf (d : doc) =
   )
 
                
-let make_doc_from_file path doc_type : doc =
+let make_doc_from_file full_path path doc_type : doc =
   {star=false;
    title="";
    authors=[];
@@ -106,7 +106,7 @@ let make_doc_from_file path doc_type : doc =
    tags=[];
    path=path;
    doc_type=doc_type;
-   hash="";
+   hash=Utilities.Sys.hash full_path;
   }
 
 let doc_to_json (doc : doc) : Json.t =
@@ -141,6 +141,14 @@ let json_to_doc path (json : Json.t) : doc =
 let get_rel_path ~library (path : string) : string =
   (Str.replace_first (Str.regexp (".json")) ""
      (Str.replace_first (Str.regexp (".*/"^library^"/")) "" path))
+
+let rec get_files ~library (path : string) : string list =
+  if not (Sys.is_directory path) then
+    [get_rel_path ~library path]
+  else
+    (List.flatten
+       (List.map (fun name -> get_files ~library (path^"/"^name))
+          (Array.to_list (Sys.readdir path))))
 
 let json_to_libs (json : Json.t) : (string * (string * string)) list =
   (Json.raise_opt "Could not find entry `libraries`"
@@ -231,7 +239,8 @@ object (self)
     (if (Sys.file_exists name) then
        None
      else
-       (let doc = (make_doc_from_file path doc_type) in
+       (let full_path = self#get_full_path ~library path in
+        let doc = (make_doc_from_file full_path path doc_type) in
         let _ = self#add_document ~library doc in
         (Some doc)))
 
@@ -241,7 +250,7 @@ object (self)
     (prerr_endline "Importing files...");
     List.filter_map (fun path ->
         let load = ((float_of_int !i) /. (float_of_int n)) in
-        prerr_endline (string_of_float load);
+        (* prerr_endline (string_of_float load); *)
         i := !i+1;
         (self#import_file ~library ~doc_type path))
       paths
@@ -307,10 +316,10 @@ object (self)
     libraries <- libs
     
 
-  method check_library_integrity ~library : unit =
+  method check_library_integrity ~library : doc list =
     (prerr_endline ("Checking integrity of library: "^library));
     let docs = self#get_documents ~library in
-    List.iter (fun doc ->
+    List.filter (fun doc ->
         let full_path = self#get_full_path ~library doc.path in
         if (not (Sys.file_exists full_path)) then
           ((prerr_endline ("Misplaced file: "^full_path));
@@ -322,8 +331,12 @@ object (self)
               let rel_path = (get_rel_path ~library path) in
               let new_doc = (edit_document (Path rel_path) doc) in
               (self#add_document ~library new_doc);
-              (self#remove_document ~library ~path:doc.path)
-           | None -> prerr_endline ("Could not find file: ^"^full_path^"\n It was either placed in a different library or deleted!")))
+              (self#remove_document ~library ~path:doc.path);
+              false
+           | None ->
+              prerr_endline ("Could not find file: "^full_path^"\n It was either placed in a different library or deleted!");
+              true)
+        else false)
       docs
 end
   

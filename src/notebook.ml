@@ -59,17 +59,17 @@ class notebook notebook db context_menu filter_func = object (self)
     
   method init (libs : (string * string) list) : unit =
     (List.iter (fun (library,doc_type) -> self#add_library ~library ~doc_type) libs);
-
     (* On page switch *)
     notebook#connect#switch_page ~callback:(fun index ->
         if (List.length libs) > 0 then
           (let (library,lib) = (List.nth libraries index) in
-           (* prerr_endline ("Index:"^ (string_of_int index)^ "->"^library); *)
            (self#load_library library);
            self#refilter ~library:(Some library) ())
         else ()
       );
-    (if (List.length libs) > 0 then self#load_library (fst (self#current_library)))
+    if (List.length libs) > 0 then
+      (let library = (fst (self#current_library)) in
+       self#load_library library)    
 
   method private get_index ~library : int =
     match (List.assoc_index libraries library) with
@@ -98,10 +98,9 @@ class notebook notebook db context_menu filter_func = object (self)
       libraries
     
   method load_library ~library : unit =
-    (prerr_endline ("Loading library "^library));
     let lib = (List.assoc library libraries) in
     if lib#is_loaded then () else
-      let _ = (db#check_library_integrity ~library) in
+      (* let bad_docs = (db#check_library_integrity ~library) in *)
       let library = lib#get_name in
       let doc_type = lib#get_doc_type in
       let page = lib#get_page in
@@ -110,7 +109,19 @@ class notebook notebook db context_menu filter_func = object (self)
                      ~editable:true ~library ~doc_type ~packing:page#add data) in
       model#handle_click_events ~context_menu;
       model#set_visible_func filter_func;
-      self#set_model library model
+      self#set_model library model;
+      (self#refresh_library ~library)
+
+  method refresh_library ~library : unit =
+    let lib = self#get_library ~library in
+    let files = (Db.get_files ~library (db#get_library_root ~library)) in
+    let data = (db#import_files ~library ~doc_type:(lib#get_doc_type) files) in
+    (lib#get_model#import_documents data);
+    let bad_docs = (db#check_library_integrity ~library) in
+    (* (List.iter (fun doc ->
+     *      let model = (self#get_library ~library)#get_model in
+     *    bad_docs) *)
+    ()
 
   method action_on_selected ~action : unit =
     let (library,lib) = self#current_library in

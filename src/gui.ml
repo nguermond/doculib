@@ -4,13 +4,6 @@ open Gobject.Data
 
 let icon_path = Db.configdir^"/icons/Gnome-colors-applications-office.svg"
 
-let rec get_files ~library (path : string) : string list =
-  if not (Sys.is_directory path) then
-    [Db.get_rel_path ~library path]
-  else
-    (List.flatten
-       (List.map (fun name -> get_files ~library (path^"/"^name))
-          (Array.to_list (Sys.readdir path))))
 
   
 let choose_files (root_path : string) (library : string) : string list =
@@ -24,7 +17,7 @@ let choose_files (root_path : string) (library : string) : string list =
      | `OPEN ->
         (match dialog#get_filenames with
          | [] -> failwith "No file name!"
-         | files -> List.flatten (List.map (get_files ~library) files))
+         | files -> List.flatten (List.map (Db.get_files ~library) files))
      | `DELETE_EVENT | `CANCEL -> [])
   in
   dialog#destroy();
@@ -53,7 +46,7 @@ let error_dialog (msg : string) : unit =
 
   
 let new_library ~(db:Db.db) ~(notebook:Notebook.notebook) : (string * string) option =
-  let dialog = GWindow.dialog ~title:"New Library" ~border_width:8 ~width:500 ~height:200 () in
+  let dialog = GWindow.dialog ~title:"New Library" ~border_width:8 ~width:300 ~height:150 () in
   let grid = GPack.grid  ~col_spacings:8 ~row_spacings:8 ~packing:dialog#vbox#pack () in
 
   (* let name_l = GMisc.label ~text:"Name" ~packing:(grid#attach ~left:0 ~top:0) () in
@@ -62,9 +55,9 @@ let new_library ~(db:Db.db) ~(notebook:Notebook.notebook) : (string * string) op
   let root_path_hbox = GPack.hbox ~spacing:8 ~packing:(grid#attach ~left:1 ~top:0) () in
   let root_path_e = GMisc.label ~packing:(root_path_hbox#pack) () in
   let root_path_b = GButton.button ~label:"Choose" ~packing:(root_path_hbox#pack) () in
-  let import_dir_check = GButton.check_button ~label:"import all files" ~packing:(grid#attach ~left:1 ~top:1) () in
-  let doc_type_l = GMisc.label ~text:"Type" ~packing:(grid#attach ~left:0 ~top:2) () in
-  let doc_type_combo = GEdit.combo_box_text ~active:0 ~strings:["article"; "book"] ~packing:(grid#attach ~left:1 ~top:2)() in
+  (* let import_dir_check = GButton.check_button ~label:"import all files" ~packing:(grid#attach ~left:1 ~top:1) () in *)
+  let doc_type_l = GMisc.label ~text:"Type" ~packing:(grid#attach ~left:0 ~top:1) () in
+  let doc_type_combo = GEdit.combo_box_text ~active:0 ~strings:["article"; "book"] ~packing:(grid#attach ~left:1 ~top:1)() in
   
   root_path_b#connect#clicked ~callback:(fun () ->
       let root_path =
@@ -85,12 +78,12 @@ let new_library ~(db:Db.db) ~(notebook:Notebook.notebook) : (string * string) op
       let key = (String.split_on_char '/' root) in
       let library = (List.nth key ((List.length key) - 1)) in
       dialog#destroy();
-      let import_dir = import_dir_check#active in
+      let import_dir = true in (*import_dir_check#active in*)
       (try
          (db#add_library ~library ~doc_type ~root;
           notebook#add_library library doc_type;
           (if import_dir then
-             let files = (get_files ~library root) in
+             let files = (Db.get_files ~library root) in
              ignore (db#import_files ~library ~doc_type files));
           notebook#load_library library;
           (Some (library, root)))
@@ -411,13 +404,13 @@ let main () =
     );
   
   (* Remove entry from database *)
-  context_factory#add_item "Remove Entry"
-    ~callback:(fun _ ->
-      notebook#action_on_selected (fun library model row ->
-          let path = (model#get ~row ~column:Model.Attr.path) in
-          db#remove_document library path;
-          ignore (model#remove row))
-    );
+  (* context_factory#add_item "Remove Entry"
+   *   ~callback:(fun _ ->
+   *     notebook#action_on_selected (fun library model row ->
+   *         let path = (model#get ~row ~column:Model.Attr.path) in
+   *         db#remove_document library path;
+   *         ignore (model#remove row))
+   *   ); *)
 
   context_factory#add_separator ();
 
@@ -436,14 +429,14 @@ let main () =
                              ~message:"Delete selected file(s)?"
                              ~message_type:`QUESTION () in
 
-      (* TODO: Window does not always close??? *)
       (match confirm_dialog#run() with
        | `OK -> notebook#action_on_selected (fun library model row ->
                     let path = (model#get ~row ~column:Model.Attr.path) in
                     db#remove_document library path;
                     model#remove row;
                     let full_path = (db#get_full_path library path) in
-                    ignore (Sys.remove path))
+                    (if (Sys.file_exists full_path) then (Sys.remove full_path)
+                     else (error_dialog "Warning: file does not exist!")))
        | _ -> prerr_endline "Cancel");
       confirm_dialog#destroy()
     );
@@ -453,8 +446,8 @@ let main () =
   (* Refresh library *)
   file_factory#add_item "Refresh Library"
     ~callback:(fun () ->
-      (* notebook#refresh_library *)
-      (error_dialog "Refresh Library: Not yet implemented")
+      let (library,_) = notebook#current_library in
+      notebook#refresh_library ~library
     );
   
   (* Import files from directory *)

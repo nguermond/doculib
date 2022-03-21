@@ -33,6 +33,8 @@ type attribute =  Star of bool
 val set_attribute : string -> string -> attribute
     
 val get_rel_path : library:string -> string -> string
+val get_files : library:string -> string -> string list
+
 val pp_doc : Format.formatter -> doc -> unit
 val edit_document : attribute -> doc -> doc
 
@@ -69,5 +71,5 @@ object
   method get_full_path : library:string -> string -> string
 
   method open_doc : library:string -> path:string -> unit
-  method check_library_integrity : library:string -> unit
+  method check_library_integrity : library:string -> doc list
 end
