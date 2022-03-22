@@ -42,7 +42,7 @@ Example directory structure is as follows:
 On Debian/Ubuntu, enter the commands
 ```
 wget https://github.com/nguermond/doculib/releases/download/v1.1.0/doculib_1.1.0_amd64.deb
-sudo dpkg -i doculib_1.1.0_amd.deb && sudo apt -f install
+sudo dpkg -i doculib_1.1.0_amd64.deb && sudo apt -f install
 ```
 and run with `doculib`.
 
