@@ -404,13 +404,14 @@ let main () =
     );
   
   (* Remove entry from database *)
-  (* context_factory#add_item "Remove Entry"
-   *   ~callback:(fun _ ->
-   *     notebook#action_on_selected (fun library model row ->
-   *         let path = (model#get ~row ~column:Model.Attr.path) in
-   *         db#remove_document library path;
-   *         ignore (model#remove row))
-   *   ); *)
+  (* TODO: remove this *)
+  context_factory#add_item "Remove Entry"
+    ~callback:(fun _ ->
+      notebook#action_on_selected (fun library model row ->
+          let path = (model#get ~row ~column:Model.Attr.path) in
+          db#remove_document library path;
+          ignore (model#remove row))
+    );
 
   context_factory#add_separator ();
 
@@ -448,19 +449,6 @@ let main () =
     ~callback:(fun () ->
       let (library,_) = notebook#current_library in
       notebook#refresh_library ~library
-    );
-  
-  (* Import files from directory *)
-  file_factory#add_item "Import Files"
-    ~callback:(fun () ->
-      try
-        let (library,lib) = notebook#current_library in
-        let root_path = (db#get_library_root ~library) in
-        let files = choose_files root_path library in
-        let data = (db#import_files ~library ~doc_type:(lib#get_doc_type) files) in
-        lib#get_model#import_documents data
-      with
-        Notebook.NoLibrary -> (error_dialog "Library must be created first!")
     );
 
   (* Make new library tab *)

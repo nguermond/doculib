@@ -39,11 +39,12 @@ Example directory structure is as follows:
 ```
 
 ## Installation
-On Debian/Ubuntu run the commands
+On Debian/Ubuntu, enter the commands
 ```
 wget https://github.com/nguermond/doculib/releases/download/v1.1.0/doculib_1.1.0_amd64.deb
 sudo dpkg -i doculib_1.1.0_amd.deb
 ```
+and run with `doculib`.
 
 ## Build from source
 See [BUILD](./BUILD.md).
