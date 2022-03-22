@@ -163,8 +163,9 @@ let json_to_libs (json : Json.t) : (string * (string * string)) list =
 let get_lib_version () : string =
   let json = Yojson.Basic.from_file libconfig in
   Json.to_string
-    (Json.raise_opt "Could not find entry `version`"
-       (Json.get "version" json))
+    (match (Json.get "version" json) with
+     | Some v -> v
+     | None -> `String "2.0")
 
 let set_lib_version (version : string) : unit =
   let json = Yojson.Basic.from_file libconfig in

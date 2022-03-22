@@ -2,5 +2,5 @@ Package: doculib
 Version: 1.1.0
 Architecture: amd64
 Maintainer: Nathan Guermond <nguermond@protonmail.com>
-Depends: bash, libgmp-dev, pkg-config, libcairo2-dev, libexpat1-dev, libgtk-3-dev
+Depends: bash, libev-dev, libgmp-dev, pkg-config, libcairo2-dev, libexpat1-dev, libgtk-3-dev
 Description: A GUI for tagging and managing document metadata for books, textbooks, or articles.
