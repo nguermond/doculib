@@ -28,9 +28,9 @@ class model : Db.db -> GTree.model_filter -> GTree.list_store -> GTree.view ->
 
     method remove : row:row -> unit
       
-    method set_entry : row:row -> Db.doc -> unit
+    method set_entry : row:row -> Doc.t -> unit
       
-    method import_documents : (Db.doc list) -> unit
+    method import_documents : (Doc.t list) -> unit
          
     method reset_model : unit -> unit
          
@@ -52,6 +52,6 @@ class model : Db.db -> GTree.model_filter -> GTree.list_store -> GTree.view ->
 val make_document_list : db:Db.db -> ?height:int -> ?show_path:bool -> ?multiple:bool -> ?show_stars:bool ->
                          ?editable:bool -> ?library:string ->
                          ?sort:(('a GTree.column) option) -> doc_type:string ->
-                         packing:(GObj.widget -> unit) -> (Db.doc list) -> model 
+                         packing:(GObj.widget -> unit) -> (Doc.t list) -> model 
 
                                                                                                                       

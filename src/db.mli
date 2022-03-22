@@ -6,43 +6,16 @@ val current_branch : string
 val configdir : string
 val datadir : string
 val libconfig : string
-
-type doc = {star : bool;
-            title : string;
-            authors : string list;
-            doi : string;
-            isbn : string;
-            year : string;
-            tags : string list;
-            path : string;
-            doc_type : string;
-            hash : string;
-           }
-
-type attribute =  Star of bool
-                | Title of string
-                | Authors of string list
-                | Doi of string
-                | Isbn of string
-                | Year of string
-                | Tags of string list
-                | Path of string
-                | DocType of string
-                | Hash of string
-  
-val set_attribute : string -> string -> attribute
     
 val get_rel_path : library:string -> string -> string
 val get_files : library:string -> string -> string list
-
-val pp_doc : Format.formatter -> doc -> unit
-val edit_document : attribute -> doc -> doc
 
 val set_lib_version : string -> unit
 val init_lib_config : unit -> unit
 val get_lib_version : unit -> string
 
 
+type doc = Doc.t
                                                                            
 class db : string ->
 object

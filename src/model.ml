@@ -50,7 +50,7 @@ object (self)
   method remove ~row : unit =
     ignore (store#remove row)
     
-  method set_entry ~row doc : unit =
+  method set_entry ~row (doc : Doc.t) : unit =
     let open Db in
     store#set ~row ~column:Attr.star doc.star;
     store#set ~row ~column:Attr.title doc.title;
@@ -61,7 +61,7 @@ object (self)
     store#set ~row ~column:Attr.tags (String.concat "; " doc.tags);
     store#set ~row ~column:Attr.path doc.path
     
-  method import_documents (data : Db.doc list) : unit =
+  method import_documents (data : Doc.t list) : unit =
     List.iter
       (fun doc ->
         let row = store#append () in
@@ -113,7 +113,7 @@ object (self)
               let path = (store#get ~row ~column:Attr.path) in
               let key = (Attr.get_name (col.index)) in
               let doc = db#get_document ~library ~path in
-              let doc = Db.edit_document (Db.set_attribute key str) doc in
+              let doc = Doc.edit_document (Doc.set_attribute key str) doc in
               (* (prerr_endline (Format.asprintf "%a" Db.pp_doc doc)); *)
               db#set_document ~library ~path doc;
               store#set ~row ~column:col str
@@ -202,7 +202,7 @@ let make_document_list ~db ?(height=400) ?(show_path=true) ?(multiple=false)
       let value = (not (store#get ~row ~column:Attr.star)) in
       let path = model#get ~row ~column:Attr.path in
       let doc = db#get_document ~library ~path in
-      let doc = Db.edit_document (Star value) doc in
+      let doc = Doc.edit_document (Star value) doc in
       db#set_document ~library ~path doc;
       store#set ~row ~column:Attr.star value);
   let star_cell_renderer = Some (CellRenderer (renderer,values)) in
