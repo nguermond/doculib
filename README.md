@@ -39,14 +39,11 @@ Example directory structure is as follows:
 ```
 
 ## Installation
-See [INSTALL](./INSTALL.md).
+On Debian/Ubuntu run the commands
+```
+wget https://github.com/nguermond/doculib/releases/download/v1.1.0/doculib_1.1.0_amd64.deb
+sudo dpkg -i doculib_1.1.0_amd.deb
+```
 
 ## Build from source
 See [BUILD](./BUILD.md).
-
-## Configuration
-Metadata for DocuLib is stored in `$HOME/.doculib/`.
-
-## To be (maybe) implemented
-* fancy tag management (synonyms, subtags...)
-* local compressed [zbMATH](https://zbmath.org/) library for faster metadata search
