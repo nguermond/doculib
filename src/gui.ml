@@ -2,7 +2,7 @@
 open StdLabels
 open Gobject.Data
 
-let icon_path = Db.configdir^"/icons/Gnome-colors-applications-office.svg"
+let icon_path = "/usr/local/lib/doculib/icons/Gnome-colors-applications-office.svg"
 
 
   
