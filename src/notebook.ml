@@ -114,8 +114,7 @@ class notebook notebook db context_menu filter_func = object (self)
 
   method refresh_library ~library : unit =
     let lib = self#get_library ~library in
-    let files = (Db.get_files ~library (db#get_library_root ~library)) in
-    let data = (db#import_files ~library ~doc_type:(lib#get_doc_type) files) in
+    let data = (db#refresh_library ~library) in
     (lib#get_model#import_documents data);
     let bad_docs = (db#check_library_integrity ~library) in
     (* (List.iter (fun doc ->

@@ -4,26 +4,8 @@ open Gobject.Data
 
 let icon_path = "/usr/local/lib/doculib/icons/Gnome-colors-applications-office.svg"
 
+exception InternalError of string
 
-  
-let choose_files (root_path : string) (library : string) : string list =
-  let dialog = GWindow.file_chooser_dialog ~action:`OPEN ~title:"Import Documents" () in
-  dialog#set_current_folder root_path;
-  dialog#add_button_stock `CANCEL `CANCEL;
-  dialog#add_button_stock `OPEN `OPEN;
-  dialog#set_select_multiple true;
-  let files =
-    (match dialog#run() with
-     | `OPEN ->
-        (match dialog#get_filenames with
-         | [] -> failwith "No file name!"
-         | files -> List.flatten (List.map (Db.get_files ~library) files))
-     | `DELETE_EVENT | `CANCEL -> [])
-  in
-  dialog#destroy();
-  files
-  
-  
 let choose_dir (title : string) : string option =
   let dialog = GWindow.file_chooser_dialog ~action:`SELECT_FOLDER ~title () in
   dialog#add_button_stock `CANCEL `CANCEL;
@@ -72,19 +54,15 @@ let new_library ~(db:Db.db) ~(notebook:Notebook.notebook) : (string * string) op
   (match (dialog#run()) with
    | `OK ->
       let doc_type = match GEdit.text_combo_get_active doc_type_combo with
-        | None -> failwith "doc_type select: Not possible"
+        | None -> raise (InternalError "Not possible: doc_type not selected")
         | Some s -> s in
       let root = root_path_e#text in
       let key = (String.split_on_char '/' root) in
       let library = (List.nth key ((List.length key) - 1)) in
       dialog#destroy();
-      let import_dir = true in (*import_dir_check#active in*)
       (try
          (db#add_library ~library ~doc_type ~root;
           notebook#add_library library doc_type;
-          (if import_dir then
-             let files = (Db.get_files ~library root) in
-             ignore (db#import_files ~library ~doc_type files));
           notebook#load_library library;
           (Some (library, root)))
        with Db.LibraryExists
@@ -93,15 +71,12 @@ let new_library ~(db:Db.db) ~(notebook:Notebook.notebook) : (string * string) op
           | Db.InvalidLibrary -> None
       )
    | `CANCEL | `DELETE_EVENT ->
-      dialog#destroy();
-      None
-  )
+      dialog#destroy(); None)
 
   
 let manage_libraries ~db ~notebook : unit =
   let dialog = GWindow.dialog ~title:"Manage Libraries"
                  ~width:500 ~height:200 () in
-
   let swindow = GBin.scrolled_window ~height:200 ~shadow_type:`ETCHED_IN ~hpolicy:`AUTOMATIC
                   ~vpolicy:`AUTOMATIC ~packing:(dialog#vbox#pack) () in
   let open Gobject.Data in
@@ -115,9 +90,7 @@ let manage_libraries ~db ~notebook : unit =
   view#set_enable_grid_lines `HORIZONTAL;
   
   let name_renderer,name_values = (GTree.cell_renderer_text
-                                     [`EDITABLE true;
-                                      `WRAP_WIDTH 200;
-                                      `WRAP_MODE `WORD_CHAR],
+                                     [`EDITABLE true],
                                    ["text",name]) in
   let path_renderer,path_values = (GTree.cell_renderer_text
                                      [`EDITABLE false;
@@ -126,7 +99,7 @@ let manage_libraries ~db ~notebook : unit =
                                    ["text",path]) in
           
   (* 2 rows of text *)
-  name_renderer#set_fixed_height_from_font 2;
+  (* name_renderer#set_fixed_height_from_font 2; *)
           
   (* save cell edits *)
   name_renderer#connect#edited ~callback:(fun p str ->
@@ -169,7 +142,7 @@ let manage_libraries ~db ~notebook : unit =
       
       let confirm_dialog = GWindow.message_dialog ~title:"Confirm Removal"
                              ~buttons:GWindow.Buttons.ok_cancel
-                             ~message:("Remove Library: "^library^"?")
+                             ~message:("Remove Library: "^library^"?\nThis will delete all metadata for the library!")
                              ~message_type:`QUESTION () in
       (match confirm_dialog#run() with
        | `OK -> (notebook#remove_library ~library);

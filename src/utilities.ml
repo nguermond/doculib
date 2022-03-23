@@ -14,23 +14,28 @@ module Sys =
     let hash (file : string) : string =
       (Digest.to_hex (Digest.file file))
 
+      
+    let rec get_files (path : string) : string list =
+      (if (Sys.is_directory path) then
+         (List.flatten
+            (List.map (fun name -> get_files (path^"/"^name))
+               (Array.to_list (Sys.readdir path))))
+       else [path])
+
     let find_file (hash : string) (full_path : string) : string option =
       let hash = (Digest.from_hex hash) in
-      let rec find_file_ (full_path : string) =
-        List.find_map (fun path ->
-            let full_path = (full_path^"/"^path) in 
-            (if (Sys.is_directory full_path) then
-               (find_file_ full_path)
-             else
-               (if (Digest.equal (Digest.file full_path) hash) then
-                  (Some full_path) else None)))
-          (Array.to_list (Sys.readdir full_path))
-      in (find_file_ full_path)
+      List.find_map (fun path ->
+          (if (Digest.equal (Digest.file path) hash) then
+             (Some path) else None))
+        (get_files full_path)
 
-    let rmdir (str : string) : unit =
-      if (Sys.command ("rm -r \""^str^"\"")) > 0 then
-        (raise (InternalError ("Could not remove directory: "^str)));
-      
+    let rmdir (path : string) : unit =
+      (if (Sys.command ("rm -r \""^path^"\"")) > 0 then
+         (raise (InternalError ("Could not remove directory: "^path))))
+
+    let mkdir (path : string) : unit =
+      (if (Sys.command ("mkdir -p \""^path^"\"")) > 0 then
+         (raise (InternalError ("Could not make directory: "^path))))
   end
 
 module List =

@@ -7,20 +7,18 @@ val configdir : string
 val datadir : string
 val libconfig : string
     
-val get_rel_path : library:string -> string -> string
-val get_files : library:string -> string -> string list
-
 val set_lib_version : string -> unit
 val init_lib_config : unit -> unit
 val get_lib_version : unit -> string
 
 
 type doc = Doc.t
+type library
                                                                            
 class db : string ->
 object
   val store : string
-  val mutable libraries : ((string * (string * string)) list)
+  val mutable libraries : ((string * library) list)
 
   method get_document : library:string -> path:string -> doc
   method get_documents : library:string -> doc list
@@ -34,12 +32,12 @@ object
 
   method get_libraries : unit -> string list
   method get_library_doc_type : library:string -> string
+  method get_library_root : library:string -> string
+
   method add_library : library:string -> root:string -> doc_type:string -> unit
   method remove_library : library:string -> unit
        
-  method get_library_root : library:string -> string
-  method import_files : library:string -> doc_type:string -> (string list) ->  doc list
-
+  method refresh_library : library:string -> doc list
 
   method get_full_path : library:string -> string -> string
 

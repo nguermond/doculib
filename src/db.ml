@@ -25,29 +25,24 @@ let configdir : string = (Sys.getenv "HOME")^"/.doculib"
 let datadir : string = configdir^"/data"
 let libconfig : string = configdir^"/libraries.json"
 
+type library = {name : string;
+                root : string;
+                doc_type : string
+               }
 
 
 let get_rel_path ~library (path : string) : string =
   (Str.replace_first (Str.regexp (".json")) ""
      (Str.replace_first (Str.regexp (".*/"^library^"/")) "" path))
 
-let rec get_files ~library (path : string) : string list =
-  if not (Sys.is_directory path) then
-    [get_rel_path ~library path]
-  else
-    (List.flatten
-       (List.map (fun name -> get_files ~library (path^"/"^name))
-          (Array.to_list (Sys.readdir path))))
-
-let json_to_libs (json : Json.t) : (string * (string * string)) list =
-  (Json.raise_opt "Could not find entry `libraries`"
-     (Json.get "libraries" json))
-  |> Json.to_list
+let json_to_libs (json : Json.t) : (string * library) list =
+  (Json.to_list (Json.raise_opt "Could not find entry `libraries`"
+                   (Json.get "libraries" json)))
   |> List.map (fun json ->
          let name = Json.to_string (Json.raise_opt "Could not find entry `name`" (Json.get "name" json)) in
          let path = Json.to_string (Json.raise_opt "Could not find entry `path`" (Json.get "path" json)) in
          let doc_type = Json.to_string (Json.raise_opt "Could not find entry `doc_type`" (Json.get "doc_type" json)) in
-         (name,(path,doc_type)))
+         (name,{name = name; root = path; doc_type = doc_type}))
 
 let get_lib_version () : string =
   let json = Yojson.Basic.from_file libconfig in
@@ -63,11 +58,11 @@ let set_lib_version (version : string) : unit =
   (Json.to_file libconfig json)
   
 
-let libs_to_json (version : string) (libs : (string * (string * string)) list) : Json.t =
-  let libs = (`List (List.map (fun (name,(path,doc_type)) ->
+let libs_to_json (version : string) (libs : (string * library) list) : Json.t =
+  let libs = (`List (List.map (fun (name,lib) ->
                          (`Assoc [("name",`String name);
-                                  ("path", `String path);
-                                  ("doc_type", `String doc_type)]))
+                                  ("path", `String lib.root);
+                                  ("doc_type", `String lib.doc_type)]))
                        libs)) in
   (`Assoc [("version",`String version);
            ("libraries", libs)])
@@ -80,12 +75,14 @@ let init_lib_config () : unit =
          
 class db branch =
 object (self)
-  val store : string = datadir^"/"^branch
-  val mutable libraries : ((string * (string * string)) list) =
-    let store = (datadir^"/"^branch) in
-    (if (not (Sys.file_exists store)) then
-       (prerr_endline "store directory does not exist: creating...";
-        Sys.mkdir store 0o755));
+  val store : string =
+    (let store = (datadir^"/"^branch) in
+     (if (not (Sys.file_exists store)) then
+        (prerr_endline "store directory does not exist: creating...";
+         Sys.mkdir store 0o755));
+     store)
+    
+  val mutable libraries : ((string * library) list) =
     let json = Yojson.Basic.from_file libconfig in
     (json_to_libs json)
     
@@ -101,7 +98,6 @@ object (self)
       | dir::dirs -> make_dirs_ (path^"/"^dir) dirs
     in (make_dirs_ store (Str.split (Str.regexp "/") path))
      
-
 (* Store document metadata as
  * store/library/path.json *)  
   method add_document ~library (doc : doc) : unit =
@@ -124,47 +120,42 @@ object (self)
     let name = (store^"/"^library^"/"^path^".json") in
     Sys.remove name
  
-  method private import_file ~library ~doc_type path : doc option =
+  method private import_file ~library path : doc option =
     let name = (store^"/"^library^"/"^path^".json") in
-    (if (Sys.file_exists name) then
-       None
-     else
+    let doc_type = (self#get_library_doc_type ~library) in
+    (if (not (Sys.file_exists name)) then
        (let full_path = self#get_full_path ~library path in
         let doc = (make_doc_from_file full_path path doc_type) in
         let _ = self#add_document ~library doc in
-        (Some doc)))
-
-  method import_files ~library ~doc_type (paths : string list) : doc list =
-    let n = (List.length paths) in
-    let i = ref 0 in
-    (prerr_endline "Importing files...");
+        (Some doc))
+     else None)    
+    
+  method private import_files ~library (paths : string list) : doc list =
     List.filter_map (fun path ->
-        let load = ((float_of_int !i) /. (float_of_int n)) in
-        (* prerr_endline (string_of_float load); *)
-        i := !i+1;
-        (self#import_file ~library ~doc_type path))
+        (self#import_file ~library path))
       paths
 
+  method refresh_library ~library : doc list =
+    let root = (self#get_library_root ~library) in
+    let files = Utilities.Sys.get_files root in
+    let paths = (List.map (get_rel_path ~library) files) in
+    (self#import_files ~library paths)
+
   method get_documents ~library : doc list =
-    let rec get_files (full_path : string) : doc list =
-      (if not (Sys.is_directory full_path) then
-         (let path = get_rel_path ~library full_path in
-          [self#get_document ~library ~path])
-       else
-         (List.flatten
-            (List.map (fun name -> get_files (full_path^"/"^name))
-               (Array.to_list (Sys.readdir full_path)))))
-    in (get_files (store^"/"^library))
+    List.map (fun path ->
+        let path = get_rel_path ~library path in
+        self#get_document ~library ~path)
+      (Utilities.Sys.get_files (store^"/"^library))
   
   method private print_documents library : unit =
     let docs = self#get_documents library in
     List.iter (fun d -> printf "%a@\n" pp_doc d) docs
     
   method get_library_root ~library : string =
-    fst (List.assoc library libraries)
+    (List.assoc library libraries).root
 
   method get_library_doc_type ~library : string =
-    snd (List.assoc library libraries)
+    (List.assoc library libraries).doc_type
 
   method get_full_path ~library (rel_path : string) : string =
     let root = (self#get_library_root library) in
@@ -185,7 +176,8 @@ object (self)
     let json = Yojson.Basic.from_file libconfig in
     let version = (get_lib_version ()) in
     let libs = (json_to_libs json) in
-    let libs = (library,(root,doc_type)) :: libs in
+    let lib = {name = library; root = root; doc_type = doc_type} in
+    let libs = (library,lib) :: libs in
     let json = (libs_to_json version libs) in
     let _ = Json.to_file libconfig json in
     (prerr_endline ("Creating library: "^library^" -> "^root));
@@ -205,7 +197,6 @@ object (self)
     let _ = Json.to_file libconfig json in
     libraries <- libs
     
-
   method check_library_integrity ~library : doc list =
     (prerr_endline ("Checking integrity of library: "^library));
     let docs = self#get_documents ~library in
