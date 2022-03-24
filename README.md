@@ -3,39 +3,45 @@
 A GUI for managing document metadata for books, textbooks, or articles.
 
 ## Features
-* multiple libraries (and two document types - book/article)
-* search for metadata on [openlibrary.org](https://openlibrary.org/) and [semanticscholar.org](https://www.semanticscholar.org/)
+* files can be moved or renamed without losing metadata
 * metadata includes authors, title, publishing year, tags, bookmark, and DOI/ISBN
+* search for metadata on [openlibrary.org](https://openlibrary.org/) and [semanticscholar.org](https://www.semanticscholar.org/)
+* manage multiple libraries in different locations
 * error permissive search
-* files can be moved or renamed within library
 
 ## Usage
-Each library points to a unique directory. You can choose whether to automatically keep track of all items in that directory to the library,
-or add items manually. The default search query is the name of the file.
-The type of the library determines the following:
-* "book": store ISBN and search on [openlibrary.org](https://openlibrary.org), it works best to name files by author and title
-* "article": store DOI and search on [semanticscholar.org](https://semanticscholar.org), it works best to name files by title only
+Each library points to a unique directory, and all files in that directory are automatically added to that library. Each library must have a unique document type, book or article, which indicates
+* the type of new items added to the library
+* the default database to search for metadata ([openlibrary.org](https://openlibrary.org/) or [semanticscholar.org](https://www.semanticscholar.org/))
+* whether to store DOI or ISBN.
 
-Example directory structure is as follows:
-* Library "Textbooks" (type: book):
+When searching for metadata, the default search query is either the title or the name of the original file. To open a file, edit a file, search for a files metadata, etc., right click on an entry.
+
+An example directory structure is as follows:
+* Library "Math\Textbooks" (type: book):
 ```
-/home/user/Libraries/Textbooks
-> example0.pdf
-> math/example1.pdf
-> math/example2.djvu
-> cs/example3.ps
+~/Libraries/Math/Textbooks
+> Analysis/Rudin_principles_of_mathematical_analysis.djvu
+> "Algebra/Category Theory/MacLane Categories for the working mathematician.pdf"
+> Trash/Stewart_calculus_14th_edition.pdf
 ```
-* Library "Articles" (type: article):
+* Library "Math\Articles" (type: article):
 ```
-/home/user/Libraries/Articles
-> example0.pdf
-> example1.pdf
+~/Libraries/Math/Articles
+> obscure_journal_71_v2.ps
+> fancy_math_with_numbers.pdf
+```
+* Library "CS\Articles" (type: article):
+```
+~/Libraries/CS/Articles
+> COMPUTING_MACHINERY_AND_INTELLIGENCE.pdf
+> "Notions of Computation and Monads.pdf"
 ```
 * Library "eBooks" (type: book):
 ```
-/home/user/other/path/eBooks
-> path/to/example0.epub
-> example1.mobi
+~/Documents/Stuff/eBooks
+> scifi/asimov-foundation_trilogy.epub
+> mystery/2923497_203098.mobi
 ```
 
 ## Installation
