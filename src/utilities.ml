@@ -33,9 +33,24 @@ module Sys =
       (if (Sys.command ("rm -r \""^path^"\"")) > 0 then
          (raise (InternalError ("Could not remove directory: "^path))))
 
-    let mkdir (path : string) : unit =
-      (if (Sys.command ("mkdir -p \""^path^"\"")) > 0 then
-         (raise (InternalError ("Could not make directory: "^path))))
+    (* let mkdir (path : string) : unit =
+     *   (if (Sys.command ("mkdir -p \""^path^"\"")) > 0 then
+     *      (raise (InternalError ("Could not make directory: "^path)))) *)
+
+    let move (path : string) (new_path : string) : unit =
+      (if (Sys.command ("mv \""^path^"\" \""^new_path^"\"")) > 0 then
+         (raise (InternalError ("Could not move directory: "^path^" -> "^new_path))))
+
+    (* let make_dirs (path : string) : unit =
+     *   let rec make_dirs_ path dirs : unit =
+     *     (if Sys.file_exists path then ()
+     *      else (Sys.mkdir path 0o755));
+     *     match dirs with
+     *     | [] -> failwith "Not a full path"
+     *     | [name] -> ()
+     *     | dir::dirs -> make_dirs_ (path^"/"^dir) dirs
+     *   in (make_dirs_ "/" (Str.split (Str.regexp "/") path)) *)
+
   end
 
 module List =

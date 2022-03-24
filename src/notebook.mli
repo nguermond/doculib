@@ -3,12 +3,14 @@ exception LibraryDoesNotExist of string
 exception ModelNotLoaded of string
 exception NoLibrary
 
-class library : string -> string -> GPack.box ->
+class library : string -> string -> GPack.box -> GMisc.label ->
   object      
     method get_name : string
     method get_doc_type : string
     method get_page : GPack.box
+    method get_label : GMisc.label
     method get_model : Model.model
+    method rename : string -> unit
     method is_loaded : bool
     method set_model : Model.model -> unit
   end
@@ -18,8 +20,10 @@ class notebook : GPack.notebook -> Db.db -> GMenu.menu -> (GTree.model -> Model.
   val mutable libraries : (string * library) list
                                                  
   method init : ((string * string) list) -> unit
-  method add_library : library:string -> doc_type:string -> unit
+  method add_library : library:string -> doc_type:string -> prepend:bool -> unit
   method remove_library : library:string -> unit
+  method rename_library : library:string -> string -> bool
+       
   method load_library : library:string -> unit
   method refresh_library : library:string -> unit
 

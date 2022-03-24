@@ -47,19 +47,26 @@ let new_library ~(db:Db.db) ~(notebook:Notebook.notebook) : (string * string) op
   let dialog = GWindow.dialog ~title:"New Library" ~border_width:8 ~width:300 ~height:150 () in
   let grid = GPack.grid  ~col_spacings:8 ~row_spacings:8 ~packing:dialog#vbox#pack () in
 
-  let root_path_l = GMisc.label ~text:"Location" ~packing:(grid#attach ~left:0 ~top:0) () in
-  let root_path_hbox = GPack.hbox ~spacing:8 ~packing:(grid#attach ~left:1 ~top:0) () in
+  let name_l = GMisc.label ~text:"Name" ~packing:(grid#attach ~left:0 ~top:0) () in
+  let name_e = GEdit.entry ~packing:(grid#attach ~left:1 ~top:0) () in
+  let root_path_l = GMisc.label ~text:"Location" ~packing:(grid#attach ~left:0 ~top:1) () in
+  let root_path_hbox = GPack.hbox ~spacing:8 ~packing:(grid#attach ~left:1 ~top:1) () in
   let root_path_e = GMisc.label ~packing:(root_path_hbox#pack) () in
   let root_path_b = GButton.button ~label:"Choose" ~packing:(root_path_hbox#pack) () in
-  let doc_type_l = GMisc.label ~text:"Type" ~packing:(grid#attach ~left:0 ~top:1) () in
-  let doc_type_combo = GEdit.combo_box_text ~active:0 ~strings:["article"; "book"] ~packing:(grid#attach ~left:1 ~top:1)() in
+  let doc_type_l = GMisc.label ~text:"Type" ~packing:(grid#attach ~left:0 ~top:2) () in
+  let doc_type_combo = GEdit.combo_box_text ~active:0 ~strings:["article"; "book"] ~packing:(grid#attach ~left:1 ~top:2)() in
   
   root_path_b#connect#clicked ~callback:(fun () ->
       let root_path =
         match (choose_dir "Choose Library Location") with
         | Some path -> path
         | None -> "" in
-      root_path_e#set_text root_path);
+      root_path_e#set_text root_path;
+      let key = (String.split_on_char '/' root_path) in
+      let library = (List.nth key ((List.length key) - 1)) in
+      (if name_e#text = "" then
+         name_e#set_text library)
+    );
 
   dialog#add_button_stock `OK `OK;
   dialog#add_button_stock `CANCEL `CANCEL;
@@ -70,19 +77,19 @@ let new_library ~(db:Db.db) ~(notebook:Notebook.notebook) : (string * string) op
         | None -> raise (InternalError "Not possible: doc_type not selected")
         | Some s -> s in
       let root = root_path_e#text in
-      let key = (String.split_on_char '/' root) in
-      let library = (List.nth key ((List.length key) - 1)) in
+      let library = name_e#text in
+      let library = (Str.global_replace (Str.regexp "/") (Str.quote "\\") library) in
       dialog#destroy();
       (try
          (db#add_library ~library ~doc_type ~root;
-          notebook#add_library library doc_type;
+          notebook#add_library ~library ~doc_type ~prepend:false;
           notebook#load_library ~library;
-          notebook#refresh_library ~library;
           (Some (library, root)))
        with Db.LibraryExists
             -> (error_dialog "Library already exists!");
                None
-          | Db.InvalidLibrary -> None
+          | Db.InvalidLibrary ->
+             None
       )
    | `CANCEL | `DELETE_EVENT ->
       dialog#destroy(); None)
@@ -116,7 +123,14 @@ let manage_libraries ~db ~notebook : unit =
                     
   (* save cell edits *)
   name_renderer#connect#edited ~callback:(fun p str ->
-      (prerr_endline ("Editing: "^str));
+      let row = (store#get_iter p) in
+      let column = name in
+      let library = (store#get ~row ~column) in
+      let new_name = (Str.global_replace (Str.regexp "/")
+                        (Str.quote "\\") str) in
+      (prerr_endline ("Rename: "^library^" ~> "^new_name));
+      (if (notebook#rename_library ~library new_name) then
+         store#set ~row ~column new_name)
     );
 
   let name_col = GTree.view_column ~title:"Library" ~renderer:(name_renderer,name_values) () in
@@ -132,11 +146,13 @@ let manage_libraries ~db ~notebook : unit =
       store#set ~row ~column:name library;
       store#set ~row ~column:path root_path;
     ) (db#get_libraries());
+  
 
+  
   let hbox = GPack.hbox ~border_width:8 ~spacing:8 ~packing:(dialog#vbox#pack)() in  
 
   let add_b = GButton.button ~label:"Add" ~packing:(hbox#pack ~from:`END) () in
-  let move_b = GButton.button ~label:"Move" ~packing:(hbox#pack ~from:`END) () in
+  (* let move_b = GButton.button ~label:"Move" ~packing:(hbox#pack ~from:`END) () in *)
   let remove_b = GButton.button ~label:"Remove" ~packing:(hbox#pack ~from:`END) () in
 
   add_b#connect#clicked ~callback:(fun () ->
@@ -164,9 +180,9 @@ let manage_libraries ~db ~notebook : unit =
       confirm_dialog#destroy()
     );
 
-  move_b#connect#clicked ~callback:(fun () ->
-      (error_dialog "Not yet implemented")
-    );
+  (* move_b#connect#clicked ~callback:(fun () ->
+   *     (error_dialog "Not yet implemented")
+   *   ); *)
   
   dialog#add_button "Ok" `OK;
   (match dialog#run() with
@@ -346,7 +362,8 @@ let main () =
 
   
   
-  let libraries = (List.map (fun lib -> (lib, db#get_library_doc_type lib)) (db#get_libraries())) in
+  let libraries = (List.map (fun lib -> (lib, db#get_library_doc_type lib))
+                     (db#get_libraries())) in
   notebook#init libraries;
   
 
@@ -363,8 +380,19 @@ let main () =
       notebook#action_on_selected (fun library model row ->
           db#open_doc ~library ~path:(model#get ~row ~column:Model.Attr.path))
     );
+  
+  (* Search for metadata *)
+  context_factory#add_item "Search Metadata"
+    ~callback:(fun _ ->
+      notebook#edit_selected (fun doc ->
+          let search_str =
+            (if doc.title = "" then
+               (Str.global_replace (Str.regexp ("\\(.*/\\)\\|\\(\\..*\\)\\|[-_\\()]")) "" doc.path)
+             else doc.title) in
+          search_metadata db doc search_str)
+    );
 
-  (* Open DOI of selected files *)
+    (* Open DOI of selected files *)
   context_factory#add_item "Open DOI"
     ~callback:(fun _ ->
       notebook#action_on_selected (fun library model row ->
@@ -376,21 +404,9 @@ let main () =
   (* Edit metadata for an entry *)
   context_factory#add_item "Edit Entry"
     ~callback:(fun _ -> notebook#edit_selected edit_document);
-  
-  (* Search for metadata *)
-  context_factory#add_item "Search Metadata"
-    ~callback:(fun _ ->
-      notebook#edit_selected (fun doc ->
-          let search_str =
-            (if doc.title = "" then
-               (Str.global_replace (Str.regexp ("\\(.*/\\)\\|\\(\\..*\\)\\|[-_\\()]")) "" doc.path)
-             else doc.title) in
-          (* let search_str = Str.global_replace (Str.regexp "\\(.pdf\\)\\|\\(.djvu\\)\\|[-_\\.() ]+") " " search_str in *)
-          search_metadata db doc search_str)
-    );
-  
+
   (* Remove entry from database *)
-  (* TODO: remove this *)
+  (* TODO: remove this, still needed in case file no longer exists *)
   context_factory#add_item "Remove Entry"
     ~callback:(fun _ ->
       notebook#action_on_selected (fun library model row ->
@@ -402,10 +418,10 @@ let main () =
   context_factory#add_separator ();
 
   (* Rename physical file *)
-  context_factory#add_item "Rename File"
-    ~callback:(fun _ ->
-      (error_dialog "Rename File: Not yet implemented")
-    );
+  (* context_factory#add_item "Rename File"
+   *   ~callback:(fun _ ->
+   *     (error_dialog "Rename File: Not yet implemented")
+   *   ); *)
   
   (* Delete physical file *)
   context_factory#add_item "Delete File"
@@ -446,6 +462,11 @@ let main () =
   file_factory#add_item "Manage Libraries"
     ~callback:(fun () -> (manage_libraries ~db ~notebook)
     );
+
+  (* Export a library to an archive *)
+  (* file_factory#add_item "Export Library"
+   *   ~callback:(fun () -> ()
+   *   ); *)
   
   file_factory#add_separator ();
 

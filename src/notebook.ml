@@ -11,21 +11,26 @@ let iter_cancel f lst : unit =
   | Cancel -> ()
 
                           
-class library library doc_type page =
+class library library doc_type page label =
   object
-    val library : string = library
+    val mutable library : string = library
     val doc_type : string = doc_type
     val page : GPack.box = page
+    val label : GMisc.label = label
     val mutable model : Model.model option = None
 
     method get_name : string = library
     method get_doc_type : string = doc_type
     method get_page : GPack.box = page
+    method get_label : GMisc.label = label
     method get_model : Model.model =
       match model with
       | Some m -> m
       | None -> raise (ModelNotLoaded library)
 
+    method rename (name : string) : unit =
+      library <- name
+              
     method set_model (m : Model.model) : unit =
       model <- Some m
 
@@ -42,33 +47,55 @@ class notebook notebook db context_menu filter_func = object (self)
   val filter_func : GTree.model -> Gtk.tree_iter -> bool = filter_func
   val mutable libraries : (string * library) list = []
    
-  method add_library ~library ~doc_type : unit =
+  method add_library ~library ~doc_type ~prepend : unit =
     (prerr_endline ("Adding library "^library));
     let label = (GMisc.label ~text:library ()) in
     let page = (GPack.vbox ~border_width:8 ~spacing:8
                   ~packing:(fun w ->
-                    ignore (notebook#prepend_page ~tab_label:(label#coerce) w)) ()) in
-    let lib = new library library doc_type page in
-    libraries <- (library, lib) :: libraries
+                    let add_page = (if prepend then notebook#prepend_page
+                               else notebook#append_page) in
+                    ignore (add_page ~tab_label:(label#coerce) w)) ()) in
+    let lib = new library library doc_type page label in
+    let libs = (library, lib) :: libraries in
+    (if prepend then
+       (libraries <- (library, lib) :: libraries)
+     else
+       (libraries <- (List.rev ((library,lib) :: (List.rev libraries)))))
     
   method remove_library ~library : unit =
-    (prerr_endline ("Removing library "^library));
+    (prerr_endline ("Removing library "^library^" @"
+                    ^(string_of_int (self#get_index ~library))));
     (db#remove_library library);
     notebook#remove_page (self#get_index ~library);
     libraries <- (List.remove_assoc library libraries)
+
+  method rename_library ~library new_name : bool =
+    try
+      ((db#rename_library ~library new_name);
+       let lib = (List.assoc library libraries) in
+       (lib#rename new_name);
+       libraries <- (new_name,lib) :: (List.remove_assoc library libraries);
+       let label = lib#get_label in
+       label#set_text new_name;
+       true)
+    with
+      Db.LibraryExists -> false
     
   method init (libs : (string * string) list) : unit =
-    (List.iter (fun (library,doc_type) -> self#add_library ~library ~doc_type) libs);
+    (List.iter (fun (library,doc_type) -> self#add_library ~library ~doc_type ~prepend:true)
+       (List.rev libs));
     (* On page switch *)
     notebook#connect#switch_page ~callback:(fun index ->
-        if (List.length libs) > 0 then
+        let n = (List.length libs) in
+        if n > 0 then
           (let (library,lib) = (List.nth libraries index) in
            (self#load_library ~library);
            self#refilter ~library:(Some library) ())
         else ()
       );
     if (List.length libs) > 0 then
-      (let library = (fst (self#current_library)) in
+      (notebook#goto_page 0;
+       let library = (fst (self#current_library)) in
        self#load_library ~library)    
 
   method private get_index ~library : int =
@@ -104,12 +131,13 @@ class notebook notebook db context_menu filter_func = object (self)
       let doc_type = lib#get_doc_type in
       let page = lib#get_page in
       let data = (db#get_documents ~library) in
+      (* let data = [] in *)
       let model = (Model.make_document_list ~db:db ~multiple:true ~sort:(Some Model.Attr.star)
                      ~editable:true ~library ~doc_type ~packing:page#add data) in
       model#handle_click_events ~context_menu;
       model#set_visible_func filter_func;
-      self#set_model library model(* ;
-       * (self#refresh_library ~library) *)
+      self#set_model library model;
+      (self#refresh_library ~library)
 
   method refresh_library ~library : unit =
     let lib = self#get_library ~library in

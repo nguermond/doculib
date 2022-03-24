@@ -36,6 +36,7 @@ object
 
   method add_library : library:string -> root:string -> doc_type:string -> unit
   method remove_library : library:string -> unit
+  method rename_library : library:string -> string -> unit
 
   (* method refresh_library_incr : library:string -> (int -> ((doc option) * bool)) *)
   

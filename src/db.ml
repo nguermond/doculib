@@ -30,20 +30,16 @@ type library = {name : string;
                 doc_type : string
                }
 
-
-(* let get_rel_path ~library (path : string) : string =
- *   (Str.replace_first (Str.regexp (".*/"^library^"/")) "" path)) *)
-
 let get_rel_path ~(library_root : string) (path : string) : string =
   (Str.replace_first (Str.regexp (Str.quote (library_root^"/"))) "" path)
 
 let json_to_libs (json : Json.t) : (string * library) list =
-  (Json.to_list (Json.raise_opt "Could not find entry `libraries`"
+  (Json.to_list (Json.raise_opt "`libraries`"
                    (Json.get "libraries" json)))
   |> List.map (fun json ->
-         let name = Json.to_string (Json.raise_opt "Could not find entry `name`" (Json.get "name" json)) in
-         let path = Json.to_string (Json.raise_opt "Could not find entry `path`" (Json.get "path" json)) in
-         let doc_type = Json.to_string (Json.raise_opt "Could not find entry `doc_type`" (Json.get "doc_type" json)) in
+         let name = Json.to_string (Json.raise_opt "`name`" (Json.get "name" json)) in
+         let path = Json.to_string (Json.raise_opt "`path`" (Json.get "path" json)) in
+         let doc_type = Json.to_string (Json.raise_opt "`doc_type`" (Json.get "doc_type" json)) in
          (name,{name = name; root = path; doc_type = doc_type}))
 
 let get_lib_version () : string =
@@ -62,7 +58,7 @@ let set_lib_version (version : string) : unit =
 
 let libs_to_json (version : string) (libs : (string * library) list) : Json.t =
   let libs = (`List (List.map (fun (name,lib) ->
-                         (`Assoc [("name",`String name);
+                         (`Assoc [("name",`String lib.name);
                                   ("path", `String lib.root);
                                   ("doc_type", `String lib.doc_type)]))
                        libs)) in
@@ -87,11 +83,12 @@ object (self)
   val mutable libraries : ((string * library) list) =
     let json = Yojson.Basic.from_file libconfig in
     (json_to_libs json)
+
+  val version : string = get_lib_version()
     
   (* TODO: move to utilities *)
   method private make_dirs (path : string) : unit =
     let rec make_dirs_ path dirs : unit =
-      (* prerr_endline ("Making dir: " ^ path); *)
       (if Sys.file_exists path then ()
        else (Sys.mkdir path 0o755));
       match dirs with
@@ -112,6 +109,10 @@ object (self)
     let name = (store^"/"^library^"/"^path^".json") in
     let json = (Json.from_file name) in
     (json_to_doc path json)
+
+  (* method private get_document_from_file full_path : doc =
+   *   let json = (Json.from_file full_path) in
+   *   (json_to_doc json)  *)
   
   method set_document ~library ~path doc : unit =
     let name = (store^"/"^library^"/"^path^".json") in
@@ -130,12 +131,12 @@ object (self)
         let doc = (make_doc_from_file full_path path doc_type) in
         let _ = self#add_document ~library doc in
         (Some doc))
-     else None)    
+     else None)
     
   method private import_files ~library (paths : string list) : doc list =
     (prerr_endline "Importing files");
     List.filter_map (fun path ->
-        (prerr_endline ("Loading~"^path));
+        (* (prerr_endline ("Loading~"^path)); *)
         (self#import_file ~library path))
       paths
 
@@ -165,10 +166,11 @@ object (self)
         let path = (Str.replace_first (Str.regexp (Str.quote ".json")) "" path) in
         let path = get_rel_path ~library_root path in
         self#get_document ~library ~path) in
+    (* let map = self#get_document_from_file in *)
     (Utilities.Sys.get_files (store^"/"^library) ~map)
   
   method private print_documents library : unit =
-    let docs = self#get_documents library in
+    let docs = self#get_documents ~library in
     List.iter (fun d -> printf "%a@\n" pp_doc d) docs
     
   method get_library_root ~library : string =
@@ -193,11 +195,8 @@ object (self)
        raise InvalidLibrary);
     (if (List.mem_assoc library libraries) then
        raise LibraryExists);
-    let json = Yojson.Basic.from_file libconfig in
-    let version = (get_lib_version ()) in
-    let libs = (json_to_libs json) in
     let lib = {name = library; root = root; doc_type = doc_type} in
-    let libs = (library,lib) :: libs in
+    let libs = (List.rev ((library,lib) :: (List.rev libraries))) in
     let json = (libs_to_json version libs) in
     let _ = Json.to_file libconfig json in
     (prerr_endline ("Creating library: "^library^" -> "^root));
@@ -205,17 +204,26 @@ object (self)
     libraries <- libs
 
   method remove_library ~library : unit =
-    (* delete ~/.doculib/data/2.1/library *)
     (prerr_endline ("Removing: "^(store^"/"^library)));
     (Utilities.Sys.rmdir (store^"/"^library));
-    (* remove entry in ~/.doculib/libraries.json *)
-    let json = Yojson.Basic.from_file libconfig in
-    let version = (get_lib_version ()) in
-    let libs = (json_to_libs json) in
-    let libs = List.remove_assoc library libs in
+    let libs = List.remove_assoc library libraries in
     let json = (libs_to_json version libs) in
     let _ = Json.to_file libconfig json in
     libraries <- libs
+
+  method rename_library ~library new_name : unit =
+    (if (List.mem_assoc new_name libraries) then
+       raise LibraryExists);
+    let old_lib = (List.assoc library libraries) in
+    (prerr_endline ("Renaming Library: "^library^" -> "^new_name^" ~> "^(Str.quote new_name)));
+    (Utilities.Sys.move (store^"/"^library) (store^"/"^new_name));
+    let libs = List.remove_assoc library libraries in
+    let lib = {name = new_name; root = old_lib.root; doc_type = old_lib.doc_type} in
+    let libs = (List.rev ((new_name,lib) :: (List.rev libs))) in
+    let json = (libs_to_json version libs) in
+    let _ = Json.to_file libconfig json in
+    libraries <- libs
+
     
   method check_library_integrity ~library : doc list =
     (prerr_endline ("Checking integrity of library: "^library));

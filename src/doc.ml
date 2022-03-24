@@ -103,16 +103,16 @@ let doc_to_json (doc : t) : Json.t =
 
 let json_to_doc path (json : Json.t) : t =
   let open Json in
-  { star = (to_bool (raise_opt "" (get "star" json)));
-    title = (to_string (raise_opt "" (get "title" json)));
+  { star = (to_bool (raise_opt "star" (get "star" json)));
+    title = (to_string (raise_opt "title" (get "title" json)));
     authors = (List.map to_string
-                 (to_list (raise_opt "" (get "authors" json))));
-    doi = (to_string (raise_opt "" (get "doi" json)));
-    isbn = (to_string (raise_opt "" (get "isbn" json)));
-    year = (to_string (raise_opt "" (get "year" json)));
+                 (to_list (raise_opt "authors" (get "authors" json))));
+    doi = (to_string (raise_opt "doi" (get "doi" json)));
+    isbn = (to_string (raise_opt "isbn" (get "isbn" json)));
+    year = (to_string (raise_opt "year" (get "year" json)));
     tags = (List.map to_string
-              (to_list (raise_opt "" (get "tags" json))));
+              (to_list (raise_opt "tags" (get "tags" json))));
     path = path;
-    doc_type = (to_string (raise_opt "" (get "doc_type" json)));
-    hash = (to_string (default (`String "") (get "hash" json)));
+    doc_type = (to_string (raise_opt "doc_type" (get "doc_type" json)));
+    hash = (to_string (default (`String "hash") (get "hash" json)));
   }
