@@ -36,7 +36,9 @@ object
 
   method add_library : library:string -> root:string -> doc_type:string -> unit
   method remove_library : library:string -> unit
-       
+
+  (* method refresh_library_incr : library:string -> (int -> ((doc option) * bool)) *)
+  
   method refresh_library : library:string -> doc list
 
   method get_full_path : library:string -> string -> string

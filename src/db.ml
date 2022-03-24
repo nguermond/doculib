@@ -31,9 +31,11 @@ type library = {name : string;
                }
 
 
-let get_rel_path ~library (path : string) : string =
-  (Str.replace_first (Str.regexp (".json")) ""
-     (Str.replace_first (Str.regexp (".*/"^library^"/")) "" path))
+(* let get_rel_path ~library (path : string) : string =
+ *   (Str.replace_first (Str.regexp (".*/"^library^"/")) "" path)) *)
+
+let get_rel_path ~(library_root : string) (path : string) : string =
+  (Str.replace_first (Str.regexp (Str.quote (library_root^"/"))) "" path)
 
 let json_to_libs (json : Json.t) : (string * library) list =
   (Json.to_list (Json.raise_opt "Could not find entry `libraries`"
@@ -94,7 +96,7 @@ object (self)
        else (Sys.mkdir path 0o755));
       match dirs with
       | [] -> failwith "Not a full path"
-      | [name] -> prerr_endline name; ()
+      | [name] -> ()
       | dir::dirs -> make_dirs_ (path^"/"^dir) dirs
     in (make_dirs_ store (Str.split (Str.regexp "/") path))
      
@@ -131,21 +133,39 @@ object (self)
      else None)    
     
   method private import_files ~library (paths : string list) : doc list =
+    (prerr_endline "Importing files");
     List.filter_map (fun path ->
+        (prerr_endline ("Loading~"^path));
         (self#import_file ~library path))
       paths
 
+  (* method refresh_library_incr ~library : (int -> ((doc option) * bool)) =
+   *   let library_root = self#get_library_root ~library in
+   *   let map = (get_rel_path ~library_root) in
+   *   let paths = (Utilities.Sys.get_files library_root ~map) in
+   *   let stack = ref (Stack.of_seq (List.to_seq paths)) in
+   *   let cc = ref 0 in
+   *   let k = (fun n ->
+   *       cc := !cc + 1;
+   *       match (Stack.pop_opt !stack) with
+   *       | None -> (None, false)
+   *       | Some path -> (prerr_endline ("Loading["^(string_of_int (!cc+n))^"]: "^path));
+   *                      (self#import_file ~library path, true)) in
+   *   k *)
+
   method refresh_library ~library : doc list =
-    let root = (self#get_library_root ~library) in
-    let files = Utilities.Sys.get_files root in
-    let paths = (List.map (get_rel_path ~library) files) in
+    let library_root = self#get_library_root ~library in
+    let map = (get_rel_path ~library_root) in
+    let paths = Utilities.Sys.get_files library_root ~map in
     (self#import_files ~library paths)
 
   method get_documents ~library : doc list =
-    List.map (fun path ->
-        let path = get_rel_path ~library path in
-        self#get_document ~library ~path)
-      (Utilities.Sys.get_files (store^"/"^library))
+    let library_root = (store^"/"^library) in
+    let map = (fun path ->
+        let path = (Str.replace_first (Str.regexp (Str.quote ".json")) "" path) in
+        let path = get_rel_path ~library_root path in
+        self#get_document ~library ~path) in
+    (Utilities.Sys.get_files (store^"/"^library) ~map)
   
   method private print_documents library : unit =
     let docs = self#get_documents library in
@@ -164,10 +184,10 @@ object (self)
   method open_doc ~library ~path : unit =
     let path = (self#get_full_path ~library path) in
     (Utilities.Sys.xopen path)
-  
+    
   method get_libraries () : string list =
     List.map fst libraries
-  
+    
   method add_library ~library ~root ~doc_type : unit =
     (if (library = "" || root = "") then
        raise InvalidLibrary);
@@ -200,6 +220,7 @@ object (self)
   method check_library_integrity ~library : doc list =
     (prerr_endline ("Checking integrity of library: "^library));
     let docs = self#get_documents ~library in
+    let library_root = self#get_library_root ~library in
     List.filter (fun doc ->
         let full_path = self#get_full_path ~library doc.path in
         if (not (Sys.file_exists full_path)) then
@@ -208,14 +229,16 @@ object (self)
            let root_path = (self#get_library_root ~library) in
            match (Utilities.Sys.find_file doc.hash root_path) with
            | Some path ->
+              let path = (Str.replace_first (Str.regexp (Str.quote ".json")) "" path) in
               prerr_endline ("Found new location: "^path);
-              let rel_path = (get_rel_path ~library path) in
+              let rel_path = (get_rel_path ~library_root path) in
               let new_doc = (edit_document (Path rel_path) doc) in
               (self#add_document ~library new_doc);
               (self#remove_document ~library ~path:doc.path);
               false
            | None ->
-              prerr_endline ("Could not find file: "^full_path^"\n It was either placed in a different library or deleted!");
+              prerr_endline ("Could not find file: "^full_path^
+                               "\n It was either placed in a different library or deleted!");
               true)
         else false)
       docs

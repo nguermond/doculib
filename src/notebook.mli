@@ -23,6 +23,8 @@ class notebook : GPack.notebook -> Db.db -> GMenu.menu -> (GTree.model -> Model.
   method load_library : library:string -> unit
   method refresh_library : library:string -> unit
 
+  (* method refresh_library_incr : library:string -> (int -> bool) *)
+
   (* TODO: should not be public *)
   method current_library : string * library
            

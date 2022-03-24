@@ -6,6 +6,7 @@ let icon_path = "/usr/local/lib/doculib/icons/Gnome-colors-applications-office.s
 
 exception InternalError of string
 
+                         
 let choose_dir (title : string) : string option =
   let dialog = GWindow.file_chooser_dialog ~action:`SELECT_FOLDER ~title () in
   dialog#add_button_stock `CANCEL `CANCEL;
@@ -25,19 +26,31 @@ let error_dialog (msg : string) : unit =
   (match error_dialog#run() with
    | _ -> error_dialog#destroy()
   )
-
   
+let loading_dialog (f : int -> bool) : unit =
+  let dialog = GWindow.dialog ~border_width:8 ~width:300 ~height:20 () in
+  let pbar = GRange.progress_bar ~pulse_step:0.01 ()
+               ~packing:(dialog#vbox#pack) in
+  let g = (fun () -> pbar#pulse();
+                     (if (f 0) then true
+                      else (dialog#destroy();false))) in
+
+  dialog#add_button_stock `CANCEL `CANCEL;
+  let _ = GMain.Timeout.add ~ms:50 ~callback:g in
+  try
+    (match (dialog#run()) with
+     | _ -> dialog#destroy())
+  with _ -> ()
+
+       
 let new_library ~(db:Db.db) ~(notebook:Notebook.notebook) : (string * string) option =
   let dialog = GWindow.dialog ~title:"New Library" ~border_width:8 ~width:300 ~height:150 () in
   let grid = GPack.grid  ~col_spacings:8 ~row_spacings:8 ~packing:dialog#vbox#pack () in
 
-  (* let name_l = GMisc.label ~text:"Name" ~packing:(grid#attach ~left:0 ~top:0) () in
-   * let name_e = GEdit.entry ~packing:(grid#attach ~left:1 ~top:0) () in *)
   let root_path_l = GMisc.label ~text:"Location" ~packing:(grid#attach ~left:0 ~top:0) () in
   let root_path_hbox = GPack.hbox ~spacing:8 ~packing:(grid#attach ~left:1 ~top:0) () in
   let root_path_e = GMisc.label ~packing:(root_path_hbox#pack) () in
   let root_path_b = GButton.button ~label:"Choose" ~packing:(root_path_hbox#pack) () in
-  (* let import_dir_check = GButton.check_button ~label:"import all files" ~packing:(grid#attach ~left:1 ~top:1) () in *)
   let doc_type_l = GMisc.label ~text:"Type" ~packing:(grid#attach ~left:0 ~top:1) () in
   let doc_type_combo = GEdit.combo_box_text ~active:0 ~strings:["article"; "book"] ~packing:(grid#attach ~left:1 ~top:1)() in
   
@@ -63,7 +76,8 @@ let new_library ~(db:Db.db) ~(notebook:Notebook.notebook) : (string * string) op
       (try
          (db#add_library ~library ~doc_type ~root;
           notebook#add_library library doc_type;
-          notebook#load_library library;
+          notebook#load_library ~library;
+          notebook#refresh_library ~library;
           (Some (library, root)))
        with Db.LibraryExists
             -> (error_dialog "Library already exists!");
@@ -94,13 +108,12 @@ let manage_libraries ~db ~notebook : unit =
                                    ["text",name]) in
   let path_renderer,path_values = (GTree.cell_renderer_text
                                      [`EDITABLE false;
+                                      `FONT Font.default_font; `YPAD 2;
+                                      `HEIGHT (Font.calc_font_height ~ypad:2 2);
                                       `WRAP_WIDTH 300;
                                       `WRAP_MODE `WORD_CHAR],
                                    ["text",path]) in
-          
-  (* 2 rows of text *)
-  (* name_renderer#set_fixed_height_from_font 2; *)
-          
+                    
   (* save cell edits *)
   name_renderer#connect#edited ~callback:(fun p str ->
       (prerr_endline ("Editing: "^str));

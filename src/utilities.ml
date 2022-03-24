@@ -15,19 +15,19 @@ module Sys =
       (Digest.to_hex (Digest.file file))
 
       
-    let rec get_files (path : string) : string list =
+    let rec get_files (path : string) ~(map:string -> 'a): 'a list =
       (if (Sys.is_directory path) then
          (List.flatten
-            (List.map (fun name -> get_files (path^"/"^name))
+            (List.map (fun name -> get_files (path^"/"^name) ~map)
                (Array.to_list (Sys.readdir path))))
-       else [path])
+       else [map path])
 
     let find_file (hash : string) (full_path : string) : string option =
       let hash = (Digest.from_hex hash) in
       List.find_map (fun path ->
           (if (Digest.equal (Digest.file path) hash) then
              (Some path) else None))
-        (get_files full_path)
+        (get_files full_path ~map:(fun x -> x))
 
     let rmdir (path : string) : unit =
       (if (Sys.command ("rm -r \""^path^"\"")) > 0 then
