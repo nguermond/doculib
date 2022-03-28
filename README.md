@@ -15,7 +15,7 @@ Each library points to a unique directory, and all files in that directory are a
 * the default database to search for metadata ([openlibrary.org](https://openlibrary.org/) or [semanticscholar.org](https://www.semanticscholar.org/))
 * whether to store DOI or ISBN.
 
-When searching for metadata, the default search query is either the title or the name of the original file. To open a file, edit a file, search for a files metadata, etc., right click on an entry.
+When searching for metadata, the default search query is either the title or the name of the original file. To open a file, search for a files metadata, or perform other actions, right click on an entry. Double click on an entry to edit.
 
 An example directory structure is as follows:
 * Library "Math\Textbooks" (type: book):

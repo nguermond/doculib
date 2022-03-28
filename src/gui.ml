@@ -42,6 +42,48 @@ let loading_dialog (f : int -> bool) : unit =
      | _ -> dialog#destroy())
   with _ -> ()
 
+class search_bar search_box search_entry =
+object
+  val search_box : GPack.box = search_box
+
+  val filter_func = (fun (model : GTree.model) row ->
+    let search_query = search_entry#text in
+    (* prerr_endline ("Searching query: "^search_query); *)
+    let search_string = (String.concat " " (List.map (fun column -> model#get ~row ~column)
+                                              [Model.Attr.title; Model.Attr.authors; Model.Attr.tags; Model.Attr.path])) in
+    let open Agrep in
+    if search_query = "" then true
+    else
+      let pat = (pattern ~transl:Iso8859_15.case_and_accent_insensitive search_query) in
+      (string_match pat ~numerrs:(if (String.length search_string > 2) then 1 else 0) search_string)
+  )
+  val search_entry : GEdit.entry = search_entry
+
+  method init () : unit =
+    search_entry#set_secondary_icon_stock `FIND;
+    search_entry#set_secondary_icon_tooltip_text
+      ( "?X      single character\n"
+        ^"*       any character sequence\n"
+        ^"[X]    character set (eg. [a-z])\n"
+        ^"X & Y    conjunction\n"
+        ^"X | Y    disjunction\n"
+        ^"\\X      character escape")
+    
+  method get_text () : string =
+    search_entry#text
+    
+  method on_changed ~callback : unit =
+    ignore(search_entry#connect#changed ~callback)
+
+  method get_filter = filter_func
+end
+  
+let search_bar ~packing : search_bar =
+  let search_box = GPack.hbox ~border_width:8 ~spacing:8 ~packing () in
+  let search_entry = GEdit.entry ~packing:(search_box#add) () in
+  let sb = (new search_bar search_box search_entry) in
+  let _ = sb#init() in
+  sb
        
 let new_library ~(db:Db.db) ~(notebook:Notebook.notebook) : (string * string) option =
   let dialog = GWindow.dialog ~title:"New Library" ~border_width:8 ~width:300 ~height:150 () in
@@ -321,36 +363,19 @@ let main () =
   (* Toplevel menu *)
   let menubar = GMenu.menu_bar ~packing:vbox#pack () in
   let factory = new GMenu.factory menubar in
-  let file_menu = factory#add_submenu "File" in
-  let file_factory = new GMenu.factory file_menu in
+  let library_menu = factory#add_submenu "Library" in
+  let library_factory = new GMenu.factory library_menu in
+  let help_menu = factory#add_submenu "Help" in
+  let help_factory = new GMenu.factory help_menu in
+  let about_menu = factory#add_submenu "About" in
+  let about_factory = new GMenu.factory about_menu in
 
   (* Context menu *)
   let context_menu = GMenu.menu () in
   let context_factory = new GMenu.factory context_menu in
 
   (* Search bar *)
-  let search_box = GPack.hbox ~border_width:8 ~spacing:8
-                     ~packing:(vbox#pack ~from:`START) () in
-  let search_e = GEdit.entry ~packing:(search_box#add) () in
-  search_e#set_secondary_icon_stock `FIND;
-  search_e#set_secondary_icon_tooltip_text
-    ( "?X      single character\n"
-     ^"*       any character sequence\n"
-     ^"[X]    character set (eg. [a-z])\n"
-     ^"X & Y    conjunction\n"
-     ^"X | Y    disjunction\n"
-     ^"\\X      character escape");
-  let filter_func = (fun (model : GTree.model) row ->
-      let search_query = search_e#text in
-      (* prerr_endline ("Searching query: "^search_query); *)
-      let search_string = (String.concat " " (List.map (fun column -> model#get ~row ~column)
-                                                [Model.Attr.title; Model.Attr.authors; Model.Attr.tags; Model.Attr.path])) in
-      let open Agrep in
-      if search_query = "" then true
-      else
-        let pat = (pattern ~transl:Iso8859_15.case_and_accent_insensitive search_query) in
-        (string_match pat ~numerrs:(if (String.length search_string > 2) then 1 else 0) search_string)
-    ) in
+  let search_bar = search_bar ~packing:(vbox#pack ~from:`START) in
 
   (* Database *)
   Update_db.init();
@@ -358,7 +383,7 @@ let main () =
   
   (* Notebook *)
   let notebook = GPack.notebook ~packing:vbox#add () in
-  let notebook = new Notebook.notebook notebook db context_menu filter_func in
+  let notebook = new Notebook.notebook notebook db context_menu search_bar#get_filter in
 
   
   
@@ -366,10 +391,9 @@ let main () =
                      (db#get_libraries())) in
   notebook#init libraries;
   
-
+  
   (* Search on edit *)
-  search_e#connect#changed ~callback:(fun _ ->
-      notebook#refilter());
+  search_bar#on_changed ~callback:(fun _ -> notebook#refilter());
 
   (****************************************************)
   (* Context menu                                     *)
@@ -445,21 +469,22 @@ let main () =
     );
 
   (****************************************************)
-
+  (* File factory                                     *)
+  (****************************************************)
   (* Refresh library *)
-  file_factory#add_item "Refresh Library"
+  library_factory#add_item "Refresh Library"
     ~callback:(fun () ->
       let (library,_) = notebook#current_library in
       notebook#refresh_library ~library
     );
 
   (* Make new library tab *)
-  file_factory#add_item "New Library"
+  library_factory#add_item "New Library"
     ~callback:(fun () -> ignore (new_library ~db ~notebook)
     );
 
   (* Manage libraries *)
-  file_factory#add_item "Manage Libraries"
+  library_factory#add_item "Manage Libraries"
     ~callback:(fun () -> (manage_libraries ~db ~notebook)
     );
 
@@ -468,9 +493,35 @@ let main () =
    *   ~callback:(fun () -> ()
    *   ); *)
   
-  file_factory#add_separator ();
+  library_factory#add_separator ();
 
-  file_factory#add_item "Quit" ~callback:window#destroy;
+  library_factory#add_item "Quit" ~callback:window#destroy;
+
+  (****************************************************)
+  (* Help factory                                     *)
+  (****************************************************)
+  help_factory#add_item "???" ~callback:(fun () ->
+      error_dialog "Not yet implemented... sorry"
+    );
+
+  (****************************************************)
+  (* About factory                                    *)
+  (****************************************************)
+  (* Add license information for doculib and all third party libraries:
+   * cohttp-lwt-unix: ISC
+   * lablgtk3: LGPLv2.1+
+   * ocaml: LGPLv2.1+
+   * tls: BSD-2
+   * agrep: LGPLv2
+   * multidrag(quodlibet): GPLv2.0
+   * gtk: LGPLv2.1+ 
+   *)
+  about_factory#add_item "DocuLib" ~callback:(fun () ->
+      error_dialog "Not yet implemented... sorry"
+    );
+  about_factory#add_item "Licenses" ~callback:(fun () ->
+      error_dialog "Not yet implemented... sorry"
+    );
   
   window#connect#destroy ~callback:GMain.quit;
 
