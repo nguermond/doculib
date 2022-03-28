@@ -5,6 +5,8 @@ type column
 type packing
 type row = Gtk.tree_iter
 
+val dnd_targets : Gtk.target_entry list
+  
 module Attr :
   sig
     val star : bool GTree.column
@@ -49,8 +51,9 @@ class model : Db.db -> GTree.model_filter -> GTree.list_store -> GTree.view ->
 
 
     
-val make_document_list : db:Db.db -> ?height:int -> ?show_path:bool -> ?multiple:bool -> ?show_stars:bool ->
-                         ?editable:bool -> ?library:string ->
+val make_document_list : db:Db.db -> ?height:int -> ?show_path:bool
+                         -> ?multiple:bool -> ?show_stars:bool ->
+                         ?editable:bool -> ?multidrag:bool -> ?library:string ->
                          ?sort:(('a GTree.column) option) -> doc_type:string ->
                          packing:(GObj.widget -> unit) -> (Doc.t list) -> model 
 

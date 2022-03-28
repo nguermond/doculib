@@ -50,6 +50,17 @@ class notebook notebook db context_menu filter_func = object (self)
   method add_library ~library ~doc_type ~prepend : unit =
     (prerr_endline ("Adding library "^library));
     let label = (GMisc.label ~text:library ()) in
+    label#drag#dest_set Model.dnd_targets ~actions:[`MOVE];
+    label#drag#connect#data_received ~callback:
+    (fun ctx ~x ~y data ~info ~time ->
+      if data#format = 8 then
+        ((Printf.printf "Received `%s` at label `%s`\n" data#data library); flush stdout;
+         ctx#finish ~success:true ~del:false ~time)
+      else ctx#finish ~success:false ~del:false ~time
+    );
+
+
+    
     let page = (GPack.vbox ~border_width:8 ~spacing:8
                   ~packing:(fun w ->
                     let add_page = (if prepend then notebook#prepend_page
@@ -133,7 +144,7 @@ class notebook notebook db context_menu filter_func = object (self)
       let data = (db#get_documents ~library) in
       (* let data = [] in *)
       let model = (Model.make_document_list ~db:db ~multiple:true ~sort:(Some Model.Attr.star)
-                     ~editable:true ~library ~doc_type ~packing:page#add data) in
+                     ~editable:true ~multidrag:true ~library ~doc_type ~packing:page#add data) in
       model#handle_click_events ~context_menu;
       model#set_visible_func filter_func;
       self#set_model library model;

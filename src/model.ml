@@ -11,6 +11,15 @@ type packing = ?from:Gtk.Tags.pack_type -> ?expand:bool -> ?fill:bool -> ?paddin
 
 type row = Gtk.tree_iter
 
+         
+let dnd_targets : Gtk.target_entry list = [
+    (* { target = "GTK_TREE_MODEL_ROW"; flags = []; info = 0}; *)
+    (* { target = "text/uri-list"; flags = []; info = 2}; *)
+    { target = "STRING"; flags = []; info = 0};
+    (* { target = "text/plain"; flags = []; info = 2};
+     * { target = "application/x-rootwin-drop"; flags = []; info = 1} *)
+  ]
+
 
 module Attr =
   struct
@@ -137,23 +146,72 @@ object (self)
 
   (* Handle click events *)
   method handle_click_events ~(context_menu : GMenu.menu) : unit =
-    (* Open selected files with default program on select *)
+    (* Open selected files with default program on select
+     * -- conflicts with editing rows 
+     *)
     (* view#connect#after#row_activated
      *   ~callback:(fun _ _ ->
      *     List.iter (fun p ->
      *         open_doc (store#get ~row:(self#get_row p) ~column:path))
      *       view#selection#get_selected_rows); *)
     
-    (* Spawn context menu on right click *)
-    ignore
-      (view#event#connect#button_press
-         ~callback:(fun ev ->
-           (if (GdkEvent.Button.button ev) == 3 then
-              (context_menu#popup ~button:3 ~time:(GdkEvent.Button.time ev);
-               (if (view#selection#count_selected_rows) > 1
-                then true (* do not deselect *)
-                else false (* select on right click *)))
-            else false)))
+    (* Click events:
+     * - Spawn context menu on right click, do no deselect multiple selection
+     * - handle multiple selection for dragging
+     * The following code is derived from the MultiDragTreeView 
+     * of the quodlibet music software (licensed under GPLv2.0):
+     * https://github.com/quodlibet/quodlibet
+     * The effect of this is that dragging a multiple selection
+     * does not deselect entries. 
+     * The key idea here is to use `set_select_function`.
+    *)
+    let defer_select = ref None in
+    
+    view#event#connect#button_press
+      ~callback:(fun ev ->
+        (if (GdkEvent.Button.button ev) = 3 then
+           (context_menu#popup ~button:3 ~time:(GdkEvent.Button.time ev);
+            (if (view#selection#count_selected_rows) > 1
+             then true (* do not deselect *)
+             else false (* select on right click *)))
+         else if (GdkEvent.Button.button ev) = 1 then
+           let x,y = (int_of_float (GdkEvent.Button.x ev),
+                      int_of_float (GdkEvent.Button.y ev)) in
+           let selection = view#selection in
+           let target = view#get_path_at_pos ~x ~y in
+           match target with
+           | Some (p,col,_,_) ->
+              (* if CONTROL or SHIFT not in effect, and entry not selected *)
+              if ((((GdkEvent.Button.state ev) land (4 lor 1)) = 0) 
+                  && selection#path_is_selected(p)) then
+                (selection#set_select_function (fun p b -> false);
+    		     defer_select := Some p; false)
+              else (selection#set_select_function (fun p b -> true);
+    		        defer_select := None; false)
+           | None -> true
+         else false)
+      );
+    ignore(view#event#connect#button_release ~callback:(fun ev ->
+               (if (GdkEvent.Button.button ev) = 1 then
+                  (match !defer_select with
+                   | Some p ->
+                      let selection = view#selection in
+                      let x,y = (int_of_float (GdkEvent.Button.x ev),
+                                 int_of_float (GdkEvent.Button.y ev)) in
+                      let target = view#get_path_at_pos ~x ~y in
+                      selection#set_select_function (fun p b -> true);
+                      (match target with
+                       | Some (q,col,_,_) ->
+                          (if ((p = q) && (not (x = 0 && y = 0))) then
+    		                 (view#set_cursor ~edit:true p col;
+                              defer_select := None; false)
+                           else
+                             (defer_select := None; true))
+                       | None -> true)
+                   | None -> false)
+                else false)
+      ));
+
 
   method refilter () : unit =
     filter#refilter()
@@ -169,10 +227,10 @@ end
 
                                   
 let make_document_list ~db ?(height=400) ?(show_path=true) ?(multiple=false)
-      ?(show_stars=true) ?(editable=false) ?(library:string = "")
+      ?(show_stars=true) ?(editable=false) ?(multidrag=false) ?(library:string = "")
       ?(sort : ('a GTree.column) option=None) 
       ~doc_type ~packing data : model =
-  assert (library <> "" || (not show_stars && not editable));
+  assert (library <> "" || (not show_stars && not editable && not multidrag));
   
   let swindow = GBin.scrolled_window
                   ~height ~shadow_type:`ETCHED_IN ~hpolicy:`AUTOMATIC
@@ -180,7 +238,7 @@ let make_document_list ~db ?(height=400) ?(show_path=true) ?(multiple=false)
 
   let store = GTree.list_store Attr.columns in
   let filter = (GTree.model_filter store) in
-  let view = GTree.view ~reorderable:true
+  let view = GTree.view (* ~reorderable:true *)
                ~model:filter ~packing:swindow#add() in
   let model = (new model db filter store view) in
 
@@ -212,6 +270,27 @@ let make_document_list ~db ?(height=400) ?(show_path=true) ?(multiple=false)
   (if show_path then
      ignore(model#add_column ~title:"Path" ~width:200 (Str Attr.path)));
 
+  (if multidrag then
+     (GtkTree.TreeView.Dnd.enable_model_drag_source
+        view#as_tree_view
+        ~modi:[`BUTTON1]
+        ~targets:(Array.of_list dnd_targets)
+        ~actions:[`MOVE];
+      
+      ignore(view#drag#connect#data_get ~callback:
+               (fun ctx sel ~info ~time ->
+                 let tgts = (ctx#targets) in
+                 (List.iter (prerr_endline) tgts);
+                 (prerr_endline ("Selection target: "^sel#target));
+                 let selection = view#selection#get_selected_rows in
+                 let ids = (List.map (fun p ->
+                                (store#get ~row:(model#get_row p) ~column:Attr.path))
+                              selection) in
+                 let data = (String.concat ";" ids) in
+                 sel#return (library^" --> "^data)
+               ))
+     ));
+    
   (match sort with
   | None -> ()
   | Some col -> store#set_sort_column_id col.index (view#get_column col.index)#sort_order);
