@@ -34,9 +34,9 @@ jobs:
 
       - run: opam install . --deps-only
       - run: opam exec -- dune build
-      
+
       - name: Save binary
         uses: actions/upload-artifact@v2
         with:
-          name: doculib-${{ matrix.ocaml-version }}-${{ runner.os }}
-          path: doculib-${{ matrix.ocaml-version }}-${{ runner.os }}.exe
+          name: doculib-${{ github.ref_name }}-${{ runner.os }}
+          path: _build/default/doculib.exe
