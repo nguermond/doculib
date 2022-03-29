@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    tags:
+      - '*'
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os:
+          #- macos-latest
+          - ubuntu-latest
+          #- windows-latest
+        ocaml-compiler:
+          - 4.12.0
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        
+      - name: Use OCaml ${{ matrix.ocaml-compiler }}
+        uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+          
+      - name: Install opam-depext
+        run: opam install opam-depext || true # in opam 2.1 there is no depext to install
+
+      - run: opam install . --deps-only
+      - run: opam exec -- dune build
+      
+      - name: Save binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: doculib-${{ matrix.ocaml-version }}-${{ runner.os }}
+          path: doculib-${{ matrix.ocaml-version }}-${{ runner.os }}.exe
