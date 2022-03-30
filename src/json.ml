@@ -3,6 +3,8 @@ include Yojson.Basic
 
 exception ParsingFailure of string
 
+let write_string = to_string
+
 let get (key : string) (json : t) : t option =
   match json with
   | `Assoc kv_lst ->

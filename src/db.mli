@@ -1,6 +1,7 @@
 
 exception LibraryExists
 exception InvalidLibrary
+exception CannotMoveFile
         
 val current_branch : string
 val configdir : string
@@ -28,6 +29,7 @@ object
   method add_document : library:string -> doc -> unit
 
   method remove_document : library:string -> path:string -> unit
+  method move_document : from_lib:string -> to_lib:string -> path:string -> unit
 
 
   method get_libraries : unit -> string list

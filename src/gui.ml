@@ -2,7 +2,9 @@
 open StdLabels
 open Gobject.Data
 
-let icon_path = "/usr/local/lib/doculib/icons/Gnome-colors-applications-office.svg"
+let primary_icon_path = "/usr/local/lib/doculib/icons/Gnome-colors-applications-office.svg"
+let secondary_icon_path = (Db.configdir^"/icons/Gnome-colors-applications-office.svg")
+                      
 
 exception InternalError of string
 
@@ -168,6 +170,7 @@ let manage_libraries ~db ~notebook : unit =
       let row = (store#get_iter p) in
       let column = name in
       let library = (store#get ~row ~column) in
+      (* TODO: escaped quotes can be problematic! *)
       let new_name = (Str.global_replace (Str.regexp "/")
                         (Str.quote "\\") str) in
       (prerr_endline ("Rename: "^library^" ~> "^new_name));
@@ -355,9 +358,15 @@ let main () =
   GMain.init();
   let window = GWindow.window ~title:"DocuLib" () in
   (try
-     let icon = GdkPixbuf.from_file icon_path in
+     let icon = GdkPixbuf.from_file primary_icon_path in
      window#set_icon (Some icon)
-   with _ -> prerr_endline "Could not find icon");
+   with _ ->
+     (try
+        let icon = GdkPixbuf.from_file secondary_icon_path in
+        window#set_icon (Some icon)
+      with _ ->
+        window#set_icon None;
+        prerr_endline "Could not find icon"));
   let vbox = GPack.vbox ~packing:window#add () in
   
   (* Toplevel menu *)
@@ -469,7 +478,7 @@ let main () =
     );
 
   (****************************************************)
-  (* File factory                                     *)
+  (* Library factory                                  *)
   (****************************************************)
   (* Refresh library *)
   library_factory#add_item "Refresh Library"
@@ -492,7 +501,12 @@ let main () =
   (* file_factory#add_item "Export Library"
    *   ~callback:(fun () -> ()
    *   ); *)
-  
+
+  (* Import library from archive *)
+  (* file_factory#add_item "Import Library"
+   *   ~callback:(fun () -> ()
+   *   ); *)
+
   library_factory#add_separator ();
 
   library_factory#add_item "Quit" ~callback:window#destroy;

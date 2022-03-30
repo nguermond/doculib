@@ -50,29 +50,49 @@ class notebook notebook db context_menu filter_func = object (self)
   method add_library ~library ~doc_type ~prepend : unit =
     (prerr_endline ("Adding library "^library));
     let label = (GMisc.label ~text:library ()) in
-    label#drag#dest_set Model.dnd_targets ~actions:[`MOVE];
-    label#drag#connect#data_received ~callback:
-    (fun ctx ~x ~y data ~info ~time ->
-      if data#format = 8 then
-        ((Printf.printf "Received `%s` at label `%s`\n" data#data library); flush stdout;
-         ctx#finish ~success:true ~del:false ~time)
-      else ctx#finish ~success:false ~del:false ~time
-    );
-
-
-    
     let page = (GPack.vbox ~border_width:8 ~spacing:8
                   ~packing:(fun w ->
                     let add_page = (if prepend then notebook#prepend_page
                                else notebook#append_page) in
                     ignore (add_page ~tab_label:(label#coerce) w)) ()) in
     let lib = new library library doc_type page label in
+    self#init_DnD_dest lib;
+    
     let libs = (library, lib) :: libraries in
     (if prepend then
        (libraries <- (library, lib) :: libraries)
      else
        (libraries <- (List.rev ((library,lib) :: (List.rev libraries)))))
+
+  method private init_DnD_dest (lib : library) : unit =
+    let page_label = lib#get_label in
+    let library = lib#get_name in
     
+    page_label#drag#dest_set Model.dnd_targets ~actions:[`MOVE];
+    
+    ignore(page_label#drag#connect#data_received ~callback:(fun ctx ~x ~y data ~info ~time ->
+               self#load_library ~library;
+               if data#format = 8 then
+                 (let (from_lib,paths) = Doc.deserialize_description data#data in
+                  (self#move_documents ~from_lib ~to_lib:library paths);
+                  ctx#finish ~success:true ~del:false ~time)
+               else ctx#finish ~success:false ~del:false ~time
+      ))
+
+  method private move_documents ~from_lib ~to_lib paths : unit =
+    prerr_endline ("Moving documents: "^from_lib^" ---> "^to_lib);
+    (* 0. Remove notebook entries
+     * 1. move physical files to new location (preserving directory structure)
+     * 2. move metadata files to new location (preserving directory structure)
+     * 3. Refresh new library
+     *)
+    List.iter (fun path ->
+        try (db#move_document ~from_lib ~to_lib ~path) with
+          Db.CannotMoveFile ->
+          prerr_endline ("Could not move file: "^path)
+      ) paths
+
+
   method remove_library ~library : unit =
     (prerr_endline ("Removing library "^library^" @"
                     ^(string_of_int (self#get_index ~library))));
@@ -142,7 +162,6 @@ class notebook notebook db context_menu filter_func = object (self)
       let doc_type = lib#get_doc_type in
       let page = lib#get_page in
       let data = (db#get_documents ~library) in
-      (* let data = [] in *)
       let model = (Model.make_document_list ~db:db ~multiple:true ~sort:(Some Model.Attr.star)
                      ~editable:true ~multidrag:true ~library ~doc_type ~packing:page#add data) in
       model#handle_click_events ~context_menu;

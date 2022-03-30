@@ -279,15 +279,12 @@ let make_document_list ~db ?(height=400) ?(show_path=true) ?(multiple=false)
       
       ignore(view#drag#connect#data_get ~callback:
                (fun ctx sel ~info ~time ->
-                 let tgts = (ctx#targets) in
-                 (List.iter (prerr_endline) tgts);
-                 (prerr_endline ("Selection target: "^sel#target));
                  let selection = view#selection#get_selected_rows in
-                 let ids = (List.map (fun p ->
+                 let paths = (List.map (fun p ->
                                 (store#get ~row:(model#get_row p) ~column:Attr.path))
                               selection) in
-                 let data = (String.concat ";" ids) in
-                 sel#return (library^" --> "^data)
+                 let data = (Doc.serialize_description ~library ~paths) in
+                 sel#return data
                ))
      ));
     

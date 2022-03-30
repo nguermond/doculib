@@ -30,3 +30,6 @@ val edit_document : attribute -> t -> t
 val doc_to_json : t -> Json.t
 val json_to_doc : string -> Json.t -> t
 val make_doc_from_file : string -> string -> string -> t
+
+val serialize_description : library:string -> paths:(string list) -> string
+val deserialize_description : string -> (string * (string list))

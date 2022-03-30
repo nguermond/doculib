@@ -2,7 +2,9 @@
 type t = Yojson.Basic.t
 
 exception ParsingFailure of string
-                          
+
+val write_string : ?buf:Bi_outbuf.t -> ?len:int -> ?std:bool -> t -> string
+  
 val get : string -> t -> t option
 
 val to_list : t -> t list
