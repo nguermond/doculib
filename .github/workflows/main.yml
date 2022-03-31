@@ -12,9 +12,8 @@ jobs:
     strategy:
       matrix:
         os:
-          - macos-latest
           - ubuntu-latest
-          - windows-latest
+		  ;; - macos-latest
         ocaml-compiler:
           - 4.12.0
     runs-on: ${{ matrix.os }}
@@ -27,8 +26,8 @@ jobs:
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
           
-      - name: Install opam-depext
-        run: opam install opam-depext || true # in opam 2.1 there is no depext to install
+      ;; - name: Install opam-depext
+      ;;   run: opam install opam-depext || true # in opam 2.1 there is no depext to install
 
       - run: opam install . --deps-only
       - run: opam exec -- dune build

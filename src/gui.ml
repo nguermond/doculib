@@ -8,6 +8,7 @@ let secondary_icon_path = (Db.configdir^"/icons/Gnome-colors-applications-office
 
 exception InternalError of string
 
+
                          
 let choose_dir (title : string) : string option =
   let dialog = GWindow.file_chooser_dialog ~action:`SELECT_FOLDER ~title () in
@@ -159,8 +160,9 @@ let manage_libraries ~db ~notebook : unit =
                                    ["text",name]) in
   let path_renderer,path_values = (GTree.cell_renderer_text
                                      [`EDITABLE false;
-                                      `FONT Font.default_font; `YPAD 2;
-                                      `HEIGHT (Font.calc_font_height ~ypad:2 2);
+                                      (* `FONT Font.default_font; *)
+                                      `YPAD 2;
+                                      `HEIGHT (Font.calc_font_height ~widget:view#coerce ~ypad:2 2);
                                       `WRAP_WIDTH 300;
                                       `WRAP_MODE `WORD_CHAR],
                                    ["text",path]) in
