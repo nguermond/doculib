@@ -101,9 +101,8 @@ object (self)
       (match cell_renderer, column with
        | None, Str col ->
           let renderer,values = (GTree.cell_renderer_text
-                                   [`EDITABLE editable;
-                                    `FONT Font.default_font; `YPAD 2;
-                                    `HEIGHT (Font.calc_font_height ~ypad:2 2);
+                                   [`EDITABLE editable;`YPAD 2;
+                                    `HEIGHT (Font.calc_font_height ~widget:view#coerce ~ypad:2 2);
                                     `WRAP_WIDTH width;
                                     `WRAP_MODE `WORD_CHAR],
                                  ["text",col]) in
