@@ -120,7 +120,7 @@ object (self)
               store#set ~row ~column:col str
             );
           GTree.view_column ~title ~renderer:(renderer,values) ()
-       | Some (CellRenderer (renderer,values)), Bool _ ->
+       | Some (CellRenderer (renderer,values)), _ ->
           GTree.view_column ~title ~renderer:(renderer,values) ()
        | _ -> failwith "Unexpected column")
     in
@@ -245,7 +245,7 @@ let make_document_list ~db ?(height=400) ?(show_path=true) ?(multiple=false)
   view#set_enable_grid_lines `HORIZONTAL;
   (if multiple then view#selection#set_mode `MULTIPLE);
   
-  (* Columns *)
+  (* Star cell renderer *)
   let renderer,values = (GTree.cell_renderer_toggle [], ["active", Attr.star]) in
   renderer#connect#toggled ~callback:(fun p ->
       let row = (model#get_row p) in
@@ -256,13 +256,40 @@ let make_document_list ~db ?(height=400) ?(show_path=true) ?(multiple=false)
       db#set_document ~library ~path doc;
       store#set ~row ~column:Attr.star value);
   let star_cell_renderer = Some (CellRenderer (renderer,values)) in
-  
+
+  (* Tags cell renderer *)
+  let (combo_model, combo_col) = GTree.store_of_list Gobject.Data.string ["example 1" ; "example 2"] in
+  let combo_filter = GTree.model_filter combo_model in
+  let renderer,values = (GTree.cell_renderer_combo [`EDITABLE true;
+                                                    `HAS_ENTRY true;
+                                                    `TEXT_COLUMN combo_col;
+                                                    `MODEL (Some combo_model#coerce)],
+                         ["text", Attr.tags]) in
+  let tags_cell_renderer = Some (CellRenderer (renderer,values)) in
+  renderer#connect#changed ~callback:(fun p row -> prerr_endline "combo changed..."; ());
+  (* renderer#connect# *)
+  view#event#connect#key_release ~callback:(fun ev -> prerr_endline "???";
+                                                      renderer#set_properties [`IS_EXPANDED true;];
+                                                      combo_filter#refilter();
+                                                      false);
+  renderer#connect#edited ~callback:(fun p str -> prerr_endline "edited..."
+  (*   let row = (self#get_row p) in
+   *   let path = (store#get ~row ~column:Attr.path) in
+   *   let key = (Attr.get_name (col.index)) in
+   *   let doc = db#get_document ~library ~path in
+   *   let doc = Doc.edit_document (Doc.set_attribute key str) doc in
+   *   db#set_document ~library ~path doc;
+   *   store#set ~row ~column:col str
+   *)
+    );
+                
+  (* Columns *)
   (if show_stars then
      model#add_column ~title:"Star" ~width:40 ~cell_renderer:star_cell_renderer (Bool Attr.star));
   model#add_column ~title:"Author(s)" ~width:200 ~editable ~library (Str Attr.authors);
   model#add_column ~title:"Title" ~width:400 ~editable ~library (Str Attr.title);
   model#add_column ~title:"Year" ~width:100 ~editable ~library (Str Attr.year);
-  model#add_column ~title:"Tags" ~width:200 ~editable ~library (Str Attr.tags);
+  model#add_column ~title:"Tags" ~width:200 ~cell_renderer:tags_cell_renderer (Str Attr.tags);
   (match doc_type with
    | "article" -> model#add_column ~title:"DOI" ~width:80 ~editable ~library (Str Attr.doi)
    | "book" -> model#add_column ~title:"ISBN" ~width:80 ~editable ~library (Str Attr.isbn)
@@ -276,7 +303,6 @@ let make_document_list ~db ?(height=400) ?(show_path=true) ?(multiple=false)
         ~modi:[`BUTTON1]
         ~targets:(Array.of_list dnd_targets)
         ~actions:[`MOVE];
-      
       ignore(view#drag#connect#data_get ~callback:
                (fun ctx sel ~info ~time ->
                  let selection = view#selection#get_selected_rows in
