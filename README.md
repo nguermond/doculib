@@ -47,8 +47,8 @@ An example directory structure is as follows:
 ## Installation
 On Debian/Ubuntu, enter the commands
 ```
-wget https://github.com/nguermond/doculib/releases/download/v1.1.0/doculib_1.1.0_amd64.deb
-sudo dpkg -i doculib_1.1.0_amd64.deb && sudo apt -f install
+wget https://github.com/nguermond/doculib/releases/download/v1.2.0/doculib_1.2.0_amd64.deb
+sudo dpkg -i doculib_1.2.0_amd64.deb && sudo apt -f install
 ```
 and run with `doculib`.
 
