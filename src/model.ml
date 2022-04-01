@@ -58,6 +58,15 @@ object (self)
 
   method remove ~row : unit =
     ignore (store#remove row)
+
+  method remove_entry_from_path ~path : unit =
+    (store#foreach (fun p _ ->
+         let row = (self#get_row p) in
+         let path' = self#get ~row ~column:Attr.path in
+         (if path = path' then
+            (store#remove row; true)
+          else false (* stop searching *))
+    ))
     
   method set_entry ~row (doc : Doc.t) : unit =
     let open Db in

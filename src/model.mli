@@ -29,6 +29,8 @@ class model : Db.db -> GTree.model_filter -> GTree.list_store -> GTree.view ->
     method get : 'a. row:row -> column:('a GTree.column) -> 'a
 
     method remove : row:row -> unit
+
+    method remove_entry_from_path : path:string -> unit
       
     method set_entry : row:row -> Doc.t -> unit
       

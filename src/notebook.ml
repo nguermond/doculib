@@ -81,13 +81,15 @@ class notebook notebook db context_menu filter_func = object (self)
 
   method private move_documents ~from_lib ~to_lib paths : unit =
     prerr_endline ("Moving documents: "^from_lib^" ---> "^to_lib);
-    (* 0. Remove notebook entries
-     * 1. move physical files to new location (preserving directory structure)
+    (* 1. move physical files to new location (preserving directory structure)
      * 2. move metadata files to new location (preserving directory structure)
-     * 3. Refresh new library
      *)
     List.iter (fun path ->
-        try (db#move_document ~from_lib ~to_lib ~path) with
+        try (let _ = db#move_document ~from_lib ~to_lib ~path in
+             let _ = ((self#get_library ~library:from_lib)#get_model#remove_entry_from_path ~path) in
+             let doc = db#get_document ~library:to_lib ~path in
+             (self#get_library ~library:to_lib)#get_model#import_documents [doc])
+        with
           Db.CannotMoveFile ->
           prerr_endline ("Could not move file: "^path)
       ) paths
@@ -179,11 +181,6 @@ class notebook notebook db context_menu filter_func = object (self)
      *    bad_docs) *)
     ()
 
-  (* method refresh_library_incr ~library : (int -> bool) =
-   *   let lib = self#get_library ~library in
-   *   (fun k -> match (db#refresh_library_incr ~library k) with
-   *              | (Some doc), b -> lib#get_model#import_documents [doc]; b
-   *              | None, b -> b) *)
 
   method action_on_selected ~action : unit =
     let (library,lib) = self#current_library in
