@@ -9,7 +9,7 @@
     str
     agrep)
   (modules
-    Font Gui Doc Db Search Json Model Notebook Utilities Update_db)
+    Icons Font Gui Doc Db Search Json Model Notebook Utilities Update_db)
   )
 
 (env

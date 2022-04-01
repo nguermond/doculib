@@ -68,7 +68,7 @@ class notebook notebook db context_menu filter_func = object (self)
     let page_label = lib#get_label in
     let library = lib#get_name in
     
-    page_label#drag#dest_set Model.dnd_targets ~actions:[`MOVE];
+    page_label#drag#dest_set Model.dnd_targets ~actions:[`COPY];
     
     ignore(page_label#drag#connect#data_received ~callback:(fun ctx ~x ~y data ~info ~time ->
                self#load_library ~library;

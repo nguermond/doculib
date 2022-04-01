@@ -165,7 +165,10 @@ object (self)
      * The key idea here is to use `set_select_function`.
     *)
     let defer_select = ref None in
-    
+
+    (* TODO: If multiple rows are selected, one row is unselected with CONTROL,
+     * and then clicked, it is set to edit, not selected, and other rows remain selected!
+     *)
     view#event#connect#button_press
       ~callback:(fun ev ->
         (if (GdkEvent.Button.button ev) = 3 then
@@ -202,7 +205,7 @@ object (self)
                       (match target with
                        | Some (q,col,_,_) ->
                           (if ((p = q) && (not (x = 0 && y = 0))) then
-    		                 (view#set_cursor ~edit:true p col;
+    		                 (view#set_cursor ~edit:(view#selection#count_selected_rows = 1) p col;
                               defer_select := None; false)
                            else
                              (defer_select := None; true))
@@ -274,8 +277,8 @@ let make_document_list ~db ?(height=400) ?(show_path=true) ?(multiple=false)
         view#as_tree_view
         ~modi:[`BUTTON1]
         ~targets:(Array.of_list dnd_targets)
-        ~actions:[`MOVE];
-      
+        ~actions:[`COPY];
+
       ignore(view#drag#connect#data_get ~callback:
                (fun ctx sel ~info ~time ->
                  let selection = view#selection#get_selected_rows in
@@ -284,8 +287,13 @@ let make_document_list ~db ?(height=400) ?(show_path=true) ?(multiple=false)
                               selection) in
                  let data = (Doc.serialize_description ~library ~paths) in
                  sel#return data
-               ))
-     ));
+        ));
+
+      ignore(view#drag#connect#after#beginning ~callback:
+               (fun ctx ->
+                 let image = (GMisc.image ~pixbuf:Icons.drag_icon ()) in
+                 (ctx#set_icon_widget image#coerce ~hot_x:0 ~hot_y:0)));
+  ));
     
   (match sort with
   | None -> ()
