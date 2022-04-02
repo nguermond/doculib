@@ -440,23 +440,7 @@ let main () =
   context_factory#add_item "Edit Entry"
     ~callback:(fun _ -> notebook#edit_selected edit_document);
 
-  (* Remove entry from database *)
-  (* TODO: remove this, still needed in case file no longer exists *)
-  context_factory#add_item "Remove Entry"
-    ~callback:(fun _ ->
-      notebook#action_on_selected (fun library model row ->
-          let path = (model#get ~row ~column:Model.Attr.path) in
-          db#remove_document library path;
-          ignore (model#remove row))
-    );
-
   context_factory#add_separator ();
-
-  (* Rename physical file *)
-  (* context_factory#add_item "Rename File"
-   *   ~callback:(fun _ ->
-   *     (error_dialog "Rename File: Not yet implemented")
-   *   ); *)
   
   (* Delete physical file *)
   context_factory#add_item "Delete File"
