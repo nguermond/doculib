@@ -1,5 +1,9 @@
 # Changes
 
+* icon is now encoded in source (no longer needs to be installed)
+* reorganized new library dialog
+* add about dialog
+
 ## v1.2.0
 * add md5 hash to each file
 * detect file moving/renaming within the same library

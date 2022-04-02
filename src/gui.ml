@@ -1,15 +1,9 @@
 
 open StdLabels
-open Gobject.Data
-
-let primary_icon_path = "/usr/local/lib/doculib/icons/Gnome-colors-applications-office.svg"
-let secondary_icon_path = (Db.configdir^"/icons/Gnome-colors-applications-office.svg")
-                      
+open Gobject.Data                      
 
 exception InternalError of string
-
-
-                         
+    
 let choose_dir (title : string) : string option =
   let dialog = GWindow.file_chooser_dialog ~action:`SELECT_FOLDER ~title () in
   dialog#add_button_stock `CANCEL `CANCEL;
@@ -30,20 +24,20 @@ let error_dialog (msg : string) : unit =
    | _ -> error_dialog#destroy()
   )
   
-let loading_dialog (f : int -> bool) : unit =
-  let dialog = GWindow.dialog ~border_width:8 ~width:300 ~height:20 () in
-  let pbar = GRange.progress_bar ~pulse_step:0.01 ()
-               ~packing:(dialog#vbox#pack) in
-  let g = (fun () -> pbar#pulse();
-                     (if (f 0) then true
-                      else (dialog#destroy();false))) in
-
-  dialog#add_button_stock `CANCEL `CANCEL;
-  let _ = GMain.Timeout.add ~ms:50 ~callback:g in
-  try
-    (match (dialog#run()) with
-     | _ -> dialog#destroy())
-  with _ -> ()
+(* let loading_dialog (f : int -> bool) : unit =
+ *   let dialog = GWindow.dialog ~border_width:8 ~width:300 ~height:20 () in
+ *   let pbar = GRange.progress_bar ~pulse_step:0.01 ()
+ *                ~packing:(dialog#vbox#pack) in
+ *   let g = (fun () -> pbar#pulse();
+ *                      (if (f 0) then true
+ *                       else (dialog#destroy();false))) in
+ * 
+ *   dialog#add_button_stock `CANCEL `CANCEL;
+ *   let _ = GMain.Timeout.add ~ms:50 ~callback:g in
+ *   try
+ *     (match (dialog#run()) with
+ *      | _ -> dialog#destroy())
+ *   with _ -> () *)
 
 class search_bar search_box search_entry =
 object
@@ -87,15 +81,26 @@ let search_bar ~packing : search_bar =
   let sb = (new search_bar search_box search_entry) in
   let _ = sb#init() in
   sb
-       
+
+
+let about () : unit =
+  let licenses = ["doculib: GPLv3.0"; "Gnome-colors-applications-office: GPLv2+";
+                  "agrep: LGPLv2+";"quodlibet (MultiDragTreeView): GPLv2.0"] in
+  ignore(GWindow.about_dialog ~name:"DocuLib" ~authors:["nguermond"] ~website:"https://github.com/nguermond/doculib"
+           ~website_label:"source" ~logo:Icons.doculib_icon ~comments:"A GUI for managing document metadata for books, textbooks, or articles."
+           ~license:(String.concat "\n" licenses) ~show:true ())
+  
+  
 let new_library ~(db:Db.db) ~(notebook:Notebook.notebook) : (string * string) option =
   let dialog = GWindow.dialog ~title:"New Library" ~border_width:8 ~width:300 ~height:150 () in
+
+  let instructions_l = GMisc.label ~xpad:8 ~ypad:8 ~text:"Choose an existing directory for a new library:" ~packing:(dialog#vbox#pack) () in
   let grid = GPack.grid  ~col_spacings:8 ~row_spacings:8 ~packing:dialog#vbox#pack () in
 
-  let name_l = GMisc.label ~text:"Name" ~packing:(grid#attach ~left:0 ~top:0) () in
-  let name_e = GEdit.entry ~packing:(grid#attach ~left:1 ~top:0) () in
-  let root_path_l = GMisc.label ~text:"Location" ~packing:(grid#attach ~left:0 ~top:1) () in
-  let root_path_hbox = GPack.hbox ~spacing:8 ~packing:(grid#attach ~left:1 ~top:1) () in
+  let root_path_l = GMisc.label ~text:"Location" ~packing:(grid#attach ~left:0 ~top:0) () in
+  let root_path_hbox = GPack.hbox ~spacing:8 ~packing:(grid#attach ~left:1 ~top:0) () in
+  let name_l = GMisc.label ~text:"Name" ~packing:(grid#attach ~left:0 ~top:1) () in
+  let name_e = GEdit.entry ~packing:(grid#attach ~left:1 ~top:1) () in
   let root_path_e = GMisc.label ~packing:(root_path_hbox#pack) () in
   let root_path_b = GButton.button ~label:"Choose" ~packing:(root_path_hbox#pack) () in
   let doc_type_l = GMisc.label ~text:"Type" ~packing:(grid#attach ~left:0 ~top:2) () in
@@ -358,17 +363,17 @@ let edit_document (doc : Db.doc) : Db.doc option =
   
 let main () =
   GMain.init();
-  let window = GWindow.window ~title:"DocuLib" () in
-  (try
-     let icon = GdkPixbuf.from_file primary_icon_path in
-     window#set_icon (Some icon)
-   with _ ->
-     (try
-        let icon = GdkPixbuf.from_file secondary_icon_path in
-        window#set_icon (Some icon)
-      with _ ->
-        window#set_icon None;
-        prerr_endline "Could not find icon"));
+  let window = GWindow.window ~icon:Icons.doculib_icon ~title:"DocuLib" () in
+  (* (try
+   *    let icon = GdkPixbuf.from_file primary_icon_path in
+   *    window#set_icon (Some icon)
+   *  with _ ->
+   *    (try
+   *       let icon = GdkPixbuf.from_file secondary_icon_path in
+   *       window#set_icon (Some icon)
+   *     with _ ->
+   *       window#set_icon None;
+   *       prerr_endline "Could not find icon")); *)
   let vbox = GPack.vbox ~packing:window#add () in
   
   (* Toplevel menu *)
@@ -507,20 +512,8 @@ let main () =
   (****************************************************)
   (* About factory                                    *)
   (****************************************************)
-  (* Add license information for doculib and all third party libraries:
-   * cohttp-lwt-unix: ISC
-   * lablgtk3: LGPLv2.1+
-   * ocaml: LGPLv2.1+
-   * tls: BSD-2
-   * agrep: LGPLv2
-   * multidrag(quodlibet): GPLv2.0
-   * gtk: LGPLv2.1+ 
-   *)
   about_factory#add_item "DocuLib" ~callback:(fun () ->
-      error_dialog "Not yet implemented... sorry"
-    );
-  about_factory#add_item "Licenses" ~callback:(fun () ->
-      error_dialog "Not yet implemented... sorry"
+      about()
     );
   
   window#connect#destroy ~callback:GMain.quit;
