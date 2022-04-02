@@ -82,8 +82,45 @@ let search_bar ~packing : search_bar =
   let _ = sb#init() in
   sb
 
+let help_dialog () : unit =
+  let help_w = GWindow.dialog ~title:"Help" ~border_width:8 ~width:500 ~height:500 ~show:true () in
+  let swindow = GBin.scrolled_window ~height:500 ~shadow_type:`ETCHED_IN
+                  ~vpolicy:`AUTOMATIC ~packing:(help_w#vbox#pack) () in
 
-let about () : unit =
+  let help_text =
+    ["# Features";
+     " * files can be moved or renamed without losing metadata";
+     " * metadata includes authors, title, publishing year, tags, bookmark, and DOI/ISBN";
+     " * search for metadata on 'openlibrary.org' and 'semanticscholar.org'";
+     " * manage multiple libraries in different locations";
+     " * error permissive search";
+     "";
+     "# Libraries";
+     " * Each library points to a unique directory, and all files in that directory are automatically added to that library. Each library must have a unique document type, book or article, which indicates";
+     "   - the type of new items added to the library";
+     "   - the default database to search for metadata";
+     "   - whether to store DOI or ISBN.";
+     " * Libraries can be managed by selecting the 'Library' menu.";
+     " * Files can be moved between libraries by selecting the files (use CONTROL and SHIFT keys to select multiple files), and dragging them to a new tab.";
+     "";
+     "# Editing Metadata";
+     " * Right click on an entry for the following options:";
+     "   - Open -- opens the file";
+     "   - Search Metadata -- The default search query is either the title or the name of the file. It works best to only use the full title as search query, without authors, date, etc.";
+     "   - Open DOI -- if the file has a DOI, open the doi in a web browser";
+     "   - Delete File -- will delete the physical file and metadata in your library";
+     " * Double click on an entry to manually edit.";
+    ]
+     in
+  let buffer = GText.buffer ~text:(String.concat "\n" help_text) () in
+  let view = GText.view ~buffer ~editable:false ~wrap_mode:`WORD_CHAR ~packing:(swindow#add) () in
+  help_w#add_button_stock `OK `OK;
+
+  (match help_w#run() with
+   | `OK | `DELETE_EVENT -> help_w#destroy())
+
+  
+let about_dialog () : unit =
   let licenses = ["doculib: GPLv3.0"; "Gnome-colors-applications-office: GPLv2+";
                   "agrep: LGPLv2+";"quodlibet (MultiDragTreeView): GPLv2.0"] in
   ignore(GWindow.about_dialog ~name:"DocuLib" ~authors:["nguermond"] ~website:"https://github.com/nguermond/doculib"
@@ -147,9 +184,9 @@ let new_library ~(db:Db.db) ~(notebook:Notebook.notebook) : (string * string) op
   
 let manage_libraries ~db ~notebook : unit =
   let dialog = GWindow.dialog ~title:"Manage Libraries"
-                 ~width:500 ~height:200 () in
+                 ~width:500 ~height:200 ~resizable:false () in
   let swindow = GBin.scrolled_window ~height:200 ~shadow_type:`ETCHED_IN ~hpolicy:`AUTOMATIC
-                  ~vpolicy:`AUTOMATIC ~packing:(dialog#vbox#pack) () in
+                  ~vpolicy:`AUTOMATIC ~packing:(dialog#vbox#add) () in
   let open Gobject.Data in
   let columns = new GTree.column_list in
   let name = columns#add string in
@@ -201,7 +238,7 @@ let manage_libraries ~db ~notebook : unit =
   
 
   
-  let hbox = GPack.hbox ~border_width:8 ~spacing:8 ~packing:(dialog#vbox#pack)() in  
+  let hbox = GPack.hbox ~border_width:8 ~spacing:8 ~packing:(dialog#vbox#pack ~from:`END)() in  
 
   let add_b = GButton.button ~label:"Add" ~packing:(hbox#pack ~from:`END) () in
   (* let move_b = GButton.button ~label:"Move" ~packing:(hbox#pack ~from:`END) () in *)
@@ -311,69 +348,59 @@ let search_metadata ~db (default : Db.doc) (search_str : string) : Db.doc option
   ret
   
   
-let edit_document (doc : Db.doc) : Db.doc option =
-  let dialog = GWindow.dialog ~title:"Edit Document" ~border_width:8 () in
-  let grid = GPack.grid  ~col_spacings:8 ~row_spacings:8 ~packing:dialog#vbox#pack () in
-
-  let edit_field label row default =
-    let label = GMisc.label ~text:label ~packing:(grid#attach ~left:0 ~top:row) () in
-    let entry = GEdit.entry ~text:default ~packing:(grid#attach ~left:1 ~top:row) () in
-    entry
-  in
-
-  (* TODO: Entry completion *)
-  (* let (model, col) = model_of_list Gobject.Data.string ["example 1" ; "example 2"] in
-   * let c = GEdit.entry_completion ~model ~entry:authors () in
-   * c#set_text_column col ;
-   * c#set_match_func (fun str p -> true); *)
-  
-  let title = (edit_field "Title" 0 doc.title) in
-  let authors = (edit_field "Author(s)" 1 (String.concat "; " doc.authors)) in
-  let year = (edit_field "Year" 2 doc.year) in
-  let doi = (edit_field "DOI" 3 doc.doi) in
-  let isbn = (edit_field "ISBN" 4 doc.isbn) in
-  let tags = (edit_field "Tags" 5 (String.concat "; " doc.tags)) in
-
-  let path_l = GMisc.label ~text:"Path" ~packing:(grid#attach ~left:0 ~top:6) () in
-  let path_l' = GMisc.label ~text:doc.path ~line_wrap:true ~selectable:true
-                  ~packing:(grid#attach ~left:1 ~top:6) () in
-  
-  dialog#add_button_stock `SAVE `SAVE;
-  dialog#add_button "Skip" `DELETE_EVENT;
-  dialog#add_button_stock `CANCEL `CANCEL;
-    
-  let ret = (match dialog#run() with
-             | `SAVE ->
-                let doc : (Db.doc) =
-                  { star = doc.star;
-                    title = title#text;
-                    authors = (Str.split (Str.regexp "; +") authors#text);
-                    year = year#text; (* TODO: only allow numeric! *)
-                    doi = doi#text;
-                    isbn = isbn#text;
-                    tags = (Str.split (Str.regexp "; +") tags#text);
-                    doc_type = doc.doc_type;
-                    path = doc.path;
-                    hash = doc.hash;
-                  } in Some doc
-             | `CANCEL -> None
-             | `DELETE_EVENT -> Some doc) in
-  dialog#destroy();
-  ret
+(* let edit_document (doc : Db.doc) : Db.doc option =
+ *   let dialog = GWindow.dialog ~title:"Edit Document" ~border_width:8 () in
+ *   let grid = GPack.grid  ~col_spacings:8 ~row_spacings:8 ~packing:dialog#vbox#pack () in
+ * 
+ *   let edit_field label row default =
+ *     let label = GMisc.label ~text:label ~packing:(grid#attach ~left:0 ~top:row) () in
+ *     let entry = GEdit.entry ~text:default ~packing:(grid#attach ~left:1 ~top:row) () in
+ *     entry
+ *   in
+ * 
+ *   (\* TODO: Entry completion *\)
+ *   (\* let (model, col) = model_of_list Gobject.Data.string ["example 1" ; "example 2"] in
+ *    * let c = GEdit.entry_completion ~model ~entry:authors () in
+ *    * c#set_text_column col ;
+ *    * c#set_match_func (fun str p -> true); *\)
+ *   
+ *   let title = (edit_field "Title" 0 doc.title) in
+ *   let authors = (edit_field "Author(s)" 1 (String.concat "; " doc.authors)) in
+ *   let year = (edit_field "Year" 2 doc.year) in
+ *   let doi = (edit_field "DOI" 3 doc.doi) in
+ *   let isbn = (edit_field "ISBN" 4 doc.isbn) in
+ *   let tags = (edit_field "Tags" 5 (String.concat "; " doc.tags)) in
+ * 
+ *   let path_l = GMisc.label ~text:"Path" ~packing:(grid#attach ~left:0 ~top:6) () in
+ *   let path_l' = GMisc.label ~text:doc.path ~line_wrap:true ~selectable:true
+ *                   ~packing:(grid#attach ~left:1 ~top:6) () in
+ *   
+ *   dialog#add_button_stock `SAVE `SAVE;
+ *   dialog#add_button "Skip" `DELETE_EVENT;
+ *   dialog#add_button_stock `CANCEL `CANCEL;
+ *     
+ *   let ret = (match dialog#run() with
+ *              | `SAVE ->
+ *                 let doc : (Db.doc) =
+ *                   { star = doc.star;
+ *                     title = title#text;
+ *                     authors = (Str.split (Str.regexp "; +") authors#text);
+ *                     year = year#text; (\* TODO: only allow numeric! *\)
+ *                     doi = doi#text;
+ *                     isbn = isbn#text;
+ *                     tags = (Str.split (Str.regexp "; +") tags#text);
+ *                     doc_type = doc.doc_type;
+ *                     path = doc.path;
+ *                     hash = doc.hash;
+ *                   } in Some doc
+ *              | `CANCEL -> None
+ *              | `DELETE_EVENT -> Some doc) in
+ *   dialog#destroy();
+ *   ret *)
   
 let main () =
   GMain.init();
   let window = GWindow.window ~icon:Icons.doculib_icon ~title:"DocuLib" () in
-  (* (try
-   *    let icon = GdkPixbuf.from_file primary_icon_path in
-   *    window#set_icon (Some icon)
-   *  with _ ->
-   *    (try
-   *       let icon = GdkPixbuf.from_file secondary_icon_path in
-   *       window#set_icon (Some icon)
-   *     with _ ->
-   *       window#set_icon None;
-   *       prerr_endline "Could not find icon")); *)
   let vbox = GPack.vbox ~packing:window#add () in
   
   (* Toplevel menu *)
@@ -442,8 +469,8 @@ let main () =
     );
   
   (* Edit metadata for an entry *)
-  context_factory#add_item "Edit Entry"
-    ~callback:(fun _ -> notebook#edit_selected edit_document);
+  (* context_factory#add_item "Edit Entry"
+   *   ~callback:(fun _ -> notebook#edit_selected edit_document); *)
 
   context_factory#add_separator ();
   
@@ -505,15 +532,15 @@ let main () =
   (****************************************************)
   (* Help factory                                     *)
   (****************************************************)
-  help_factory#add_item "???" ~callback:(fun () ->
-      error_dialog "Not yet implemented... sorry"
+  help_factory#add_item "Help" ~callback:(fun () ->
+      help_dialog()
     );
 
   (****************************************************)
   (* About factory                                    *)
   (****************************************************)
   about_factory#add_item "DocuLib" ~callback:(fun () ->
-      about()
+      about_dialog()
     );
   
   window#connect#destroy ~callback:GMain.quit;

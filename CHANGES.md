@@ -3,6 +3,8 @@
 * icon is now encoded in source (no longer needs to be installed)
 * reorganized new library dialog
 * add about dialog
+* add help dialog
+* remove edit-entry dialog
 
 ## v1.2.0
 * add md5 hash to each file
