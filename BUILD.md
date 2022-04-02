@@ -3,11 +3,7 @@
 ```
 sudo apt install opam
 ```
-2. Install OCaml >= 4.12.0 (if not already installed)
-```
-opam switch create 4.12.0 && eval $(opam env)
-```
-3. Install system dependencies:
+2. Install system dependencies:
 ```
 sudo apt install libgmp-dev pkg-config libcairo2-dev libexpat1-dev libgtk-3-dev
 ```
@@ -15,9 +11,13 @@ sudo apt install libgmp-dev pkg-config libcairo2-dev libexpat1-dev libgtk-3-dev
 ```
 git clone https://github.com/nguermond/doculib.git
 ```
+3. Build:
+```
+cd doculib && make
+```
 5. Install:
 ```
-cd doculib && opam install .
+make install
 ```
 
 ## Build from source (MacOS):
@@ -25,15 +25,15 @@ cd doculib && opam install .
 ```
 brew install opam
 ```
-2. Install OCaml >= 4.12.0 (if not already installed):
-```
-opam switch create 4.12.0 && eval $(opam env)
-```
-3. Get source:
+2. Get source:
 ```
 git clone https://github.com/nguermond/doculib.git
 ```
+3. Build:
+```
+cd doculib && make
+```
 4. Install:
 ```
-cd doculib && opam install .
+make install
 ```
