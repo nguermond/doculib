@@ -1,5 +1,6 @@
 # Changes
 
+## v1.2.1
 * icon is now encoded in source (no longer needs to be installed)
 * reorganized new library dialog
 * add about dialog

@@ -23,21 +23,6 @@ let error_dialog (msg : string) : unit =
   (match error_dialog#run() with
    | _ -> error_dialog#destroy()
   )
-  
-(* let loading_dialog (f : int -> bool) : unit =
- *   let dialog = GWindow.dialog ~border_width:8 ~width:300 ~height:20 () in
- *   let pbar = GRange.progress_bar ~pulse_step:0.01 ()
- *                ~packing:(dialog#vbox#pack) in
- *   let g = (fun () -> pbar#pulse();
- *                      (if (f 0) then true
- *                       else (dialog#destroy();false))) in
- * 
- *   dialog#add_button_stock `CANCEL `CANCEL;
- *   let _ = GMain.Timeout.add ~ms:50 ~callback:g in
- *   try
- *     (match (dialog#run()) with
- *      | _ -> dialog#destroy())
- *   with _ -> () *)
 
 class search_bar search_box search_entry =
 object
