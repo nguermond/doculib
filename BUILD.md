@@ -5,7 +5,7 @@ sudo apt install opam
 ```
 2. Install system dependencies:
 ```
-sudo apt install libgmp-dev pkg-config libcairo2-dev libexpat1-dev libgtk-3-dev
+sudo apt install pkg-config libev-dev libgmp-dev libcairo2-dev libexpat1-dev libgtk-3-dev
 ```
 4. Get source:
 ```
@@ -25,15 +25,19 @@ make install
 ```
 brew install opam
 ```
-2. Get source:
+2. Install system dependencies:
+```
+brew install pkg-config libev gmp cairo expat gtk+3
+```
+3. Get source:
 ```
 git clone https://github.com/nguermond/doculib.git
 ```
-3. Build:
+4. Build:
 ```
 cd doculib && make
 ```
-4. Install:
+5. Install:
 ```
 make install
 ```
