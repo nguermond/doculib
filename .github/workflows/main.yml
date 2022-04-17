@@ -34,7 +34,7 @@ jobs:
 
       - name: Rename binary
         run: mv _build/default/doculib.exe _build/default/doculib
-		
+
       - name: Save binary (macOS)
         if: matrix.os == 'macOS-latest'
         uses: actions/upload-artifact@v2
@@ -50,4 +50,3 @@ jobs:
         with:
           name: doculib-${{ github.ref_name }}-${{ runner.os }}-x86_64
           path: release/packages/doculib_*_amd64.deb
-		  
