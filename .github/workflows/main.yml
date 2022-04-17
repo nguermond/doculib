@@ -27,10 +27,10 @@ jobs:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
 
       - name: Install dependencies
-      - run: opam install . --deps-only
+        run: opam install . --deps-only
 
       - name: Build doculib
-      - run: opam exec -- dune build
+        run: opam exec -- dune build
 
       - name: Rename binary
         run: mv _build/default/doculib.exe _build/default/doculib
