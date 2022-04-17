@@ -32,7 +32,8 @@ jobs:
       - name: Build doculib
         run: opam exec -- dune build
 
-      - name: Rename binary
+      - name: Rename binary (macOS)
+        if: matrix.os == 'macOS-latest'
         run: mv _build/default/doculib.exe _build/default/doculib
 
       - name: Save binary (macOS)
@@ -44,10 +45,11 @@ jobs:
 
       - name: Build package (debian)
         if: matrix.os == 'ubuntu-latest'
-        run: mkdir release/packages
+        run: mkdir release/packages &&
              bash release/release_amd64.sh
 
-      - if: matrix.os == 'ubuntu-latest'
+      - name: Save package (debian)
+        if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v2
         with:
           name: doculib-${{ github.ref_name }}-${{ runner.os }}-x86_64
