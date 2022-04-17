@@ -13,7 +13,8 @@ A GUI for managing document metadata for books, textbooks, or articles.
 On Debian/Ubuntu, enter the commands
 ```
 wget https://github.com/nguermond/doculib/releases/download/v1.2.1/doculib_1.2.1_amd64.deb
-sudo dpkg -i doculib_1.2.1_amd64.deb && sudo apt -f install
+sudo dpkg -i doculib_1.2.1_amd64.deb
+sudo apt -f install
 ```
 and run with `doculib`.
 
@@ -34,7 +35,7 @@ git clone https://github.com/nguermond/doculib.git
 ```
 cd doculib && make
 ```
-5. Install:
+5. Install (into `$HOME/.local/bin/`):
 ```
 make install
 ```
@@ -56,7 +57,7 @@ git clone https://github.com/nguermond/doculib.git
 ```
 cd doculib && make
 ```
-5. Install:
+5. Install (into `$HOME/.local/bin/`):
 ```
 make install
 ```

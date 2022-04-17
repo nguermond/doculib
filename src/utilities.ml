@@ -6,9 +6,9 @@ module Sys =
     include Sys
     let xopen (str : string) : unit =
       (* Linux *)
-      if (Sys.command ("xdg-open \""^str^"\"")) > 0 then
+      if (Sys.command ("xdg-open \""^str^"\" &")) > 0 then
         (* MacOS *)
-        (if (Sys.command ("open \""^str^"\"")) > 0 then
+        (if (Sys.command ("open \""^str^"\" &")) > 0 then
            (raise (InternalError (str ^ " could not be opened!"))))
 
     let hash (file : string) : string =

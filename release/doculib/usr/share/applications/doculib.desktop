@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=DocuLib
+Exec=doculib
+Comment=Document metadata and library manager
+Terminal=false
+Icon=/usr/local/lib/doculib/icons/Gnome-colors-applications-office.svg
+Type=Application
+Hidden=false
