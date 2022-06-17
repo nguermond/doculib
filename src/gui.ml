@@ -385,7 +385,8 @@ let search_metadata ~db (default : Db.doc) (search_str : string) : Db.doc option
   
 let main () =
   GMain.init();
-  let window = GWindow.window ~icon:Icons.doculib_icon ~title:"DocuLib" () in
+  let window = GWindow.window
+                 ~icon:Icons.doculib_icon ~title:"DocuLib" () in
   let vbox = GPack.vbox ~packing:window#add () in
   
   (* Toplevel menu *)
@@ -458,7 +459,19 @@ let main () =
    *   ~callback:(fun _ -> notebook#edit_selected edit_document); *)
 
   context_factory#add_separator ();
-  
+
+  (* TODO: Copy file name *)
+
+  (* TODO: Copy file location *)
+  context_factory#add_item "Copy File Path"
+    ~callback:(fun _ ->
+      let clipboard = GtkBase.Clipboard.get Gdk.Atom.clipboard in
+      notebook#action_on_selected (fun library model row ->
+          let path = (model#get ~row ~column:Model.Attr.path) in
+          let full_path = (db#get_full_path ~library path) in
+          (GtkBase.Clipboard.set_text clipboard full_path))
+    );
+
   (* Delete physical file *)
   context_factory#add_item "Delete File"
     ~callback:(fun _ ->
