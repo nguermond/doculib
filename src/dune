@@ -3,13 +3,26 @@
   (libraries
     lablgtk3
     lwt
-    yojson
     cohttp
     cohttp-lwt-unix
     str
-    agrep)
+    agrep
+    path
+    json
+    sys
+    metadb)
   (modules
-    Icons Font Gui Doc Db Search Json Model Notebook Utilities Update_db)
+    Icons
+    Font
+    Gui
+    Doc
+    Db
+    Search
+    Model
+    Notebook
+    Utilities
+    ; Update_db
+  )
   )
 
 (env

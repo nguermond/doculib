@@ -61,3 +61,6 @@ let file_exists (path : Path.root) : bool =
 
 let empty_dir (path : Path.root) : bool =
   (get_files_map path (fun x -> x)) = []
+
+
+let getenv_opt = Sys.getenv_opt

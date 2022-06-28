@@ -7,9 +7,7 @@ type t = {star : bool;
           isbn : string;
           year : string;
           tags : string list;
-          path : string;
-          doc_type : string;
-          hash : string;
+          (* notes : string *)
          }
 
 type attribute =  Star of bool
@@ -19,9 +17,9 @@ type attribute =  Star of bool
                 | Isbn of string
                 | Year of string
                 | Tags of string list
-                | Path of string
-                | DocType of string
-                | Hash of string
+                (* | Path of string
+                 * | DocType of string
+                 * | Hash of string *)
                            
 let set_attribute (field : string) (value : string) : attribute =
   match field with
@@ -35,9 +33,9 @@ let set_attribute (field : string) (value : string) : attribute =
   | "doi" -> Doi value
   | "isbn" -> Isbn value
   | "tags" -> Tags (Str.split (Str.regexp "; +") value)
-  | "path" -> Path value
-  | "doc_type" -> DocType value
-  | "hash" -> Hash value
+  (* | "path" -> Path value
+   * | "doc_type" -> DocType value
+   * | "hash" -> Hash value *)
   | _ -> failwith "Not a field"
 
 let edit_document (field : attribute) (doc : t) : t =
@@ -48,13 +46,13 @@ let edit_document (field : attribute) (doc : t) : t =
    isbn = (match field with Isbn v -> v | _ -> doc.isbn);
    year = (match field with Year v -> v | _ -> doc.year);
    tags = (match field with Tags v -> v | _ -> doc.tags);
-   path = (match field with Path v -> v | _ -> doc.path);
-   doc_type = (match field with DocType v -> v | _ -> doc.doc_type);
-   hash = (match field with Hash v -> v | _ -> doc.hash);
+   (* path = (match field with Path v -> v | _ -> doc.path); *)
+   (* doc_type = (match field with DocType v -> v | _ -> doc.doc_type);
+    * hash = (match field with Hash v -> v | _ -> doc.hash); *)
   }         
   
 let pp_doc ppf (d : t) =
-  (fprintf ppf "{@\n%s%s%s%s%s%s%s%s%s%s}"
+  (fprintf ppf "{@\n%s%s%s%s%s%s%s}"
      (if d.star = false then ""
       else (asprintf "  Starred@\n"))
      (if d.title = "" then ""
@@ -69,27 +67,15 @@ let pp_doc ppf (d : t) =
       else (sprintf "  Year: %s@\n" d.year))
      (if d.tags = [] then ""
       else (sprintf "  Tags: %s@\n" (String.concat "; " d.tags)))
-     (sprintf "  Path: %s@\n" d.path)
-     (sprintf "  Document Type: %s@\n" d.doc_type)
-     (sprintf "  Hash: %s@\n" d.hash)
+     (* (sprintf "  Path: %s@\n" d.path)
+      * (sprintf "  Document Type: %s@\n" d.doc_type)
+      * (sprintf "  Hash: %s@\n" d.hash) *)
   )
 
                
-let make_doc_from_file full_path path doc_type : t =
-  {star=false;
-   title="";
-   authors=[];
-   doi="";
-   isbn="";
-   year="";
-   tags=[];
-   path=path;
-   doc_type=doc_type;
-   hash=Utilities.Sys.hash full_path;
-  }
 
     
-let doc_to_json (doc : t) : Json.t =
+let to_json (doc : t) : Json.t =
   `Assoc [("star", `Bool doc.star);
           ("title", `String doc.title);
           ("authors", `List (List.map (fun x -> `String x) doc.authors));
@@ -97,11 +83,11 @@ let doc_to_json (doc : t) : Json.t =
           ("isbn", `String doc.isbn);
           ("year", `String doc.year);
           ("tags", `List (List.map (fun x -> `String x) doc.tags));
-          ("doc_type", `String doc.doc_type);
-          ("hash", `String doc.hash);
+          (* ("doc_type", `String doc.doc_type);
+           * ("hash", `String doc.hash); *)
     ]
 
-let json_to_doc path (json : Json.t) : t =
+let from_json (json : Json.t) : t =
   let open Json in
   { star = (to_bool (raise_opt "star" (get "star" json)));
     title = (to_string (raise_opt "title" (get "title" json)));
@@ -112,9 +98,9 @@ let json_to_doc path (json : Json.t) : t =
     year = (to_string (raise_opt "year" (get "year" json)));
     tags = (List.map to_string
               (to_list (raise_opt "tags" (get "tags" json))));
-    path = path;
-    doc_type = (to_string (raise_opt "doc_type" (get "doc_type" json)));
-    hash = (to_string (default (`String "hash") (get "hash" json)));
+    (* path = path;
+     * doc_type = (to_string (raise_opt "doc_type" (get "doc_type" json)));
+     * hash = (to_string (default (`String "hash") (get "hash" json))); *)
   }
 
 
@@ -130,3 +116,16 @@ let deserialize_description (str : string) : (string * (string list)) =
   let paths = (List.map Json.to_string
                 (Json.to_list (Json.raise_opt "paths" (Json.get "paths" json)))) in
   (library,paths)
+
+
+let init : t =
+  {star=false;
+   title="";
+   authors=[];
+   doi="";
+   isbn="";
+   year="";
+   tags=[];
+  }
+
+let to_string doc = (Format.asprintf "%a" pp_doc doc)

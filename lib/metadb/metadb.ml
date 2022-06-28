@@ -1,6 +1,4 @@
 
-open Format
-
 exception FileExists of Path.root
 exception EntryExists of (string * Path.rel)
 exception EntryDoesNotExist of (string * Path.rel)
@@ -71,28 +69,29 @@ module FileTbl = Hashtbl.Make(struct
                      let hash = Hash.to_int
                    end)
 type file_table = (string * Path.rel) FileTbl.t
-               
-module Library (D : Metadata) =
+
+
+                
+module type LibData =
+  sig
+    type t
+    val to_json : t -> Json.t
+    val from_json : Json.t -> t
+  end
+
+module Library (D : Metadata) (LD : LibData) =
   struct
     module E = Entry(D)
     type t = {
         name : string;
         root : Path.root;
+        libdata : LD.t;
         entries : (Path.rel, E.t) Hashtbl.t;
       }
 
       
     let store (lib : t) : Path.root =
       Path.merge lib.root (Path.mk_rel ".metadata")
-
-    (* let to_json (name : string) (lib : t) : Json.t =
-     *   (`Assoc [("name",`String name);
-     *            ("root", `String (Path.to_string lib.root))])
-     * 
-     * let from_json (json : Json.t) : string * t =
-     *   let jname = (Json.get_err "name" json) in
-     *   let jroot = (Json.get_err "root" json) in
-     *   (Json.to_string jname, make (Path.mk_root (Json.to_string jroot))) *)
 
     let load_entries (lib : t) : unit =
       let root = (store lib) in
@@ -138,8 +137,27 @@ module Library (D : Metadata) =
     let refresh (lib : t) : unit =
       read_files lib
 
-    let make n r : t =
-      {name = n; root = r; entries = Hashtbl.create 1 }
+    let make (name : string) (root : Path.root) (libdata : LD.t) : t =
+      {name = name;
+       root = root;
+       libdata = libdata;
+       entries = Hashtbl.create 1
+      }
+      
+    let to_json (lib : t) : Json.t =
+      (`Assoc [("name",`String lib.name);
+               ("root", `String (Path.to_string lib.root));
+               ("libdata", (LD.to_json lib.libdata))
+      ])
+      
+    let from_json (json : Json.t) : string * t =
+      let jname = (Json.get_err "name" json) in
+      let jroot = (Json.get_err "root" json) in
+      let jdata = (Json.get_err "libdata" json) in
+      let name = (Json.to_string jname) in
+      let root = (Path.mk_root (Json.to_string jroot)) in
+      let libdata = LD.from_json jdata in
+      (name, make name root libdata)
       
     let add (lib : t) (key : Path.rel) (m : D.t) : unit =
       let path = (Path.merge lib.root key) in
@@ -174,7 +192,7 @@ module Library (D : Metadata) =
         (remove lib key;
          Hashtbl.add lib.entries key' e)
       
-    let index_files (lib : t) (tbl : file_table) : file_table
+    let index_files (lib : t) (tbl : file_table) : unit =
       Hashtbl.iter (fun key e ->
           let library = lib.name in
           let hash = E.get_hash e in
@@ -209,19 +227,16 @@ module Library (D : Metadata) =
       Format.sprintf "%s = {@\n@[<2>%s@]\n" library str
   end
                  
-module Libraries (D : Metadata) =
+module Make (D : Metadata) (LD : LibData) =
   struct
-    module L = Library(D)
+    module L = Library(D)(LD)
     let libraries : ((string * L.t) list) ref = ref []
                                               
     (* We keep a global index of files by their hash to deal
      * with moved/renamed files and duplicates.
      * file_index : file_hash -> (library, file_path) *)
-    let file_index : (Path.rel FileTbl.t) = FileTbl.create 1
+    let file_index : file_table = FileTbl.create 1
 
-    let read_libraries (libs : (string * Path.root) list) : unit =
-      libraries := (List.map (fun (name, root) ->
-                        (name,L.make name root)) libs)
 
     let refresh_library ~library : unit =
       L.refresh (List.assoc library !libraries)
@@ -272,14 +287,15 @@ module Libraries (D : Metadata) =
               let to_path = Path.merge (L.get_root to_lib_) key in
               let _ = (Sys.make_dirp to_path) in
               (Sys.move from_path to_path)
-         | None -> raise(EntryDoesNotExist key))
+         | None -> raise(EntryDoesNotExist(from_lib,key)))
 
     let remap_entry ~from_lib ~to_lib key key' : unit =
       let from_lib_ = (List.assoc from_lib !libraries) in
       let to_lib_ = (List.assoc to_lib !libraries) in
       if (L.file_exists to_lib_ key') then
         raise(FileExists (Path.merge (L.get_root to_lib_) key'))
-      else if (L.entry_exists to_lib_ key' && not(L.entry_empty to_lib key')) then
+      else if (L.entry_exists to_lib_ key'
+               && not(L.entry_empty to_lib_ key')) then
         raise(EntryExists (to_lib, key))
       else
         failwith "NYI"
@@ -297,8 +313,8 @@ module Libraries (D : Metadata) =
          *  | None -> raise(EntryDoesNotExist key)) *)
       
       
-    let new_library ~library (root : Path.root) : unit =
-      let lib = L.make library root in
+    let new_library ~library (root : Path.root) (libdata : LD.t) : unit =
+      let lib = L.make library root libdata in
       L.load_entries lib; (* Entries may already be present *)
       L.read_files lib;
       libraries := (library, lib) :: !libraries
@@ -335,7 +351,7 @@ module Libraries (D : Metadata) =
       let lib = List.assoc library !libraries in
       let entries = (L.get_unmatched_entries lib) in
       List.iter (fun (key,entry) ->
-          let hash = E.get_hash entry in
+          let hash = L.E.get_hash entry in
           match (FileTbl.find_opt file_index hash) with
           | Some (library',key') when library=library' ->
              L.remap lib key key'
@@ -343,10 +359,29 @@ module Libraries (D : Metadata) =
              let lib' = List.assoc library' !libraries in
              if (not (L.entry_exists lib' key') ||
                    (L.entry_empty lib' key')) then
-               (migrate_entry ~from_lib:library
-                  ~to_lib:library' key ~remap:key')
+               (remap_entry ~from_lib:library
+                  ~to_lib:library' key key')
              else
-               raise(EntryExists(library',key')))
+               raise(EntryExists(library',key'))
+          | None -> failwith "NYI")
         entries
+
+    let to_json () : Json.t =
+      (`List (List.map (fun (name,lib) ->
+                  (L.to_json lib))
+                !libraries))
+      
+    let from_json (json : Json.t) : (string * L.t) list =
+      let libs = Json.to_list json in
+      (List.map L.from_json libs)
+
+
+    let load_config (libconfig : Path.root) : unit =
+      let libs = from_json @@ Json.from_file libconfig in
+      libraries := libs
+
+    let write_config (libconfig : Path.root) : unit =
+      let jlibs = to_json () in
+      Json.to_file libconfig jlibs
   end
 
