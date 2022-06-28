@@ -1,0 +1,43 @@
+
+(library
+ (name path)
+ (modules path))
+
+(library
+ (name hash)
+ (modules hash)
+ (libraries path))
+
+(library
+ (name sys)
+ (modules sys)
+ (libraries path))
+
+(library
+ (name utilities)
+ (modules utilities))
+
+(library
+ (name json)
+ (libraries
+   yojson
+   path)
+ (modules json))
+
+(library
+ (name metadb)
+ (libraries
+   sys
+   utilities
+   json
+   hash)
+ (modules
+   metadb))
+
+(env
+ (dev
+  (flags
+	:standard -w
+    -6-10-26-27-32-33
+	; -3-6-7-10-24-26-27-32-33-35
+    -no-strict-sequence)))
