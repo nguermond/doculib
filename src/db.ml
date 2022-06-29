@@ -38,6 +38,8 @@ let doc_type_of_string = function
   | "document" -> `Document
   | _ -> raise (InvalidDocType)
 
+
+       
 module LibData =
   struct
     type t = {
@@ -52,11 +54,26 @@ module LibData =
       let v = (Json.to_string (Json.get_err "version" j)) in
       let dtype = (doc_type_of_string (Json.to_string (Json.get_err "doc_type" j)))
       in {version = v ; doc_type = dtype}
+
+    let get_doc_type (ld : t) : doc_type =
+      ld.doc_type
+
+    let get_version (ld : t) : string =
+      ld.version
   end
 
 
 
 module Libraries = Make(Doc)(LibData)
-                     
 
- 
+
+
+let get_library_descriptions () : (string * doc_type) list =
+  List.map (fun (library, libdata) ->
+      (library, LibData.get_doc_type libdata))
+    (Libraries.get_libdata ())
+                     
+let init () =
+  Libraries.load_config libconfig;
+  Libraries.init_libraries ()
+  

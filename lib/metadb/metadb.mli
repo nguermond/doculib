@@ -24,12 +24,12 @@ module type LibData =
 
 module Make : functor (D : Metadata) (LD : LibData) ->
   sig
-             
+    val init_library : library:string -> unit             
     val refresh_library : library:string -> unit
-    val init_library : library:string -> unit
     
-    val refresh_libraries : unit -> unit
     val init_libraries : unit -> unit
+    val refresh_libraries : unit -> unit
+
     
     val add_entry : library:string -> Path.rel -> D.t -> unit
     val get_entry : library:string -> Path.rel -> D.t option
@@ -58,5 +58,7 @@ module Make : functor (D : Metadata) (LD : LibData) ->
 
     val load_config : Path.root -> unit
     val write_config : Path.root ->  unit
+
+    val get_libdata : unit -> (string * LD.t) list
   end
 

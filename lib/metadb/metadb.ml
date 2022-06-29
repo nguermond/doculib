@@ -386,5 +386,11 @@ module Make (D : Metadata) (LD : LibData) =
     let write_config (libconfig : Path.root) : unit =
       let jlibs = to_json () in
       Json.to_file libconfig jlibs
+
+
+    let get_libdata () : (string * LD.t) list =
+      List.map (fun (library,lib) ->
+          (library, L.get_libdata lib))
+      !libraries
   end
 
