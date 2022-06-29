@@ -220,6 +220,9 @@ module Library (D : Metadata) (LD : LibData) =
     let get_root (lib : t) : Path.root =
       lib.root
 
+    let get_libdata (lib : t) : LD.t =
+      lib.libdata
+      
     let to_string library (lib : t) : string =
       let str = Hashtbl.fold (fun key e str ->
                     (E.to_string key e) ^ str)

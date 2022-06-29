@@ -24,3 +24,6 @@ val move : Path.root -> Path.root -> unit
 
 val file_exists : Path.root -> bool
 val empty_dir : Path.root -> bool
+
+
+val getenv_opt : string -> string option
