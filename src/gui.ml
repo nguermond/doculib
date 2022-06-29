@@ -460,17 +460,28 @@ let main () =
 
   context_factory#add_separator ();
 
-  (* TODO: Copy file name *)
+  (* Copy file name to clipboard *)
+  ignore @@
+    context_factory#add_item "Copy File Name"
+      ~callback:(fun _ ->
+        let clipboard = GtkBase.Clipboard.get Gdk.Atom.clipboard in
+        notebook#action_on_selected (fun library model row ->
+            let path = (model#get ~row ~column:Model.Attr.path) in
+            let name = (Db.get_file_name ~path) in
+            (GtkBase.Clipboard.set_text clipboard name))
+      );
 
-  (* TODO: Copy file location *)
-  context_factory#add_item "Copy File Path"
-    ~callback:(fun _ ->
-      let clipboard = GtkBase.Clipboard.get Gdk.Atom.clipboard in
-      notebook#action_on_selected (fun library model row ->
-          let path = (model#get ~row ~column:Model.Attr.path) in
-          let full_path = (db#get_full_path ~library path) in
-          (GtkBase.Clipboard.set_text clipboard full_path))
-    );
+
+  (* Copy file location to clipboard *)
+  ignore @@
+    context_factory#add_item "Copy File Path"
+      ~callback:(fun _ ->
+        let clipboard = GtkBase.Clipboard.get Gdk.Atom.clipboard in
+        notebook#action_on_selected (fun library model row ->
+            let path = (model#get ~row ~column:Model.Attr.path) in
+            let full_path = (db#get_full_path ~library path) in
+            (GtkBase.Clipboard.set_text clipboard full_path))
+      );
 
   (* Delete physical file *)
   context_factory#add_item "Delete File"
