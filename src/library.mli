@@ -1,7 +1,7 @@
 exception InvalidDocType
 
 
-type doc_type = [`Book | `Document]
+type doc_type = [`Book | `Article]
 
 (* TODO : these should be private *)
 val string_of_doc_type : doc_type -> string

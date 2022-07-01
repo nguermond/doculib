@@ -5,15 +5,15 @@ exception InvalidDocType
 let branches = ["3.0"; "2.1"; "2.0"]
 let current_branch = "3.0"
 
-type doc_type = [`Book | `Document]
+type doc_type = [`Book | `Article]
 
 let string_of_doc_type = function
   | `Book -> "book"
-  | `Document -> "document"
+  | `Article -> "article"
                
 let doc_type_of_string = function
   | "book" -> `Book
-  | "document" -> `Document
+  | "article" -> `Article
   | _ -> raise (InvalidDocType)
 
 type t = {
