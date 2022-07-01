@@ -42,9 +42,8 @@ module Attr =
   end
 
 
-class model db filter store view =
+class model filter store view =
 object (self)
-  val db : Db.db = db
   val filter : GTree.model_filter = filter
   val mutable store : GTree.list_store = store
   val view : GTree.view = view
@@ -60,16 +59,16 @@ object (self)
     ignore (store#remove row)
 
   method remove_entry_from_path ~path : unit =
+    let path = Path.rel_to_string path in
     (store#foreach (fun p _ ->
          let row = (self#get_row p) in
          let path' = self#get ~row ~column:Attr.path in
          (if path = path' then
-            (store#remove row; true)
+            (ignore @@ store#remove row; true)
           else false (* stop searching *))
     ))
     
-  method set_entry ~row (doc : Doc.t) : unit =
-    let open Db in
+  method set_entry ~row (key : Path.rel) (doc : Doc.t) : unit =
     store#set ~row ~column:Attr.star doc.star;
     store#set ~row ~column:Attr.title doc.title;
     store#set ~row ~column:Attr.authors (String.concat "; " doc.authors);
@@ -77,13 +76,13 @@ object (self)
     store#set ~row ~column:Attr.isbn doc.isbn;
     store#set ~row ~column:Attr.year doc.year;
     store#set ~row ~column:Attr.tags (String.concat "; " doc.tags);
-    store#set ~row ~column:Attr.path doc.path
+    store#set ~row ~column:Attr.path (Path.rel_to_string key)
     
-  method import_documents (data : Doc.t list) : unit =
+  method import_documents (data : (Path.rel * Doc.t) list) : unit =
     List.iter
-      (fun doc ->
+      (fun (key,doc) ->
         let row = store#append () in
-        self#set_entry ~row doc)
+        self#set_entry ~row key doc)
       data
 
   (* method flag_entry doc : unit =
@@ -117,16 +116,16 @@ object (self)
                                  ["text",col]) in
           
           (* save cell edits *)
-          renderer#connect#edited ~callback:(fun p str ->
-              let row = (self#get_row p) in
-              let path = (store#get ~row ~column:Attr.path) in
-              let key = (Attr.get_name (col.index)) in
-              let doc = db#get_document ~library ~path in
-              let doc = Doc.edit_document (Doc.set_attribute key str) doc in
-              (* (prerr_endline (Format.asprintf "%a" Db.pp_doc doc)); *)
-              db#set_document ~library ~path doc;
-              store#set ~row ~column:col str
-            );
+          ignore @@
+            renderer#connect#edited ~callback:(fun p str ->
+                let row = (self#get_row p) in
+                let path = Path.mk_rel (store#get ~row ~column:Attr.path) in
+                let key = (Attr.get_name (col.index)) in
+                let doc = Db.get ~library ~path in
+                let doc = Doc.edit_document (Doc.set_attribute key str) doc in
+                Db.set ~library ~path doc;
+                store#set ~row ~column:col str
+              );
           GTree.view_column ~title ~renderer:(renderer,values) ()
        | Some (CellRenderer (renderer,values)), Bool _ ->
           GTree.view_column ~title ~renderer:(renderer,values) ()
@@ -178,51 +177,52 @@ object (self)
     (* TODO: If multiple rows are selected, one row is unselected with CONTROL,
      * and then clicked, it is set to edit, not selected, and other rows remain selected!
      *)
-    view#event#connect#button_press
-      ~callback:(fun ev ->
-        (if (GdkEvent.Button.button ev) = 3 then
-           (context_menu#popup ~button:3 ~time:(GdkEvent.Button.time ev);
-            (if (view#selection#count_selected_rows) > 1
-             then true (* do not deselect *)
-             else false (* select on right click *)))
-         else if (GdkEvent.Button.button ev) = 1 then
-           let x,y = (int_of_float (GdkEvent.Button.x ev),
-                      int_of_float (GdkEvent.Button.y ev)) in
-           let selection = view#selection in
-           let target = view#get_path_at_pos ~x ~y in
-           match target with
-           | Some (p,col,_,_) ->
-              (* if CONTROL or SHIFT not in effect, and entry not selected *)
-              if ((((GdkEvent.Button.state ev) land (4 lor 1)) = 0) 
-                  && selection#path_is_selected(p)) then
-                (selection#set_select_function (fun p b -> false);
-    		     defer_select := Some p; false)
-              else (selection#set_select_function (fun p b -> true);
-    		        defer_select := None; false)
-           | None -> true
-         else false)
-      );
-    ignore(view#event#connect#button_release ~callback:(fun ev ->
-               (if (GdkEvent.Button.button ev) = 1 then
-                  (match !defer_select with
-                   | Some p ->
-                      let selection = view#selection in
-                      let x,y = (int_of_float (GdkEvent.Button.x ev),
-                                 int_of_float (GdkEvent.Button.y ev)) in
-                      let target = view#get_path_at_pos ~x ~y in
-                      selection#set_select_function (fun p b -> true);
-                      (match target with
-                       | Some (q,col,_,_) ->
-                          (if ((p = q) && (not (x = 0 && y = 0))) then
-    		                 (view#set_cursor ~edit:(view#selection#count_selected_rows = 1) p col;
-                              defer_select := None; false)
-                           else
-                             (defer_select := None; true))
-                       | None -> true)
-                   | None -> false)
-                else false)
-      ));
-
+    ignore @@
+      view#event#connect#button_press
+        ~callback:(fun ev ->
+          (if (GdkEvent.Button.button ev) = 3 then
+             (context_menu#popup ~button:3 ~time:(GdkEvent.Button.time ev);
+              (if (view#selection#count_selected_rows) > 1
+               then true (* do not deselect *)
+               else false (* select on right click *)))
+           else if (GdkEvent.Button.button ev) = 1 then
+             let x,y = (int_of_float (GdkEvent.Button.x ev),
+                        int_of_float (GdkEvent.Button.y ev)) in
+             let selection = view#selection in
+             let target = view#get_path_at_pos ~x ~y in
+             match target with
+             | Some (p,col,_,_) ->
+                (* if CONTROL or SHIFT not in effect, and entry not selected *)
+                if ((((GdkEvent.Button.state ev) land (4 lor 1)) = 0) 
+                    && selection#path_is_selected(p)) then
+                  (selection#set_select_function (fun p b -> false);
+    		       defer_select := Some p; false)
+                else (selection#set_select_function (fun p b -> true);
+    		          defer_select := None; false)
+             | None -> true
+           else false)
+        );
+    ignore @@
+      view#event#connect#button_release ~callback:(fun ev ->
+          (if (GdkEvent.Button.button ev) = 1 then
+             (match !defer_select with
+              | Some p ->
+                 let selection = view#selection in
+                 let x,y = (int_of_float (GdkEvent.Button.x ev),
+                            int_of_float (GdkEvent.Button.y ev)) in
+                 let target = view#get_path_at_pos ~x ~y in
+                 selection#set_select_function (fun p b -> true);
+                 (match target with
+                  | Some (q,col,_,_) ->
+                     (if ((p = q) && (not (x = 0 && y = 0))) then
+    		            (view#set_cursor ~edit:(view#selection#count_selected_rows = 1) p col;
+                         defer_select := None; false)
+                      else
+                        (defer_select := None; true))
+                  | None -> true)
+              | None -> false)
+           else false)
+        );
 
   method refilter () : unit =
     filter#refilter()
@@ -231,13 +231,12 @@ object (self)
     filter#set_visible_func f
 
   method get_selected_rows : Gtk.tree_path list =
-    view#selection#get_selected_rows
-    
+    view#selection#get_selected_rows    
 end
 
 
                                   
-let make_document_list ~db ?(height=400) ?(show_path=true) ?(multiple=false)
+let make_document_list ?(height=400) ?(show_path=true) ?(multiple=false)
       ?(show_stars=true) ?(editable=false) ?(multidrag=false) ?(library:string = "")
       ?(sort : ('a GTree.column) option=None) 
       ~doc_type ~packing data : model =
@@ -251,21 +250,22 @@ let make_document_list ~db ?(height=400) ?(show_path=true) ?(multiple=false)
   let filter = (GTree.model_filter store) in
   let view = GTree.view (* ~reorderable:true *)
                ~model:filter ~packing:swindow#add() in
-  let model = (new model db filter store view) in
+  let model = (new model filter store view) in
 
   view#set_enable_grid_lines `HORIZONTAL;
   (if multiple then view#selection#set_mode `MULTIPLE);
   
   (* Columns *)
   let renderer,values = (GTree.cell_renderer_toggle [], ["active", Attr.star]) in
-  renderer#connect#toggled ~callback:(fun p ->
-      let row = (model#get_row p) in
-      let value = (not (store#get ~row ~column:Attr.star)) in
-      let path = model#get ~row ~column:Attr.path in
-      let doc = db#get_document ~library ~path in
-      let doc = Doc.edit_document (Star value) doc in
-      db#set_document ~library ~path doc;
-      store#set ~row ~column:Attr.star value);
+  ignore @@
+    renderer#connect#toggled ~callback:(fun p ->
+        let row = (model#get_row p) in
+        let value = (not (store#get ~row ~column:Attr.star)) in
+        let path = Path.mk_rel (model#get ~row ~column:Attr.path) in
+        let doc = Db.get ~library ~path in
+        let doc = Doc.edit_document (Star value) doc in
+        Db.set ~library ~path doc;
+        store#set ~row ~column:Attr.star value);
   let star_cell_renderer = Some (CellRenderer (renderer,values)) in
   
   (if show_stars then
@@ -279,7 +279,7 @@ let make_document_list ~db ?(height=400) ?(show_path=true) ?(multiple=false)
    | "book" -> model#add_column ~title:"ISBN" ~width:80 ~editable ~library (Str Attr.isbn)
    | _ -> ());
   (if show_path then
-     ignore(model#add_column ~title:"Path" ~width:200 (Str Attr.path)));
+     ignore @@ model#add_column ~title:"Path" ~width:200 (Str Attr.path));
 
   (if multidrag then
      (GtkTree.TreeView.Dnd.enable_model_drag_source
@@ -288,20 +288,22 @@ let make_document_list ~db ?(height=400) ?(show_path=true) ?(multiple=false)
         ~targets:(Array.of_list dnd_targets)
         ~actions:[`COPY];
 
-      ignore(view#drag#connect#data_get ~callback:
-               (fun ctx sel ~info ~time ->
-                 let selection = view#selection#get_selected_rows in
-                 let paths = (List.map (fun p ->
-                                (store#get ~row:(model#get_row p) ~column:Attr.path))
-                              selection) in
-                 let data = (Doc.serialize_description ~library ~paths) in
-                 sel#return data
-        ));
+      ignore @@
+        view#drag#connect#data_get ~callback:
+          (fun ctx sel ~info ~time ->
+            let selection = view#selection#get_selected_rows in
+            let paths = (List.map (fun p ->
+                             Path.mk_rel @@
+                               (store#get ~row:(model#get_row p) ~column:Attr.path))
+                           selection) in
+            let data = (Doc.serialize_description ~library ~paths) in
+            sel#return data);
 
-      ignore(view#drag#connect#after#beginning ~callback:
-               (fun ctx ->
-                 let image = (GMisc.image ~pixbuf:Icons.drag_icon ()) in
-                 (ctx#set_icon_widget image#coerce ~hot_x:0 ~hot_y:0)));
+      ignore @@
+        view#drag#connect#after#beginning ~callback:
+          (fun ctx ->
+            let image = (GMisc.image ~pixbuf:Icons.drag_icon ()) in
+            (ctx#set_icon_widget image#coerce ~hot_x:0 ~hot_y:0));
   ));
     
   (match sort with

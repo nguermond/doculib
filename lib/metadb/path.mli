@@ -13,6 +13,7 @@ val mk_path : string list -> path
 
 val to_string : root -> string
 val rel_to_string : rel -> string
+val string_of_name : name -> string
   
 val merge_lst : root -> path -> root
 val merge : root -> rel -> root
@@ -29,3 +30,5 @@ val strip_root : root -> root -> rel
 (* Drop leaf from path *)
 val drop_leaf : root -> root
 
+(* Get leaf, ie. file name *)
+val get_leaf : rel -> name

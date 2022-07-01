@@ -33,8 +33,8 @@ val to_json : t -> Json.t
 val from_json : Json.t -> t
 (* val make_doc_from_file : string -> string -> string -> t *)
 
-val serialize_description : library:string -> paths:(string list) -> string
-val deserialize_description : string -> (string * (string list))
+val serialize_description : library:string -> paths:(Path.rel list) -> string
+val deserialize_description : string -> (string * (Path.rel list))
 
 
 val init : t

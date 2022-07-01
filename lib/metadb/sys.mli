@@ -3,10 +3,14 @@ exception OSError of string
 exception InternalError of string
 
 (* Try to open file with default program *)
-val xopen : Path.root -> unit
+val xopen : string -> unit
 
+val open_file : Path.root -> unit
+
+val open_url : string -> unit
+  
 (* Get files recursively *)
-val get_files_map : Path.root -> (Path.root -> 'a) -> 'a list
+val get_files : Path.root -> Path.root Seq.t
 
 (* Remove directory recursively *)
 val rmdir : Path.root -> unit

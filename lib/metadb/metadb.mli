@@ -5,6 +5,7 @@ exception EntryDoesNotExist of (string * Path.rel)
 
 exception DirNotEmpty of Path.root 
 
+exception LibraryExists
 
 module type Metadata =
 sig
@@ -25,17 +26,18 @@ module type LibData =
 module Make : functor (D : Metadata) (LD : LibData) ->
   sig
     val init_library : library:string -> unit             
-    val refresh_library : library:string -> unit
+    val refresh_library : library:string -> (Path.rel * D.t) Seq.t
     
     val init_libraries : unit -> unit
-    val refresh_libraries : unit -> unit
+    (* val refresh_libraries : unit -> unit *)
 
     
     val add_entry : library:string -> Path.rel -> D.t -> unit
     val get_entry : library:string -> Path.rel -> D.t option
     val set_entry : library:string ->  Path.rel -> D.t -> unit
     val remove_entry : library:string ->  Path.rel -> unit
-    
+    val remove_file : library:string -> Path.rel -> unit
+      
     (* Move entry and file from one library to another *)
     val migrate_entry : from_lib:string -> to_lib:string -> Path.rel -> unit
     (* Move and rename entry from one library to another *)
@@ -59,6 +61,9 @@ module Make : functor (D : Metadata) (LD : LibData) ->
     val load_config : Path.root -> unit
     val write_config : Path.root ->  unit
 
+    val get_entries : library:string -> (Path.rel * D.t) Seq.t
+
     val get_libdata : unit -> (string * LD.t) list
+    val get_library_root : library:string -> Path.root
   end
 

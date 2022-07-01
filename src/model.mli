@@ -22,7 +22,7 @@ module Attr :
   end
 
 
-class model : Db.db -> GTree.model_filter -> GTree.list_store -> GTree.view ->
+class model : GTree.model_filter -> GTree.list_store -> GTree.view ->
   object
     method get_row : Gtk.tree_path -> row
          
@@ -30,11 +30,11 @@ class model : Db.db -> GTree.model_filter -> GTree.list_store -> GTree.view ->
 
     method remove : row:row -> unit
 
-    method remove_entry_from_path : path:string -> unit
+    method remove_entry_from_path : path:Path.rel -> unit
       
-    method set_entry : row:row -> Doc.t -> unit
+    method set_entry : row:row -> Path.rel -> Doc.t -> unit
       
-    method import_documents : (Doc.t list) -> unit
+    method import_documents : (Path.rel * Doc.t) list -> unit
          
     method reset_model : unit -> unit
          
@@ -53,10 +53,10 @@ class model : Db.db -> GTree.model_filter -> GTree.list_store -> GTree.view ->
 
 
     
-val make_document_list : db:Db.db -> ?height:int -> ?show_path:bool
+val make_document_list : ?height:int -> ?show_path:bool
                          -> ?multiple:bool -> ?show_stars:bool ->
                          ?editable:bool -> ?multidrag:bool -> ?library:string ->
                          ?sort:(('a GTree.column) option) -> doc_type:string ->
-                         packing:(GObj.widget -> unit) -> (Doc.t list) -> model 
+                         packing:(GObj.widget -> unit) -> (Path.rel * Doc.t) list -> model 
 
                                                                                                                       

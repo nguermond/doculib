@@ -21,6 +21,8 @@
     Model
     Notebook
     Utilities
+    Library
+    Log
     ; Update_db
   )
   )

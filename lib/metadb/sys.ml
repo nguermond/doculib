@@ -4,22 +4,27 @@ exception InternalError of string
 
 include Sys
 
-let xopen (path : Path.root) : unit =
+let xopen str : unit =
   (* Linux *) 
-  if (Sys.command ("xdg-open \""^(Path.to_string path)^"\" &")) > 0 then
+  if (Sys.command ("xdg-open \""^str^"\" &")) > 0 then
     (* MacOS *)
-    (if (Sys.command ("open \""^(Path.to_string path)^"\" &")) > 0 then
-       (raise (OSError ((Path.to_string path) ^ " could not be opened!"))))
-
+    (if (Sys.command ("open \""^str^"\" &")) > 0 then
+       (raise (OSError (str ^ " could not be opened!"))))
+  
+let open_file (path : Path.root) : unit =
+  xopen (Path.to_string path)
+  
+let open_url (url : string) : unit =
+  xopen url
+  
 (* Get files recursively *)
-let rec get_files_map (path : Path.root) (map : Path.root -> 'a) : 'a list =
+let rec get_files (path : Path.root) : Path.root Seq.t =
   (if (Sys.is_directory (Path.to_string path)) then
-     (List.flatten
-        (List.map (fun name ->
-             let name = Path.mk_name name in
-             get_files_map (Path.merge_lst path [name]) map)
-           (Array.to_list (Sys.readdir (Path.to_string path)))))
-   else [map path])
+     (Seq.concat_map (fun name ->
+          let name = Path.mk_name name in
+          get_files (Path.merge_lst path [name]))
+        (Array.to_seq (Sys.readdir (Path.to_string path))))
+   else (Seq.return path))
 
 (* Remove directory recursively *)
 (* TODO: Rewrite this using Sys.remove *)
@@ -60,7 +65,6 @@ let file_exists (path : Path.root) : bool =
   Sys.file_exists (Path.to_string path)
 
 let empty_dir (path : Path.root) : bool =
-  (get_files_map path (fun x -> x)) = []
-
+  List.of_seq (get_files path) = []
 
 let getenv_opt = Sys.getenv_opt

@@ -107,13 +107,14 @@ let from_json (json : Json.t) : t =
 let serialize_description ~library ~paths : string =
   let json =
     `Assoc [("library", `String library);
-            ("paths", `List (List.map (fun x -> `String x) paths))] in
+            ("paths", `List (List.map (fun x ->
+                                 `String (Path.rel_to_string x)) paths))] in
   (Json.write_string json)
 
-let deserialize_description (str : string) : (string * (string list)) =
+let deserialize_description (str : string) : (string * (Path.rel list)) =
   let json = (Json.from_string str) in
   let library = (Json.to_string (Json.raise_opt "library" (Json.get "library" json))) in
-  let paths = (List.map Json.to_string
+  let paths = (List.map (fun x -> Path.mk_rel @@ Json.to_string x)
                 (Json.to_list (Json.raise_opt "paths" (Json.get "paths" json)))) in
   (library,paths)
 

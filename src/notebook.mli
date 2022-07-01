@@ -15,7 +15,7 @@ class library : string -> string -> GPack.box -> GMisc.label ->
     method set_model : Model.model -> unit
   end
                                
-class notebook : GPack.notebook -> Db.db -> GMenu.menu -> (GTree.model -> Model.row -> bool)
+class notebook : GPack.notebook -> GMenu.menu -> (GTree.model -> Model.row -> bool)
   -> object
   val mutable libraries : (string * library) list
                                                  
@@ -27,12 +27,10 @@ class notebook : GPack.notebook -> Db.db -> GMenu.menu -> (GTree.model -> Model.
   method load_library : library:string -> unit
   method refresh_library : library:string -> unit
 
-  (* method refresh_library_incr : library:string -> (int -> bool) *)
-
   (* TODO: should not be public *)
   method current_library : string * library
            
   method refilter : ?library:(string option) -> unit -> unit
   method action_on_selected : action:(string -> Model.model -> Model.row -> unit) -> unit
-  method edit_selected : editor:(Db.doc -> Db.doc option) -> unit
+  method edit_selected : editor:(Path.rel -> Doc.t -> Doc.t option) -> unit
 end

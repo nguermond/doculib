@@ -34,8 +34,10 @@ let mk_path (path : string list) : path =
 let unroot (root : root) : root * rel =
   (mk_root "/", (Str.replace_first (Str.regexp "/") "" root))
 
+(* TODO: rename these to 'string_of_*' *)
 let to_string (root : root) : string = root
 let rel_to_string (rel : rel) : string = rel
+let string_of_name (name : name) : string = name
                                      
 let merge_lst (root : root) (path : path) : root =
   String.concat "/" (root :: path)
@@ -60,3 +62,7 @@ let strip_root (root : root) (path : root) : rel =
 
 let drop_leaf (root : root) : root =
   (Str.replace_first leaf_type "" root)
+
+let get_leaf (path : rel) : name =
+  let names = (split path) in
+  List.nth names ((List.length names) - 1)

@@ -3,7 +3,9 @@ exception FileExists of Path.root
 exception EntryExists of (string * Path.rel)
 exception EntryDoesNotExist of (string * Path.rel)
 
-exception DirNotEmpty of Path.root 
+exception DirNotEmpty of Path.root
+
+exception LibraryExists
 
 
 module type Metadata =
@@ -95,14 +97,14 @@ module Library (D : Metadata) (LD : LibData) =
 
     let load_entries (lib : t) : unit =
       let root = (store lib) in
-      ignore @@
-        Sys.get_files_map root
-        (fun path ->
-          let json = (Json.from_file path) in
-          let entry = (E.from_json json) in
-          let path = (Path.remove_file_ext "json" path) in
-          let key = (Path.strip_root root path) in
-          Hashtbl.add lib.entries key entry)
+      (Seq.iter 
+         (fun path ->
+           let json = (Json.from_file path) in
+           let entry = (E.from_json json) in
+           let path = (Path.remove_file_ext "json" path) in
+           let key = (Path.strip_root root path) in
+           Hashtbl.add lib.entries key entry)
+         (Sys.get_files root))
 
     let entry_empty (lib : t) (key : Path.rel) : bool =
       E.empty (Hashtbl.find lib.entries key)
@@ -117,25 +119,28 @@ module Library (D : Metadata) (LD : LibData) =
       Sys.file_exists path
 
     (* Add entries for new files *)
-    let read_files (lib : t) : unit =
+    let read_files (lib : t) : (Path.rel * E.t) Seq.t =
       let root = lib.root in
-      ignore @@
-        Sys.get_files_map root
-          (fun path ->
-            let key = (Path.strip_root root path) in
-            if (entry_exists lib key) then ()
-            else
-              let d = D.init in
-              let h = Hash.hash_file path in
-              let entry = (E.make d h) in
-              Hashtbl.add lib.entries key entry)
+      Seq.filter_map
+        (fun path ->
+          let key = (Path.strip_root root path) in
+          if (entry_exists lib key) then None
+          else
+            let d = D.init in
+            let h = Hash.hash_file path in
+            let entry = (E.make d h) in
+            Hashtbl.add lib.entries key entry;
+            Some (key,entry))
+        (Sys.get_files root)
+        
 
     let init (lib : t) : unit =
       load_entries lib;
-      read_files lib
+      ignore @@ (read_files lib ())
 
-    let refresh (lib : t) : unit =
-      read_files lib
+    let refresh (lib : t) : (Path.rel * D.t) Seq.t =
+      Seq.map (fun (path,e) -> (path,E.get_data e))
+        (read_files lib)
 
     let make (name : string) (root : Path.root) (libdata : LD.t) : t =
       {name = name;
@@ -179,17 +184,20 @@ module Library (D : Metadata) (LD : LibData) =
          Hashtbl.replace lib.entries key entry
       | None -> raise (EntryDoesNotExist(lib.name,key))
 
-    let remove (lib : t) (key : Path.rel) : unit =
+    let remove_entry (lib : t) (key : Path.rel) : unit =
       Hashtbl.remove lib.entries key;
-      Sys.remove (Path.merge lib.root key)
+      Sys.remove (Path.merge (store lib) key)
 
+    let remove_file (lib : t) (key : Path.rel) : unit =
+      Sys.remove (Path.merge lib.root key)
+      
     (* assumes new entry does not exists *)
     let remap (lib : t) (key : Path.rel) (key' : Path.rel) : unit =
       let e = Hashtbl.find lib.entries key in
       if (entry_exists lib key') then
         raise(EntryExists(lib.name,key'))
       else
-        (remove lib key;
+        (remove_entry lib key;
          Hashtbl.add lib.entries key' e)
       
     let index_files (lib : t) (tbl : file_table) : unit =
@@ -228,6 +236,10 @@ module Library (D : Metadata) (LD : LibData) =
                     (E.to_string key e) ^ str)
                   lib.entries "" in
       Format.sprintf "%s = {@\n@[<2>%s@]\n" library str
+
+    let get_entries (lib : t) : (Path.rel * D.t) Seq.t =
+      Seq.map (fun (path,e) -> (path,E.get_data e))
+        (Hashtbl.to_seq lib.entries)
   end
                  
 module Make (D : Metadata) (LD : LibData) =
@@ -241,14 +253,14 @@ module Make (D : Metadata) (LD : LibData) =
     let file_index : file_table = FileTbl.create 1
 
 
-    let refresh_library ~library : unit =
+    let refresh_library ~library : (Path.rel * D.t) Seq.t =
       L.refresh (List.assoc library !libraries)
       
     let init_library ~library : unit =
       L.init (List.assoc library !libraries)
 
-    let refresh_libraries () : unit =
-      List.iter (fun (name,lib) -> L.refresh lib) !libraries
+    (* let refresh_libraries () : unit =
+     *   List.iter (fun (name,lib) -> L.refresh lib) !libraries *)
       
     let init_libraries () : unit =
       List.iter (fun (name,lib) -> L.init lib) !libraries
@@ -267,8 +279,12 @@ module Make (D : Metadata) (LD : LibData) =
 
     let remove_entry ~library (key : Path.rel) : unit =
       let lib = (List.assoc library !libraries) in
-      L.remove lib key
+      L.remove_entry lib key
 
+    let remove_file ~library (key : Path.rel) : unit =
+      let lib = (List.assoc library !libraries) in
+      L.remove_file lib key
+      
     (* Move entry and file from one library to another *)
     let migrate_entry ~from_lib ~to_lib (key : Path.rel) : unit =
       let from_lib_ = (List.assoc from_lib !libraries) in
@@ -282,7 +298,7 @@ module Make (D : Metadata) (LD : LibData) =
         (match L.get from_lib_ key with
          | Some entry ->
             (L.set to_lib_ key entry);
-            (L.remove from_lib_ key);
+            (L.remove_entry from_lib_ key);
             (* Note: File may be missing, but this is okay,
              * we move the entry anyways *)
             if (L.file_exists from_lib_ key) then
@@ -301,7 +317,7 @@ module Make (D : Metadata) (LD : LibData) =
                && not(L.entry_empty to_lib_ key')) then
         raise(EntryExists (to_lib, key))
       else
-        failwith "NYI"
+        failwith "remap_entry: NYI"
         (* (match L.get from_lib_ key with
          *  | Some entry ->
          *     (L.set to_lib_ key entry);
@@ -317,9 +333,11 @@ module Make (D : Metadata) (LD : LibData) =
       
       
     let new_library ~library (root : Path.root) (libdata : LD.t) : unit =
+      if (List.mem_assoc library !libraries) then
+        raise (LibraryExists);
       let lib = L.make library root libdata in
       L.load_entries lib; (* Entries may already be present *)
-      L.read_files lib;
+      ignore @@ (L.read_files lib ());
       libraries := (library, lib) :: !libraries
 
     let remove_library ~library : unit =
@@ -387,10 +405,16 @@ module Make (D : Metadata) (LD : LibData) =
       let jlibs = to_json () in
       Json.to_file libconfig jlibs
 
-
     let get_libdata () : (string * LD.t) list =
       List.map (fun (library,lib) ->
           (library, L.get_libdata lib))
       !libraries
+
+    let get_library_root ~library : Path.root =
+      L.get_root (List.assoc library !libraries)
+
+    let get_entries ~library : (Path.rel * D.t) Seq.t =
+      let lib = List.assoc library !libraries in
+      L.get_entries lib      
   end
 
