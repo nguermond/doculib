@@ -60,7 +60,7 @@ let remove_entry (k : string) (json : t) : t =
   | _ -> raise (ParsingFailure "Not an association list")
 
 let to_file (path : Path.root) (json : t) : unit =
-  to_file (Path.to_string path) json
+  to_file (Path.string_of_root path) json
 
 let from_file (path : Path.root) : t =
-  from_file (Path.to_string path)
+  from_file (Path.string_of_root path)

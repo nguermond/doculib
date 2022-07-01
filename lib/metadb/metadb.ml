@@ -61,7 +61,7 @@ module Entry (D : Metadata) =
 
     let to_string (path : Path.rel) (e : t) : string =
       Format.sprintf "%s => %s:@\n@[<2>%s@]\n"
-        (Path.rel_to_string path) (Hash.to_string e.hash) (D.to_string e.data)
+        (Path.string_of_rel path) (Hash.to_string e.hash) (D.to_string e.data)
   end
 
   
@@ -151,7 +151,7 @@ module Library (D : Metadata) (LD : LibData) =
       
     let to_json (lib : t) : Json.t =
       (`Assoc [("name",`String lib.name);
-               ("root", `String (Path.to_string lib.root));
+               ("root", `String (Path.string_of_root lib.root));
                ("libdata", (LD.to_json lib.libdata))
       ])
       

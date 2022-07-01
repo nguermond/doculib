@@ -59,7 +59,7 @@ object (self)
     ignore (store#remove row)
 
   method remove_entry_from_path ~path : unit =
-    let path = Path.rel_to_string path in
+    let path = Path.string_of_rel path in
     (store#foreach (fun p _ ->
          let row = (self#get_row p) in
          let path' = self#get ~row ~column:Attr.path in
@@ -76,7 +76,7 @@ object (self)
     store#set ~row ~column:Attr.isbn doc.isbn;
     store#set ~row ~column:Attr.year doc.year;
     store#set ~row ~column:Attr.tags (String.concat "; " doc.tags);
-    store#set ~row ~column:Attr.path (Path.rel_to_string key)
+    store#set ~row ~column:Attr.path (Path.string_of_rel key)
     
   method import_documents (data : (Path.rel * Doc.t) list) : unit =
     List.iter

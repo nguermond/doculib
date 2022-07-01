@@ -3,7 +3,7 @@
 type t = Digest.t
 
 let hash_file (file : Path.root) : string =
-  (Digest.file (Path.to_string file))
+  (Digest.file (Path.string_of_root file))
 
 
 let to_string : t -> string = Digest.to_hex

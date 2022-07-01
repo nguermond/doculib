@@ -233,7 +233,7 @@ let manage_libraries ~notebook : unit =
       let row = store#append() in
       let root_path = Db.get_library_root ~library in
       store#set ~row ~column:name library;
-      store#set ~row ~column:path (Path.to_string root_path);
+      store#set ~row ~column:path (Path.string_of_root root_path);
     ) (Db.get_library_descriptions());
   
 
@@ -250,7 +250,7 @@ let manage_libraries ~notebook : unit =
         | Some (library,root) ->
            let row = store#append() in
            store#set ~row ~column:name library;
-           store#set ~row ~column:path (Path.to_string root);
+           store#set ~row ~column:path (Path.string_of_root root);
         | None -> ()
       );
 
@@ -451,7 +451,7 @@ let main () =
         notebook#action_on_selected (fun library model row ->
             let path = Path.mk_rel (model#get ~row ~column:Model.Attr.path) in
             let file = (Db.get_file ~library ~path) in
-            (GtkBase.Clipboard.set_text clipboard (Path.to_string file)))
+            (GtkBase.Clipboard.set_text clipboard (Path.string_of_root file)))
       );
 
   (* Delete physical file *)

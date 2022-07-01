@@ -93,7 +93,7 @@ class notebook notebook context_menu filter_func = object (self)
              (self#get_library to_lib)#get_model#import_documents [(path,doc)])
         with
           Db.CannotMigrate ->
-          Log.push (Format.sprintf "Could not move file: %s" (Path.rel_to_string path))
+          Log.push (Format.sprintf "Could not move file: %s" (Path.string_of_rel path))
       ) paths
 
 

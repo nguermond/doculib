@@ -34,9 +34,8 @@ let mk_path (path : string list) : path =
 let unroot (root : root) : root * rel =
   (mk_root "/", (Str.replace_first (Str.regexp "/") "" root))
 
-(* TODO: rename these to 'string_of_*' *)
-let to_string (root : root) : string = root
-let rel_to_string (rel : rel) : string = rel
+let string_of_root (root : root) : string = root
+let string_of_rel (rel : rel) : string = rel
 let string_of_name (name : name) : string = name
                                      
 let merge_lst (root : root) (path : path) : root =

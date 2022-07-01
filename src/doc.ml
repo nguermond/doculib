@@ -108,7 +108,7 @@ let serialize_description ~library ~paths : string =
   let json =
     `Assoc [("library", `String library);
             ("paths", `List (List.map (fun x ->
-                                 `String (Path.rel_to_string x)) paths))] in
+                                 `String (Path.string_of_rel x)) paths))] in
   (Json.write_string json)
 
 let deserialize_description (str : string) : (string * (Path.rel list)) =
