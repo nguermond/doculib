@@ -29,3 +29,5 @@ val get_library_descriptions : unit -> (string * Library.t) list
 val refresh_library : library:string -> (Path.rel * Doc.t) list
 
 val resolve_missing_files : library:string -> unit
+
+val flush_data : unit -> unit

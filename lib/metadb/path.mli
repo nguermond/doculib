@@ -1,6 +1,8 @@
 
-exception IncorrectPathType of string
-
+exception InvalidRootType of string
+exception InvalidRelType of string
+exception InvalidNameType of string
+                           
 type root
 type rel
 type name
@@ -18,7 +20,8 @@ val merge : root -> rel -> root
 
 val split : rel -> name list
 val unroot : root -> root * rel
-  
+
+val add_file_ext : string -> root -> root
 val remove_file_ext_rel : string -> rel -> rel
 val remove_file_ext : string -> root -> root
 
@@ -30,3 +33,5 @@ val drop_leaf : root -> root
 
 (* Get leaf, ie. file name *)
 val get_leaf : rel -> name
+
+val hidden : root -> bool

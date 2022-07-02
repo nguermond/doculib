@@ -10,7 +10,8 @@ val open_file : Path.root -> unit
 val open_url : string -> unit
   
 (* Get files recursively *)
-val get_files : Path.root -> Path.root Seq.t
+(* optional argument keyword is false if hidden files should be ignored *)
+val get_files : ?hidden:bool -> Path.root -> Path.root Seq.t
 
 (* Remove directory recursively *)
 val rmdir : Path.root -> unit

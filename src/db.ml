@@ -24,6 +24,16 @@ let libconfig : Path.root =
        
 module Libraries = Make(Doc)(Library)
 
+let init () =
+  Log.push "Loading library configuration file";
+  Libraries.load_config libconfig;
+  Log.push "Initializing libraries";
+  Libraries.init_libraries ()
+
+let flush_data () =
+  Log.push "Flushing libconfig";
+  Libraries.write_config libconfig;
+  Libraries.flush_metadata()
 
 let add_library ~library ~root (libdata : Library.t) : unit =
   try
@@ -66,9 +76,6 @@ let remove_library ~library : unit =
 let rename_library ~library name : unit =
   Libraries.rename_library ~library name
   
-let init () =
-  Libraries.load_config libconfig;
-  Libraries.init_libraries ()
 
 let get_documents ~library : (Path.rel * Doc.t) list =
   List.of_seq (Libraries.get_entries ~library)

@@ -65,5 +65,7 @@ module Make : functor (D : Metadata) (LD : LibData) ->
 
     val get_libdata : unit -> (string * LD.t) list
     val get_library_root : library:string -> Path.root
+
+    val flush_metadata : unit -> unit
   end
 

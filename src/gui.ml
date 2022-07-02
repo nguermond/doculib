@@ -352,7 +352,11 @@ let search_metadata ~(default : Doc.t) ~doc_type (search_str : string) : Doc.t o
 
   dialog#destroy();
   ret
-  
+
+let exit () : unit =
+  Db.flush_data();
+  GMain.quit()
+
     
 let main () =
   ignore @@ GMain.init();
@@ -380,7 +384,7 @@ let main () =
   (* Database *)
   (* Update_db.init(); *)
   Db.init();
-  
+
   (* Notebook *)
   let notebook = GPack.notebook ~packing:vbox#add () in
   let notebook = new Notebook.notebook notebook context_menu search_bar#get_filter in
@@ -527,7 +531,7 @@ let main () =
         about_dialog()
       );
   
-  ignore @@ window#connect#destroy ~callback:GMain.quit;
+  ignore @@ window#connect#destroy ~callback:exit;
 
   window#set_default_size ~width:1200 ~height:500;
   window#show ();

@@ -18,13 +18,14 @@ let open_url (url : string) : unit =
   xopen url
   
 (* Get files recursively *)
-let rec get_files (path : Path.root) : Path.root Seq.t =
-  (if (Sys.is_directory (Path.string_of_root path)) then
-     (Seq.concat_map (fun name ->
-          let name = Path.mk_name name in
-          get_files (Path.merge_lst path [name]))
-        (Array.to_seq (Sys.readdir (Path.string_of_root path))))
-   else (Seq.return path))
+let rec get_files ?(hidden=false) (path : Path.root) : Path.root Seq.t =
+  (if (not hidden) && (Path.hidden path) then (Seq.empty) else
+     (if (Sys.is_directory (Path.string_of_root path)) then
+        (Seq.concat_map (fun name ->
+             let name = Path.mk_name name in
+             get_files (Path.merge_lst path [name]))
+           (Array.to_seq (Sys.readdir (Path.string_of_root path))))
+      else (Seq.return path)))
 
 (* Remove directory recursively *)
 (* TODO: Rewrite this using Sys.remove *)

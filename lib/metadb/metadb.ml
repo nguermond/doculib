@@ -31,6 +31,8 @@ module Entry (D : Metadata) =
     let empty (e : t) : bool =
       e.data = D.init
 
+    let set_modified (e : t) : unit = e.modified <- true
+      
     let modified (e : t) : bool = e.modified
 
     let to_json (e : t) : Json.t =
@@ -46,13 +48,13 @@ module Entry (D : Metadata) =
        modified = false;
       }
 
-    let to_file (path : Path.root) (e : t) : unit =
+    let write_file (file : Path.root) (e : t) : unit =
       let j = to_json e in
-      (if not (Sys.file_exists path) then Sys.make_dirp path);
-      Json.to_file path j;
+      (if not (Sys.file_exists file) then Sys.make_dirp file);
+      Json.to_file file j;
       e.modified <- false
       
-    let from_file (path : Path.root) : t =
+    let read_file (path : Path.root) : t =
       let j = Json.from_file path in
       from_json j
 
@@ -99,8 +101,7 @@ module Library (D : Metadata) (LD : LibData) =
       let root = (store lib) in
       (Seq.iter 
          (fun path ->
-           let json = (Json.from_file path) in
-           let entry = (E.from_json json) in
+           let entry = (E.read_file path) in
            let path = (Path.remove_file_ext "json" path) in
            let key = (Path.strip_root root path) in
            Hashtbl.add lib.entries key entry)
@@ -135,6 +136,8 @@ module Library (D : Metadata) (LD : LibData) =
         
 
     let init (lib : t) : unit =
+      if not(Sys.file_exists (store lib)) then
+        Sys.make_dirp_leaf (store lib);
       load_entries lib;
       ignore @@ (read_files lib ())
 
@@ -184,9 +187,18 @@ module Library (D : Metadata) (LD : LibData) =
          Hashtbl.replace lib.entries key entry
       | None -> raise (EntryDoesNotExist(lib.name,key))
 
+    let set_entry (lib : t) (key : Path.rel) (e : E.t) : unit =
+      E.set_modified e;
+      Hashtbl.replace lib.entries key e
+
+    let get_entry (lib : t) (key : Path.rel) : E.t option =
+      Hashtbl.find_opt lib.entries key
+
     let remove_entry (lib : t) (key : Path.rel) : unit =
       Hashtbl.remove lib.entries key;
-      Sys.remove (Path.merge (store lib) key)
+      let file = (Path.merge (store lib) key) in
+      if Sys.file_exists file then
+        Sys.remove file
 
     let remove_file (lib : t) (key : Path.rel) : unit =
       Sys.remove (Path.merge lib.root key)
@@ -217,11 +229,14 @@ module Library (D : Metadata) (LD : LibData) =
 
     (* write modified entries to disk *)
     let flush_modified_entries (lib : t) : unit =
+      prerr_endline ("flushing: "^lib.name);
       Hashtbl.iter 
         (fun key entry ->
           if (E.modified entry) then
+            let _ = prerr_endline (Path.string_of_rel key) in
             let path = (Path.merge (store lib) key) in
-            E.to_file path entry
+            let file = (Path.add_file_ext "json" path) in
+            E.write_file file entry
           else ())
         lib.entries
 
@@ -252,16 +267,12 @@ module Make (D : Metadata) (LD : LibData) =
      * file_index : file_hash -> (library, file_path) *)
     let file_index : file_table = FileTbl.create 1
 
-
     let refresh_library ~library : (Path.rel * D.t) Seq.t =
       L.refresh (List.assoc library !libraries)
       
     let init_library ~library : unit =
       L.init (List.assoc library !libraries)
 
-    (* let refresh_libraries () : unit =
-     *   List.iter (fun (name,lib) -> L.refresh lib) !libraries *)
-      
     let init_libraries () : unit =
       List.iter (fun (name,lib) -> L.init lib) !libraries
 
@@ -295,9 +306,9 @@ module Make (D : Metadata) (LD : LibData) =
       else if (L.entry_exists to_lib_ key) then
         raise(EntryExists (to_lib, key))
       else
-        (match L.get from_lib_ key with
+        (match L.get_entry from_lib_ key with
          | Some entry ->
-            (L.set to_lib_ key entry);
+            (L.set_entry to_lib_ key entry);
             (L.remove_entry from_lib_ key);
             (* Note: File may be missing, but this is okay,
              * we move the entry anyways *)
@@ -336,7 +347,8 @@ module Make (D : Metadata) (LD : LibData) =
       if (List.mem_assoc library !libraries) then
         raise (LibraryExists);
       let lib = L.make library root libdata in
-      L.load_entries lib; (* Entries may already be present *)
+      (* Note: Entries may already be present *)
+      L.init lib; 
       ignore @@ (L.read_files lib ());
       libraries := (library, lib) :: !libraries
 
@@ -384,7 +396,9 @@ module Make (D : Metadata) (LD : LibData) =
                   ~to_lib:library' key key')
              else
                raise(EntryExists(library',key'))
-          | None -> failwith "NYI")
+          | None ->
+             (*??????????????????????????????????*)
+             failwith "NYI")
         entries
 
     let to_json () : Json.t =
@@ -398,8 +412,13 @@ module Make (D : Metadata) (LD : LibData) =
 
 
     let load_config (libconfig : Path.root) : unit =
-      let libs = from_json @@ Json.from_file libconfig in
-      libraries := libs
+      if Sys.file_exists libconfig then
+        let libs = from_json @@ Json.from_file libconfig in
+        libraries := libs
+      else
+        (Sys.make_dirp libconfig;
+         libraries := [])
+        
 
     let write_config (libconfig : Path.root) : unit =
       let jlibs = to_json () in
@@ -415,6 +434,11 @@ module Make (D : Metadata) (LD : LibData) =
 
     let get_entries ~library : (Path.rel * D.t) Seq.t =
       let lib = List.assoc library !libraries in
-      L.get_entries lib      
+      L.get_entries lib
+
+    let flush_metadata () : unit =
+      List.iter (fun (library,lib) ->
+          L.flush_modified_entries lib)
+        !libraries
   end
 
