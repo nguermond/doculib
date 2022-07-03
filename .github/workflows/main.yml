@@ -25,12 +25,16 @@ jobs:
         uses: ocaml/setup-ocaml@v2
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
+          dune-cache: true
 
       - name: Install dependencies
         run: opam install . --deps-only
 
       - name: Build doculib
         run: opam exec -- dune build
+
+      - name: Build and deploy documentation
+        uses: ocaml/setup-ocaml/deploy-doc@v2
 
       - name: Rename binary (macOS)
         if: matrix.os == 'macOS-latest'
