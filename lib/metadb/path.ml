@@ -9,8 +9,11 @@ type name = string
 
 
 
-let debug = true
+let debug = ref true
 
+let set_debug (d : bool) : unit =
+  debug := d
+          
 (* TODO: Maybe we should distinguish between files and directories? *)
 let root_type = (Str.regexp "\\(/\\|\\(/[^/]+\\)*\\)$")
 let rel_type = (Str.regexp "[^/]+\\(/[^/]+\\)*$")
@@ -18,19 +21,19 @@ let name_type = (Str.regexp "[^/]+$")
 let leaf_type = (Str.regexp "/[^/]+$")
        
 let mk_root (root : string) : root =
-  if ((not debug) || Str.string_match root_type root 0) then root
+  if ((not !debug) || Str.string_match root_type root 0) then root
   else raise (InvalidRootType root)
 
 let mk_rel (rel : string) : rel =
-  if ((not debug) || Str.string_match rel_type rel 0) then rel
+  if ((not !debug) || Str.string_match rel_type rel 0) then rel
   else raise (InvalidRelType rel)
 
 let mk_name (name : string) : name =
-  if ((not debug) || Str.string_match name_type name 0) then name
+  if ((not !debug) || Str.string_match name_type name 0) then name
   else raise (InvalidNameType name)
   
 let mk_path (path : string list) : name list =
-  if debug then (List.map mk_name path)
+  if !debug then (List.map mk_name path)
   else path
 
 let unroot (root : root) : root * rel =
@@ -48,7 +51,7 @@ let merge (root : root) (path : rel) : root =
 
 let split (path : rel) : name list =
   let names = String.split_on_char '/' path in
-  if debug then (List.map mk_name names)
+  if !debug then (List.map mk_name names)
   else names
 
 let add_file_ext (ext : string) (root : root) : root =

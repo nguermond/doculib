@@ -1,6 +1,7 @@
 exception InvalidDocType
 
-
+open Metadb
+   
 type doc_type = [`Book | `Article]
 
 (* TODO : these should be private *)

@@ -1,5 +1,6 @@
 exception InvalidDocType
 
+open Metadb
 
 (* The database is versioned, to prevent data loss upon upgrade. *)
 let branches = ["3.0"; "2.1"; "2.0"]

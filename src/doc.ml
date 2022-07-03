@@ -1,4 +1,4 @@
-open Format
+open Metadb
    
 type t = {star : bool;
           title : string;
@@ -52,6 +52,7 @@ let edit_document (field : attribute) (doc : t) : t =
   }         
   
 let pp_doc ppf (d : t) =
+  let open Format in
   (fprintf ppf "{@\n%s%s%s%s%s%s%s}"
      (if d.star = false then ""
       else (asprintf "  Starred@\n"))

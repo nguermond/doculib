@@ -1,38 +1,16 @@
-
-(library
- (name path)
- (modules path))
-
-(library
- (name hash)
- (modules hash)
- (libraries path))
-
-(library
- (name sys)
- (modules sys)
- (libraries path))
-
-(library
- (name utilities)
- (modules utilities))
-
-(library
- (name json)
- (libraries
-   yojson
-   path)
- (modules json))
-
 (library
  (name metadb)
+ (public_name metadb)
+  
  (libraries
-   sys
-   utilities
-   json
-   hash)
+   yojson)
  (modules
-   metadb))
+   path
+   json
+   hash
+   system
+   metadb
+))
 
 (env
  (dev

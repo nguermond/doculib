@@ -5,6 +5,7 @@ exception LibraryExists
    
 exception CannotMigrate
 
+open Metadb
 
 val init : unit -> unit
   

@@ -3,6 +3,8 @@ exception LibraryDoesNotExist of string
 exception ModelNotLoaded of string
 exception NoLibrary
 
+open Metadb
+        
 class library : string -> string -> GPack.box -> GMisc.label ->
   object      
     method get_name : string

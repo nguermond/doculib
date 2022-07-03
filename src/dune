@@ -7,9 +7,6 @@
     cohttp-lwt-unix
     str
     agrep
-    path
-    json
-    sys
     metadb)
   (modules
     Icons

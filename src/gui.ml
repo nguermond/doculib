@@ -1,7 +1,8 @@
 
 open StdLabels
 open Gobject.Data                      
-
+open Metadb
+   
 exception InternalError of string
     
 let choose_dir (title : string) : string option =
@@ -409,7 +410,7 @@ let main () =
         notebook#action_on_selected (fun library model row ->
             let path = Path.mk_rel (model#get ~row ~column:Model.Attr.path) in
             let file = (Db.get_file ~library ~path) in
-            Sys.open_file file)
+            System.open_file file)
       );
   
   (* Search for metadata *)
@@ -436,7 +437,7 @@ let main () =
              else
                let url = ("https://www.doi.org/" ^
                             (model#get ~row ~column:Model.Attr.doi)) in
-               Sys.open_url url))
+               System.open_url url))
       );
   
   (* Edit metadata for an entry *)

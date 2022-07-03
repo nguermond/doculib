@@ -8,6 +8,13 @@ exception DirNotEmpty of Path.root
 exception LibraryExists
 
 
+
+module Path = Path
+module Hash = Hash
+module Json = Json
+module System = System
+              
+        
 module type Metadata =
 sig
   type t
@@ -50,7 +57,7 @@ module Entry (D : Metadata) =
 
     let write_file (file : Path.root) (e : t) : unit =
       let j = to_json e in
-      (if not (Sys.file_exists file) then Sys.make_dirp file);
+      (if not (System.file_exists file) then System.make_dirp file);
       Json.to_file file j;
       e.modified <- false
       
@@ -107,7 +114,7 @@ module Library (D : Metadata) (LD : LibData) =
            let key = (Path.strip_root root path) in
            prerr_endline ("Adding entry: "^(Path.string_of_rel key));
            Hashtbl.add lib.entries key entry)
-         (Sys.get_files ~hidden:true root))
+         (System.get_files ~hidden:true root))
 
     let entry_empty (lib : t) (key : Path.rel) : bool =
       E.empty (Hashtbl.find lib.entries key)
@@ -119,7 +126,7 @@ module Library (D : Metadata) (LD : LibData) =
 
     let file_exists (lib : t) (key : Path.rel) : bool =
       let path = (Path.merge lib.root key) in
-      Sys.file_exists path
+      System.file_exists path
 
     (* Add entries for new files *)
     let read_files (lib : t) : (Path.rel * E.t) Seq.t =
@@ -135,12 +142,12 @@ module Library (D : Metadata) (LD : LibData) =
             let entry = (E.make d h) in
             Hashtbl.add lib.entries key entry;
             Some (key,entry))
-        (Sys.get_files root)
+        (System.get_files root)
         
 
     let init (lib : t) : unit =
-      if not(Sys.file_exists (store lib)) then
-        Sys.make_dirp_leaf (store lib);
+      if not(System.file_exists (store lib)) then
+        System.make_dirp_leaf (store lib);
       load_entries lib;
       ignore @@ (read_files lib ())
 
@@ -200,11 +207,11 @@ module Library (D : Metadata) (LD : LibData) =
     let remove_entry (lib : t) (key : Path.rel) : unit =
       Hashtbl.remove lib.entries key;
       let file = (Path.add_file_ext "json" (Path.merge (store lib) key)) in
-      if Sys.file_exists file then
-        Sys.remove file
+      if System.file_exists file then
+        System.remove file
 
     let remove_file (lib : t) (key : Path.rel) : unit =
-      Sys.remove (Path.merge lib.root key)
+      System.remove (Path.merge lib.root key)
       
     (* assumes new entry does not exists *)
     let remap (lib : t) (key : Path.rel) (key' : Path.rel) : unit =
@@ -320,14 +327,14 @@ module Make (D : Metadata) (LD : LibData) =
 
     let move_library ~library (root : Path.root) : unit =
       let lib = List.assoc library !libraries in
-      if (Sys.file_exists root) then
-        if not (Sys.empty_dir root) then
+      if (System.file_exists root) then
+        if not (System.empty_dir root) then
           raise(DirNotEmpty root)
         else
-          Sys.move (L.get_root lib) (Path.drop_leaf root)
+          System.move (L.get_root lib) (Path.drop_leaf root)
       else
-        let _ = Sys.make_dirp root in
-        Sys.move (L.get_root lib) root
+        let _ = System.make_dirp root in
+        System.move (L.get_root lib) root
 
     let index_files () : unit =
       FileTbl.reset file_index;
@@ -354,8 +361,8 @@ module Make (D : Metadata) (LD : LibData) =
             if (L.file_exists from_lib_ key) then
               let from_path = Path.merge (L.get_root from_lib_) key in
               let to_path = Path.merge (L.get_root to_lib_) key in
-              let _ = (Sys.make_dirp to_path) in
-              (Sys.move from_path to_path)
+              let _ = (System.make_dirp to_path) in
+              (System.move from_path to_path)
          | None -> raise(EntryDoesNotExist(from_lib,key)))
 
     let remap_entry ~from_lib ~to_lib key key' : unit =
@@ -377,8 +384,8 @@ module Make (D : Metadata) (LD : LibData) =
      *     if (L.file_exists from_lib_ key) then
      *       let from_path = Path.merge (L.get_root from_lib_) key in
      *       let to_path = Path.merge (L.get_root to_lib_) key' in
-     *       let _ = (Sys.make_dirp to_path) in
-     *       (Sys.move from_path to_path)
+     *       let _ = (System.make_dirp to_path) in
+     *       (System.move from_path to_path)
      *  | None -> raise(EntryDoesNotExist key)) *)
 
       
@@ -417,11 +424,11 @@ module Make (D : Metadata) (LD : LibData) =
 
 
     let load_config (libconfig : Path.root) : unit =
-      if Sys.file_exists libconfig then
+      if System.file_exists libconfig then
         let libs = from_json @@ Json.from_file libconfig in
         libraries := libs
       else
-        (Sys.make_dirp libconfig;
+        (System.make_dirp libconfig;
          libraries := [])
         
 

@@ -1,4 +1,4 @@
-
+open Metadb
 
 type cell_renderer =
   CellRenderer : ((#GTree.cell_renderer) * (string * 'b GTree.column) list) -> cell_renderer

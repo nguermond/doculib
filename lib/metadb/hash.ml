@@ -1,4 +1,5 @@
 
+module Path = Path
 
 type t = Digest.t
 

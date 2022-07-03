@@ -1,7 +1,8 @@
 
 open Cohttp
 open Cohttp_lwt_unix
-
+open Metadb
+   
 exception UnexpectedDocumentType of string
 exception SearchFailure of string
                                   

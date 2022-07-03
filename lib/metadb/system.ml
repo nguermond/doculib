@@ -1,9 +1,10 @@
 
 exception OSError of string
 exception InternalError of string
+exception NotADirectory of Path.root
 
 include Sys
-
+      
 let xopen str : unit =
   (* Linux *) 
   if (Sys.command ("xdg-open \""^str^"\" &")) > 0 then
@@ -18,21 +19,31 @@ let open_url (url : string) : unit =
   xopen url
   
 (* Get files recursively *)
-let rec get_files ?(hidden=false) (path : Path.root) : Path.root Seq.t =
-  (if (not hidden) && (Path.hidden path) then (Seq.empty) else
-     (if (Sys.is_directory (Path.string_of_root path)) then
-        (Seq.concat_map (fun name ->
-             let name = Path.mk_name name in
-             get_files (Path.merge_lst path [name]))
-           (Array.to_seq (Sys.readdir (Path.string_of_root path))))
-      else (Seq.return path)))
+let get_files ?(hidden=false) (path : Path.root) : Path.root Seq.t =
+  if (not (Sys.is_directory (Path.string_of_root path))) then
+    raise (NotADirectory path);
+  let rec get_files_ path =
+    (if (not hidden) && (Path.hidden path) then (Seq.empty) else
+       (if (Sys.is_directory (Path.string_of_root path)) then
+          (Seq.concat_map (fun name ->
+               let name = Path.mk_name name in
+               get_files_ (Path.merge_lst path [name]))
+             (Array.to_seq (Sys.readdir (Path.string_of_root path))))
+        else (Seq.return path)))
+  in (get_files_ path)
 
 (* Remove directory recursively *)
-(* TODO: Rewrite this using Sys.remove *)
 let rmdir (path : Path.root) : unit =
-  (if (Sys.command ("rm -r \""^(Path.string_of_root path)^"\"")) > 0 then
-     (raise (OSError ("Could not remove directory: "^(Path.string_of_root path)))))
-
+  if (not (Sys.is_directory (Path.string_of_root path))) then
+    raise (NotADirectory path);
+  let rec rmdir_ path =
+    (if (Sys.is_directory (Path.string_of_root path)) then
+       (Seq.iter (fun name ->
+            (rmdir_ (Path.merge_lst path [Path.mk_name name])))
+          (Array.to_seq (Sys.readdir (Path.string_of_root path))))
+     else
+       (Sys.remove (Path.string_of_root path)))
+  in (rmdir_ path)
 
 let remove (path : Path.root) : unit =
   Sys.remove (Path.string_of_root path)

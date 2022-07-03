@@ -1,6 +1,8 @@
 
 open Utilities
 
+open Metadb
+   
 exception LibraryDoesNotExist of string
 exception ModelNotLoaded of string
 exception Cancel
