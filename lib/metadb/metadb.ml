@@ -287,9 +287,9 @@ module Make (D : Metadata) (LD : LibData) =
     let init_libraries () : unit =
       List.iter (fun (name,lib) -> L.init lib) !libraries
 
-    let add_entry ~library (key : Path.rel) (m : D.t) : unit =
-      let lib = (List.assoc library !libraries) in
-      L.add lib key m
+    (* let add_entry ~library (key : Path.rel) (m : D.t) : unit =
+     *   let lib = (List.assoc library !libraries) in
+     *   L.add lib key m *)
 
     let get_entry ~library (key : Path.rel) : D.t option =
       let lib = (List.assoc library !libraries) in
@@ -413,6 +413,8 @@ module Make (D : Metadata) (LD : LibData) =
              failwith "NYI")
         entries
 
+    let find_duplicates : library:string -> (Path.rel) Seq.t = failwith "NYI"
+
     let to_json () : Json.t =
       (`List (List.map (fun (name,lib) ->
                   (L.to_json lib))
@@ -448,9 +450,15 @@ module Make (D : Metadata) (LD : LibData) =
       let lib = List.assoc library !libraries in
       L.get_entries lib
 
+    let flush_library_metadata ~library : unit =
+      L.flush_modified_entries (List.assoc library !libraries)
+      
     let flush_metadata () : unit =
       List.iter (fun (library,lib) ->
           L.flush_modified_entries lib)
         !libraries
+
+    let library_to_string ~library : string =
+      L.to_string library (List.assoc library !libraries)
   end
 
