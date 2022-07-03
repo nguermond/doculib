@@ -99,13 +99,15 @@ module Library (D : Metadata) (LD : LibData) =
 
     let load_entries (lib : t) : unit =
       let root = (store lib) in
+      prerr_endline ("Loading entries in "^(Path.string_of_root root));
       (Seq.iter 
          (fun path ->
            let entry = (E.read_file path) in
            let path = (Path.remove_file_ext "json" path) in
            let key = (Path.strip_root root path) in
+           prerr_endline ("Adding entry: "^(Path.string_of_rel key));
            Hashtbl.add lib.entries key entry)
-         (Sys.get_files root))
+         (Sys.get_files ~hidden:true root))
 
     let entry_empty (lib : t) (key : Path.rel) : bool =
       E.empty (Hashtbl.find lib.entries key)
@@ -128,6 +130,7 @@ module Library (D : Metadata) (LD : LibData) =
           if (entry_exists lib key) then None
           else
             let d = D.init in
+            prerr_endline ("No entry for "^(Path.string_of_rel key));
             let h = Hash.hash_file path in
             let entry = (E.make d h) in
             Hashtbl.add lib.entries key entry;
@@ -196,7 +199,7 @@ module Library (D : Metadata) (LD : LibData) =
 
     let remove_entry (lib : t) (key : Path.rel) : unit =
       Hashtbl.remove lib.entries key;
-      let file = (Path.merge (store lib) key) in
+      let file = (Path.add_file_ext "json" (Path.merge (store lib) key)) in
       if Sys.file_exists file then
         Sys.remove file
 
@@ -234,6 +237,7 @@ module Library (D : Metadata) (LD : LibData) =
         (fun key entry ->
           if (E.modified entry) then
             let _ = prerr_endline (Path.string_of_rel key) in
+            prerr_endline (D.to_string (E.get_data entry));
             let path = (Path.merge (store lib) key) in
             let file = (Path.add_file_ext "json" path) in
             E.write_file file entry
@@ -285,6 +289,7 @@ module Make (D : Metadata) (LD : LibData) =
       L.get lib key
 
     let set_entry ~library (key : Path.rel) (m : D.t) : unit =
+      prerr_endline ("Setting entry ~ "^(D.to_string m));
       let lib = (List.assoc library !libraries) in
       L.set lib key m
 
@@ -294,54 +299,7 @@ module Make (D : Metadata) (LD : LibData) =
 
     let remove_file ~library (key : Path.rel) : unit =
       let lib = (List.assoc library !libraries) in
-      L.remove_file lib key
-      
-    (* Move entry and file from one library to another *)
-    let migrate_entry ~from_lib ~to_lib (key : Path.rel) : unit =
-      let from_lib_ = (List.assoc from_lib !libraries) in
-      let to_lib_ = (List.assoc to_lib !libraries) in
-      if (L.file_exists to_lib_ key) then
-        (* Output a warning message *)
-        raise(FileExists (Path.merge (L.get_root to_lib_) key))
-      else if (L.entry_exists to_lib_ key) then
-        raise(EntryExists (to_lib, key))
-      else
-        (match L.get_entry from_lib_ key with
-         | Some entry ->
-            (L.set_entry to_lib_ key entry);
-            (L.remove_entry from_lib_ key);
-            (* Note: File may be missing, but this is okay,
-             * we move the entry anyways *)
-            if (L.file_exists from_lib_ key) then
-              let from_path = Path.merge (L.get_root from_lib_) key in
-              let to_path = Path.merge (L.get_root to_lib_) key in
-              let _ = (Sys.make_dirp to_path) in
-              (Sys.move from_path to_path)
-         | None -> raise(EntryDoesNotExist(from_lib,key)))
-
-    let remap_entry ~from_lib ~to_lib key key' : unit =
-      let from_lib_ = (List.assoc from_lib !libraries) in
-      let to_lib_ = (List.assoc to_lib !libraries) in
-      if (L.file_exists to_lib_ key') then
-        raise(FileExists (Path.merge (L.get_root to_lib_) key'))
-      else if (L.entry_exists to_lib_ key'
-               && not(L.entry_empty to_lib_ key')) then
-        raise(EntryExists (to_lib, key))
-      else
-        failwith "remap_entry: NYI"
-        (* (match L.get from_lib_ key with
-         *  | Some entry ->
-         *     (L.set to_lib_ key entry);
-         *     (L.remove from_lib_ key);
-         *     (\* Note: File may be missing, but this is okay,
-         *      * we move the entry anyways *\)
-         *     if (L.file_exists from_lib_ key) then
-         *       let from_path = Path.merge (L.get_root from_lib_) key in
-         *       let to_path = Path.merge (L.get_root to_lib_) key' in
-         *       let _ = (Sys.make_dirp to_path) in
-         *       (Sys.move from_path to_path)
-         *  | None -> raise(EntryDoesNotExist key)) *)
-      
+      L.remove_file lib key      
       
     let new_library ~library (root : Path.root) (libdata : LD.t) : unit =
       if (List.mem_assoc library !libraries) then
@@ -377,6 +335,53 @@ module Make (D : Metadata) (LD : LibData) =
           L.index_files lib file_index)
         !libraries
 
+    (* Move entry and file from one library to another *)
+    let migrate_entry ~from_lib ~to_lib (key : Path.rel) : unit =
+      let from_lib_ = (List.assoc from_lib !libraries) in
+      let to_lib_ = (List.assoc to_lib !libraries) in
+      if (L.file_exists to_lib_ key) then
+        (* Output a warning message *)
+        raise(FileExists (Path.merge (L.get_root to_lib_) key))
+      else if (L.entry_exists to_lib_ key) then
+        raise(EntryExists (to_lib, key))
+      else
+        (match L.get_entry from_lib_ key with
+         | Some entry ->
+            (L.set_entry to_lib_ key entry);
+            (L.remove_entry from_lib_ key);
+            (* Note: File may be missing, but this is okay,
+             * we move the entry anyways *)
+            if (L.file_exists from_lib_ key) then
+              let from_path = Path.merge (L.get_root from_lib_) key in
+              let to_path = Path.merge (L.get_root to_lib_) key in
+              let _ = (Sys.make_dirp to_path) in
+              (Sys.move from_path to_path)
+         | None -> raise(EntryDoesNotExist(from_lib,key)))
+
+    let remap_entry ~from_lib ~to_lib key key' : unit =
+      let from_lib_ = (List.assoc from_lib !libraries) in
+      let to_lib_ = (List.assoc to_lib !libraries) in
+      if (L.file_exists to_lib_ key') then
+        raise(FileExists (Path.merge (L.get_root to_lib_) key'))
+      else if (L.entry_exists to_lib_ key'
+               && not(L.entry_empty to_lib_ key')) then
+        raise(EntryExists (to_lib, key))
+      else
+        failwith "remap_entry: NYI"
+    (* (match L.get from_lib_ key with
+     *  | Some entry ->
+     *     (L.set to_lib_ key entry);
+     *     (L.remove from_lib_ key);
+     *     (\* Note: File may be missing, but this is okay,
+     *      * we move the entry anyways *\)
+     *     if (L.file_exists from_lib_ key) then
+     *       let from_path = Path.merge (L.get_root from_lib_) key in
+     *       let to_path = Path.merge (L.get_root to_lib_) key' in
+     *       let _ = (Sys.make_dirp to_path) in
+     *       (Sys.move from_path to_path)
+     *  | None -> raise(EntryDoesNotExist key)) *)
+
+      
     (* This function assumes 
      * 1. libraries are freshly initialized or have been refreshed
      * 2. files have been indexed *)
