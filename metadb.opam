@@ -9,7 +9,7 @@ homepage: "https://github.com/nguermond/doculib"
 bug-reports: "https://github.com/nguermond/doculib/issues"
 depends: [
   "dune" {>= "2.9"}
-  "yojson"
+  "yojson" {>= "2.0.0"}
   "ocaml" {>= "4.12.0"}
   "odoc" {with-doc}
 ]

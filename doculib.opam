@@ -11,7 +11,7 @@ bug-reports: "https://github.com/nguermond/doculib/issues"
 depends: [
   "dune" {>= "2.9"}
   "cohttp-lwt-unix"
-  "yojson"
+  "metadb"
   "lablgtk3" {>= "3.1.2"}
   "ocaml" {>= "4.12.0"}
   "tls"

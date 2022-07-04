@@ -14,7 +14,7 @@
  (synopsis "A database for storing and managing file metadata in JSON format")
  (depends
    dune
-   yojson
+  (yojson (>= 2.0.0))
   (ocaml (>= 4.12.0))
   ))
 
@@ -25,7 +25,7 @@
  (depends
   dune
   cohttp-lwt-unix
-  yojson
+  metadb
   (lablgtk3 (>= 3.1.2))
   (ocaml (>= 4.12.0))
   tls
