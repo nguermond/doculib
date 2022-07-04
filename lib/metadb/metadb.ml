@@ -307,7 +307,7 @@ module Make (D : Metadata) (LD : LibData) =
     let remove_file ~library (key : Path.rel) : unit =
       let lib = (List.assoc library !libraries) in
       L.remove_file lib key      
-      
+
     let new_library ~library (root : Path.root) (libdata : LD.t) : unit =
       if (List.mem_assoc library !libraries) then
         raise (LibraryExists);
@@ -317,12 +317,15 @@ module Make (D : Metadata) (LD : LibData) =
       ignore @@ (L.read_files lib ());
       libraries := (library, lib) :: !libraries
 
-    let remove_library ~library : unit =
-      libraries := List.remove_assoc library !libraries
+    let remove_library ~delete_metadata ~library : unit =
+      let lib = List.assoc library !libraries in
+      libraries := List.remove_assoc library !libraries;
+      if delete_metadata && (System.file_exists (L.store lib)) then
+        System.rmdir (L.store lib)
 
     let rename_library ~library new_name : unit =
       let lib = List.assoc library !libraries in
-      remove_library ~library;
+      remove_library ~delete_metadata:false ~library;
       libraries := (library,lib) :: !libraries
 
     let move_library ~library (root : Path.root) : unit =
@@ -413,7 +416,8 @@ module Make (D : Metadata) (LD : LibData) =
              failwith "NYI")
         entries
 
-    let find_duplicates : library:string -> (Path.rel) Seq.t = failwith "NYI"
+    let find_duplicates ~library : (Path.rel) Seq.t =
+      failwith "NYI"
 
     let to_json () : Json.t =
       (`List (List.map (fun (name,lib) ->

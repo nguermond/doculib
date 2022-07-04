@@ -70,8 +70,8 @@ let migrate ~from_lib ~to_lib ~path : unit =
   | FileExists _ | EntryExists _ | EntryDoesNotExist _ ->
      raise CannotMigrate
 
-let remove_library ~library : unit =
-  Libraries.remove_library ~library
+let remove_library ~delete_metadata ~library : unit =
+  Libraries.remove_library ~delete_metadata ~library
 
 let rename_library ~library name : unit =
   Libraries.rename_library ~library name

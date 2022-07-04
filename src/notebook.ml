@@ -99,9 +99,9 @@ class notebook notebook context_menu filter_func = object (self)
       ) paths
 
 
-  method remove_library ~library : unit =
+  method remove_library ~delete_metadata ~library : unit =
     Log.push (Format.sprintf "Removing library `%s`" library);
-    (Db.remove_library library);
+    (Db.remove_library ~delete_metadata ~library);
     notebook#remove_page (self#get_index ~library);
     libraries <- (List.remove_assoc library libraries)
 

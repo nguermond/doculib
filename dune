@@ -1,0 +1,3 @@
+(executable
+ (name doculib)
+ (libraries doculib_gui))

@@ -1,6 +1,6 @@
 (lang dune 2.9)
 (name doculib)
-(version 1.3.0)
+
 
 (generate_opam_files true)
 (source (github nguermond/doculib))
@@ -10,6 +10,7 @@
 
 (package
  (name metadb)
+  (version 1.0.0)
  (synopsis "A database for storing and managing file metadata in JSON format")
  (depends
    dune
@@ -19,6 +20,7 @@
 
 (package
  (name doculib)
+  (version 1.3.0)
  (synopsis "A GUI for tagging and managing document metadata for books, textbooks, or articles")
  (depends
   dune

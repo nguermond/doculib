@@ -38,9 +38,10 @@ let rmdir (path : Path.root) : unit =
     raise (NotADirectory path);
   let rec rmdir_ path =
     (if (Sys.is_directory (Path.string_of_root path)) then
-       (Seq.iter (fun name ->
-            (rmdir_ (Path.merge_lst path [Path.mk_name name])))
-          (Array.to_seq (Sys.readdir (Path.string_of_root path))))
+       ((Seq.iter (fun name ->
+             (rmdir_ (Path.merge_lst path [Path.mk_name name])))
+           (Array.to_seq (Sys.readdir (Path.string_of_root path))));
+        Sys.rmdir (Path.string_of_root path))
      else
        (Sys.remove (Path.string_of_root path)))
   in (rmdir_ path)

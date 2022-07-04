@@ -23,7 +23,7 @@ class notebook : GPack.notebook -> GMenu.menu -> (GTree.model -> Model.row -> bo
                                                  
   method init : ((string * string) list) -> unit
   method add_library : library:string -> doc_type:string -> prepend:bool -> unit
-  method remove_library : library:string -> unit
+  method remove_library : delete_metadata:bool -> library:string -> unit
   method rename_library : library:string -> string -> bool
        
   method load_library : library:string -> unit

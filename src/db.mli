@@ -10,7 +10,7 @@ open Metadb
 val init : unit -> unit
   
 val add_library : library:string -> root:Path.root -> Library.t -> unit
-val remove_library : library:string -> unit
+val remove_library : delete_metadata:bool -> library:string -> unit
 val rename_library : library:string -> string -> unit
 
 

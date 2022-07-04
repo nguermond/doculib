@@ -22,7 +22,7 @@
     - [article2.djvu.json]
     - [path/to/article3.pdf.json]
 
-    The key to an entry or file of a library is always given by its relative path with respect to the library's root path.
+    The key to an entry or file in a library is always given by its {{!Path.rel} relative path} with respect to the library's {{!Make.get_library_root} root path}.
  *)
 
 
@@ -77,8 +77,9 @@ module Make : functor (D : Metadata) (LD : LibData) ->
     (** Create a new library with name [library] pointing to the given path *)
     val new_library : library:string -> Path.root -> LD.t -> unit
 
-    (** Remove the given library *)
-    val remove_library : library:string -> unit
+    (** Remove the given library. If [delete_metadata] is true, 
+        the [.metadata] directory will be deleted as well. *)
+    val remove_library : delete_metadata:bool -> library:string -> unit
 
     (** Rename the given library *)
     val rename_library : library:string -> string -> unit
@@ -110,7 +111,8 @@ module Make : functor (D : Metadata) (LD : LibData) ->
     (** Get all entries of a specified library and their associated metadata *)
     val get_entries : library:string -> (Path.rel * D.t) Seq.t
 
-    (** If it exists, get the value of an entry in the specified library *)
+    (** If it exists, get the value of an entry in the specified library. 
+        The key to an entry is the relative path of the file with respect to the library's {{!get_library_root} root} *)
     val get_entry : library:string -> Path.rel -> D.t option
 
     (** Set the value of an entry in the specified library. Raises {!EntryDoesNotExist} if key does not exist *)

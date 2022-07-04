@@ -262,13 +262,15 @@ let manage_libraries ~notebook : unit =
         let p = (List.nth (view#selection#get_selected_rows) 0) in
         let row = (store#get_iter p) in
         let library = (store#get ~row ~column:name) in
-        let message = (Format.sprintf "Remove Library: %s?\n%s"
-                         library "This will delete all metadata for the library!") in
+        let root = (Db.get_library_root ~library) in
+        let message = (Format.sprintf "Remove Library '%s'?" library) in
         let confirm_dialog = GWindow.message_dialog ~title:"Confirm Removal"
                                ~buttons:GWindow.Buttons.ok_cancel
                                ~message ~message_type:`QUESTION () in
+        let chk = GButton.check_button ~label:(Format.sprintf "Delete metadata -- This will remove:\n '%s/.metadata'" (Path.string_of_root root))
+                  ~packing:confirm_dialog#vbox#add () in
         (match confirm_dialog#run() with
-         | `OK -> (notebook#remove_library ~library);
+         | `OK -> (notebook#remove_library ~delete_metadata:chk#active ~library);
                   ignore (store#remove row)
          | _ -> ());
         confirm_dialog#destroy()
