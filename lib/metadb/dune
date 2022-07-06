@@ -3,7 +3,8 @@
  (public_name metadb)
   
  (libraries
-   yojson)
+   yojson
+   fileutils)
  (modules
    path
    json

@@ -37,7 +37,7 @@ val make_dirp : Path.root -> unit
 (** Same as {!make_dirp} but creates a directory for the leaf *)
 val make_dirp_leaf : Path.root -> unit
 
-(** This uses the unix [mv] command. Raises {!OSError} on failure *)
+(** This is a wrapper for the {{: https://gildor478.github.io/ocaml-fileutils/} [fileutils]} library move command *)
 val move : Path.root -> Path.root -> unit
 
 (** Returns true if file or directory exists *)

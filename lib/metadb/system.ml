@@ -67,7 +67,11 @@ let make_dirp (root : Path.root) : unit =
 let make_dirp_leaf (root : Path.root) : unit =
   let (root,path) = Path.unroot root in
   make_dirp_rel ~ignore_leaf:false root path
+
+let move (path : Path.root) (new_path : Path.root) : unit =
+  FileUtil.mv (Path.string_of_root path) (Path.string_of_root new_path)
   
+(* TODO: Rewrite this using POSIX syscalls (ie. using rename) *)
 let move (path : Path.root) (new_path : Path.root) : unit =
   (if (Sys.command ("mv \""^(Path.string_of_root path)^"\" \""
                     ^(Path.string_of_root new_path)^"\"")) > 0 then
