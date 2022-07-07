@@ -103,5 +103,14 @@ let refresh_library ~library : (Path.rel * Doc.t) list =
   List.of_seq (Libraries.refresh_library ~library)
 
 (* TODO: return list of missing entries *)
-let resolve_missing_files ~library : unit =
-  Libraries.resolve_missing_files ~library
+let resolve_missing_files ~library : Path.rel list =
+  Seq.filter_map (function
+      | Libraries.Missing key ->
+         prerr_endline ("Missing file: "^(Path.string_of_rel key));
+         Some key
+      | Libraries.Remap (key,(library',key')) ->
+         prerr_endline ("Remapped file: "^(Path.string_of_rel key)
+                        ^"\n -> "^library'^" : "^(Path.string_of_rel key'));
+         None)
+    (Libraries.resolve_missing_files ~library)
+  |> List.of_seq
