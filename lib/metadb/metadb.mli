@@ -131,22 +131,26 @@ module Make : functor (D : Metadata) (LD : LibData) ->
         - {!EntryDoesNotExist} if entry does not exist in [from_lib] *)
     val migrate_entry : from_lib:string -> to_lib:string -> Path.rel -> unit
       
-    (* Move and rename entry from one library to another *)
-    (* val remap_entry : from_lib:string -> to_lib:string
-     *                   -> Path.rel -> Path.rel -> unit *)
-
     (** {2 Missing and duplicate files} *)
       
     (** Needed in order to quickly {{!resolve_missing_files} resolve missing files} or {{!find_duplicates} find duplicates}. 
         This should only be called after freshly initializing or refreshing a library *)
     val index_files : unit -> unit
-    
+
+      (** Return type of {!resolve_missing_files}. 
+          - [Remap (key, (library',key'))] signifies that entry [key] has been
+            moved to [library'] with new key [key']
+          - [Missing key] signifies that no file could be associated with entry [key] *)
+    type resolution = Remap of (Path.rel * (string * Path.rel))
+                    | Missing of Path.rel
+      
     (** Resolve moved or renamed files. Entries may no longer point to a file if the user moves or renames files.
         For each entry no longer pointing to a file, this function searches accross all libraries for a file with matching hash.
         This function assumes 
         - All libraries are {{!init_libraries} freshly initialized} or have been {{!refresh_library} refreshed}
-        - Files have been {{!index_files} indexed} *)
-    val resolve_missing_files : library:string -> unit
+        - Files have been {{!index_files} indexed}
+        Note: this function cannot resolve duplicate conflicts *)
+    val resolve_missing_files : library:string -> resolution Seq.t
 
     (** Return a list of entries in a library for which there exists another entry (across all libraries) pointing to a file of the same hash.
         This function assumes 
@@ -154,7 +158,6 @@ module Make : functor (D : Metadata) (LD : LibData) ->
         - Files have been {{!index_files} indexed} *)
     val find_duplicates : library:string -> (Path.rel) Seq.t
       
-
     (** {2 Writing data to disk} *)
       
     (** Write modified metadata for specified library to disk *)

@@ -7,6 +7,7 @@ exception DirNotEmpty of Path.root
 
 exception LibraryExists
 
+exception InternalError
 
 
 module Path = Path
@@ -231,11 +232,9 @@ module Library (D : Metadata) (LD : LibData) =
 
     (* Return the list of entries 
      * that do not have associated files *)
-    let get_unmatched_entries (lib : t) : (Path.rel * E.t) list =
-      Hashtbl.fold (fun key e entries ->
-          (if (file_exists lib key) then entries
-           else ((key,e) :: entries)))
-        lib.entries []
+    let get_unmatched_entries (lib : t) : (Path.rel * E.t) Seq.t =
+      Seq.filter (fun (key,e) -> (file_exists lib key))
+        (Hashtbl.to_seq lib.entries)
 
     (* write modified entries to disk *)
     let flush_modified_entries (lib : t) : unit =
@@ -271,6 +270,7 @@ module Library (D : Metadata) (LD : LibData) =
 module Make (D : Metadata) (LD : LibData) =
   struct
     module L = Library(D)(LD)
+                               
     let libraries : ((string * L.t) list) ref = ref []
                                               
     (* We keep a global index of files by their hash to deal
@@ -368,55 +368,46 @@ module Make (D : Metadata) (LD : LibData) =
               (System.move from_path to_path)
          | None -> raise(EntryDoesNotExist(from_lib,key)))
 
-    let remap_entry ~from_lib ~to_lib key key' : unit =
-      let from_lib_ = (List.assoc from_lib !libraries) in
-      let to_lib_ = (List.assoc to_lib !libraries) in
-      if (L.file_exists to_lib_ key') then
-        raise(FileExists (Path.merge (L.get_root to_lib_) key'))
-      else if (L.entry_exists to_lib_ key'
-               && not(L.entry_empty to_lib_ key')) then
-        raise(EntryExists (to_lib, key))
-      else
-        failwith "remap_entry: NYI"
-    (* (match L.get from_lib_ key with
-     *  | Some entry ->
-     *     (L.set to_lib_ key entry);
-     *     (L.remove from_lib_ key);
-     *     (\* Note: File may be missing, but this is okay,
-     *      * we move the entry anyways *\)
-     *     if (L.file_exists from_lib_ key) then
-     *       let from_path = Path.merge (L.get_root from_lib_) key in
-     *       let to_path = Path.merge (L.get_root to_lib_) key' in
-     *       let _ = (System.make_dirp to_path) in
-     *       (System.move from_path to_path)
-     *  | None -> raise(EntryDoesNotExist key)) *)
+
+    type resolution = Remap of (Path.rel * (string * Path.rel))
+                    | Missing of Path.rel
 
       
+    let remap_entry ~from_lib ~to_lib key key' : (Path.rel * (string * Path.rel)) =
+      let from_lib_ = (List.assoc from_lib !libraries) in
+      let to_lib_ = (List.assoc to_lib !libraries) in
+      if (L.entry_exists to_lib_ key') &&
+           (not (L.entry_empty to_lib_ key')) then
+        raise(EntryExists (to_lib,key'))
+      else
+        (match L.get_entry from_lib_ key with
+         | Some entry ->
+            L.set_entry to_lib_ key' entry;
+            L.remove_entry from_lib_ key;
+            (key,(to_lib,key'))
+         | None -> raise InternalError)
+        
+    (* We must resolve duplicates before we can resolve missing files! *)
     (* This function assumes 
      * 1. libraries are freshly initialized or have been refreshed
      * 2. files have been indexed *)
-    let resolve_missing_files ~library : unit =
+    let resolve_missing_files ~library : resolution Seq.t =
       let lib = List.assoc library !libraries in
       let entries = (L.get_unmatched_entries lib) in
-      List.iter (fun (key,entry) ->
-          let hash = L.E.get_hash entry in
+      Seq.filter_map (fun (key,entry) ->
+          let hash = (L.E.get_hash entry) in
           match (FileTbl.find_opt file_index hash) with
-          | Some (library',key') when library=library' ->
-             L.remap lib key key'
           | Some (library',key') ->
-             let lib' = List.assoc library' !libraries in
-             if (not (L.entry_exists lib' key') ||
-                   (L.entry_empty lib' key')) then
-               (remap_entry ~from_lib:library
-                  ~to_lib:library' key key')
-             else
-               raise(EntryExists(library',key'))
+             (try Some(Remap(remap_entry ~from_lib:library
+                           ~to_lib:library' key key'))
+              with _ -> None)
           | None ->
-             (*??????????????????????????????????*)
-             failwith "NYI")
+             Some (Missing key))
         entries
 
+    (* Return list of entries with duplicate files *)
     let find_duplicates ~library : (Path.rel) Seq.t =
+      (* Seq.filter (fun (hash,(FileTbl.to_seq file_index) *)
       failwith "NYI"
 
     let to_json () : Json.t =
