@@ -152,11 +152,11 @@ module Make : functor (D : Metadata) (LD : LibData) ->
         Note: this function cannot resolve duplicate conflicts *)
     val resolve_missing_files : library:string -> resolution Seq.t
 
-    (** Return a list of entries in a library for which there exists another entry (across all libraries) pointing to a file of the same hash.
+    (** Return a list of entries and their libraries for which there exists another entry (across all libraries) pointing to a file of the same hash.
         This function assumes 
         - All libraries are {{!init_libraries} freshly initialized} or have been {{!refresh_library} refreshed}
         - Files have been {{!index_files} indexed} *)
-    val find_duplicates : library:string -> (Path.rel) Seq.t
+    val find_duplicates : unit -> (string * Path.rel) list
       
     (** {2 Writing data to disk} *)
       

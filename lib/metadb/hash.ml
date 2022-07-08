@@ -12,6 +12,4 @@ let of_string : string -> t = Digest.from_hex
 
 let equal : t -> t -> bool = Digest.equal
 
-
-let to_int (h : t) : int =
-  int_of_string ("0x"^(Digest.to_hex h))
+let compare : t -> t -> int = Digest.compare

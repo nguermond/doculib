@@ -94,7 +94,6 @@ let remove_library ~delete_metadata ~library : unit =
 let rename_library ~library name : unit =
   Libraries.rename_library ~library name
   
-
 let get_documents ~library : (Path.rel * Doc.t) list =
   List.of_seq (Libraries.get_entries ~library)
 
@@ -102,8 +101,9 @@ let get_documents ~library : (Path.rel * Doc.t) list =
 let refresh_library ~library : (Path.rel * Doc.t) list =
   List.of_seq (Libraries.refresh_library ~library)
 
-(* TODO: return list of missing entries *)
+(* Assumes library was just refreshed *)
 let resolve_missing_files ~library : Path.rel list =
+  Libraries.index_files();
   Seq.filter_map (function
       | Libraries.Missing key ->
          prerr_endline ("Missing file: "^(Path.string_of_rel key));
@@ -114,3 +114,9 @@ let resolve_missing_files ~library : Path.rel list =
          None)
     (Libraries.resolve_missing_files ~library)
   |> List.of_seq
+
+
+(* Assumes library was just refreshed *)
+let find_duplicates () : (string * Path.rel) list =
+  Libraries.index_files();
+  Libraries.find_duplicates ()

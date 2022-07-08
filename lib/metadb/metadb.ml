@@ -75,12 +75,9 @@ module Entry (D : Metadata) =
   end
 
   
-module FileTbl = Hashtbl.Make(struct
-                     type t = Hash.t
-                     let equal = Hash.equal
-                     let hash = Hash.to_int
-                   end)
-type file_table = (string * Path.rel) FileTbl.t
+module HashMap = Map.Make(Hash)
+              
+type file_table = (string * Path.rel) HashMap.t
 
 
                 
@@ -223,17 +220,19 @@ module Library (D : Metadata) (LD : LibData) =
         (remove_entry lib key;
          Hashtbl.add lib.entries key' e)
       
-    let index_files (lib : t) (tbl : file_table) : unit =
-      Hashtbl.iter (fun key e ->
+    let index_files (lib : t) (tbl : file_table) : file_table =
+      Hashtbl.fold (fun key e tbl ->
           let library = lib.name in
           let hash = E.get_hash e in
-          FileTbl.add tbl hash (library, key))
-        lib.entries
+          if (file_exists lib key) then
+            HashMap.add hash (library, key) tbl
+          else tbl)
+        lib.entries tbl
 
     (* Return the list of entries 
      * that do not have associated files *)
     let get_unmatched_entries (lib : t) : (Path.rel * E.t) Seq.t =
-      Seq.filter (fun (key,e) -> (file_exists lib key))
+      Seq.filter (fun (key,e) -> not (file_exists lib key))
         (Hashtbl.to_seq lib.entries)
 
     (* write modified entries to disk *)
@@ -276,7 +275,7 @@ module Make (D : Metadata) (LD : LibData) =
     (* We keep a global index of files by their hash to deal
      * with moved/renamed files and duplicates.
      * file_index : file_hash -> (library, file_path) *)
-    let file_index : file_table = FileTbl.create 1
+    let file_index : file_table ref = ref HashMap.empty
 
     let refresh_library ~library : (Path.rel * D.t) Seq.t =
       L.refresh (List.assoc library !libraries)
@@ -340,10 +339,10 @@ module Make (D : Metadata) (LD : LibData) =
         System.move (L.get_root lib) root
 
     let index_files () : unit =
-      FileTbl.reset file_index;
-      List.iter (fun (library,lib) ->
-          L.index_files lib file_index)
-        !libraries
+      file_index :=
+        List.fold_left (fun tbl (library,lib) ->
+            L.index_files lib tbl)
+          HashMap.empty !libraries 
 
     (* Move entry and file from one library to another *)
     let migrate_entry ~from_lib ~to_lib (key : Path.rel) : unit =
@@ -374,16 +373,20 @@ module Make (D : Metadata) (LD : LibData) =
 
       
     let remap_entry ~from_lib ~to_lib key key' : (Path.rel * (string * Path.rel)) =
-      let from_lib_ = (List.assoc from_lib !libraries) in
-      let to_lib_ = (List.assoc to_lib !libraries) in
-      if (L.entry_exists to_lib_ key') &&
-           (not (L.entry_empty to_lib_ key')) then
+      prerr_endline (Format.sprintf "Remapping %s:%s -> %s:%s"
+                       from_lib (Path.string_of_rel key)
+                       to_lib (Path.string_of_rel key'));
+      let lib = (List.assoc from_lib !libraries) in
+      let lib' = (List.assoc to_lib !libraries) in
+      if ((L.entry_exists lib' key')
+          && (not (L.entry_empty lib' key'))
+          && (not (L.get lib key = L.get lib' key'))) then
         raise(EntryExists (to_lib,key'))
       else
-        (match L.get_entry from_lib_ key with
+        (match L.get_entry lib key with
          | Some entry ->
-            L.set_entry to_lib_ key' entry;
-            L.remove_entry from_lib_ key;
+            L.set_entry lib' key' entry;
+            L.remove_entry lib key;
             (key,(to_lib,key'))
          | None -> raise InternalError)
         
@@ -396,7 +399,7 @@ module Make (D : Metadata) (LD : LibData) =
       let entries = (L.get_unmatched_entries lib) in
       Seq.filter_map (fun (key,entry) ->
           let hash = (L.E.get_hash entry) in
-          match (FileTbl.find_opt file_index hash) with
+          match (HashMap.find_opt hash !file_index) with
           | Some (library',key') ->
              (try Some(Remap(remap_entry ~from_lib:library
                            ~to_lib:library' key key'))
@@ -406,10 +409,21 @@ module Make (D : Metadata) (LD : LibData) =
         entries
 
     (* Return list of entries with duplicate files *)
-    let find_duplicates ~library : (Path.rel) Seq.t =
-      (* Seq.filter (fun (hash,(FileTbl.to_seq file_index) *)
-      failwith "NYI"
-
+    let find_duplicates () : (string * Path.rel) list =
+      let rec find_dups dup_hashes dups bdgs =
+        match bdgs with
+        | [] -> dups
+        | [(hash,v)] ->
+           if (hash = List.hd dup_hashes)
+           then v::dups else dups
+        | (hash,v)::(((hash',v')::_) as bdgs) ->
+           if (hash = hash' || hash = List.hd dup_hashes)
+           then (find_dups (hash::dup_hashes) (v::dups) bdgs)
+           else (find_dups dup_hashes dups bdgs)
+      in
+      let bdgs = List.(HashMap.bindings !file_index) in
+      (find_dups [] [] bdgs)
+      
     let to_json () : Json.t =
       (`List (List.map (fun (name,lib) ->
                   (L.to_json lib))

@@ -16,5 +16,5 @@ val of_string : string -> t
 (** Equality of hashes *)
 val equal : t -> t -> bool
 
-(** Converts hexadecimal hash to integer value *)
-val to_int : t -> int
+(** Wrapper for [Digest.compare] *)
+val compare : t -> t -> int
