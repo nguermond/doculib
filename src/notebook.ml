@@ -203,8 +203,11 @@ class notebook notebook context_menu filter_func = object (self)
     let new_data = (Db.refresh_library ~library) in
     (Model.import_documents (lib#get_model) new_data);
     (* returns a list of entries with missing files *)
-    let bad_docs = (Db.resolve_missing_files ~library) in
-    ()
+    let missing_docs = (Db.resolve_missing_files ~library) in
+    List.iter (fun key ->
+        let row = Model.get_row_from_path (lib#get_model) key in
+        Model.flag_missing (lib#get_model) row true)
+      missing_docs
 
 
   method action_on_selected ~action : unit =

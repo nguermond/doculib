@@ -35,6 +35,8 @@ module Attr :
     val isbn : string GTree.column
     val tags : string GTree.column
     val path : string GTree.column
+    val missing : bool GTree.column
+    val duplicate : bool GTree.column
       
     val get_name : int -> string
   end
@@ -47,9 +49,15 @@ val get : t -> row:row -> column:('a GTree.column) -> 'a
 
 val remove : t -> row:row -> unit
 
+val get_row_from_path : t -> path:Path.rel -> row
+
 val remove_entry_from_path : t -> path:Path.rel -> unit
   
 val set_entry : t -> row:row -> Path.rel -> Doc.t -> unit
+
+val flag_missing : t -> row -> bool -> unit
+
+val flag_duplicate : t -> row -> bool -> unit
   
 val import_documents : t -> (Path.rel * Doc.t) list -> unit
   

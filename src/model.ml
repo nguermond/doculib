@@ -50,8 +50,7 @@ let dnd_targets : Gtk.target_entry list = [
 module Attr =
   struct
     open Gobject.Data
-    let col_names = ["star"; "authors"; "title"; "year"; "doi"; "isbn"; "tags"; "path";
-                     (* "fg"; "bg" *)]
+    let col_names = ["star"; "authors"; "title"; "year"; "doi"; "isbn"; "tags"; "path"; "missing" ; "duplicate"]
 
     let columns = new GTree.column_list
              
@@ -63,8 +62,8 @@ module Attr =
     let isbn = columns#add string
     let tags = columns#add string
     let path = columns#add string
-    (* let fg = columns#add boolean
-     * let bg = columns#add boolean *)
+    let missing = columns#add boolean
+    let duplicate = columns#add boolean
 
     let get_name i : string =
       List.nth col_names i
@@ -103,6 +102,20 @@ let remove_entry_from_path (m : t) ~path : unit =
            (ignore @@ m.store#remove row; true)
          else false (* stop searching *))
       )
+
+let get_row_from_path (m : t) ~path : row =
+  let path = Path.string_of_rel path in
+  match m.store#get_iter_first with
+  | Some iter ->
+     let p0 = ref (m.store#get_path iter) in
+     m.store#foreach (fun p _ ->
+         let row = (get_row m p) in
+         let path' = get m ~row ~column:Attr.path in
+         (if path = path' then
+            (p0 := p; true)
+          else false));
+     (get_row m !p0)
+  | None -> failwith "Row does not exist"
   
 let set_entry (m : t) ~row (key : Path.rel) (doc : Doc.t) : unit =
   m.store#set ~row ~column:Attr.star doc.star;
@@ -112,7 +125,15 @@ let set_entry (m : t) ~row (key : Path.rel) (doc : Doc.t) : unit =
   m.store#set ~row ~column:Attr.isbn doc.isbn;
   m.store#set ~row ~column:Attr.year doc.year;
   m.store#set ~row ~column:Attr.tags (String.concat "; " doc.tags);
-  m.store#set ~row ~column:Attr.path (Path.string_of_rel key)
+  m.store#set ~row ~column:Attr.path (Path.string_of_rel key);
+  m.store#set ~row ~column:Attr.missing false;
+  m.store#set ~row ~column:Attr.duplicate false
+
+let flag_missing (m : t) row b : unit =
+  m.store#set ~row ~column:Attr.missing b
+
+let flag_duplicate (m : t) row b : unit =
+  failwith "NYI"
   
 let import_documents (m : t) (data : (Path.rel * Doc.t) list) : unit =
   List.iter
@@ -140,6 +161,9 @@ let add_column (m : t) ~title ~width ~(cell_renderer:cell_renderer) (column : co
   col#set_clickable(true);
   col#set_fixed_width width;
   col#set_sort_order `DESCENDING;
+  col#add_attribute renderer "cell-background-set" Attr.duplicate;
+  col#add_attribute renderer "foreground-set" Attr.missing;
+
 
   (* Set sort index *)
   ignore @@
@@ -241,12 +265,16 @@ let get_selected_rows (m : t) : Gtk.tree_path list =
   m.view#selection#get_selected_rows    
 
 let make_toggle_cell_renderer ~(store : store) ~(model : t) ~library ~(column : bool GTree.column) : cell_renderer =
-  let renderer,values = (GTree.cell_renderer_toggle [],
-                         ["active", column]) in
+  let renderer,values =
+    (GTree.cell_renderer_toggle
+       [`CELL_BACKGROUND_GDK
+          (Gdk.Color.color_parse "light yellow");],
+     [("active", column);
+      ("cell-background-set", Attr.duplicate)]) in
   ignore @@
     renderer#connect#toggled ~callback:(fun p ->
         let row = (get_row model p) in
-        let value = (not (store#get ~row ~column:Attr.star)) in
+        let value = (not (store#get ~row ~column)) in
         let path = Path.mk_rel (get model ~row ~column:Attr.path) in
         let doc = Db.get ~library ~path in
         let doc = Doc.edit_document (Star value) doc in
@@ -255,7 +283,8 @@ let make_toggle_cell_renderer ~(store : store) ~(model : t) ~library ~(column : 
   CellRenderer(renderer,values)
 
 let make_text_cell_renderer ~(store : store) ~(model:t) ~view ~width ~editable ~(library : string option) ~(column : string GTree.column) : cell_renderer =
-  let renderer,values =
+  let renderer,values (* :
+         * ((#GTree.cell_renderer) * ((string * 'b . 'b GTree.column) list)) *) =
     (GTree.cell_renderer_text
        [`EDITABLE editable;`YPAD 2;
         `HEIGHT (Font.calc_font_height
@@ -264,14 +293,15 @@ let make_text_cell_renderer ~(store : store) ~(model:t) ~view ~width ~editable ~
         `WRAP_MODE `WORD_CHAR;
         `CELL_BACKGROUND_GDK
           (Gdk.Color.color_parse "light yellow");
-        `CELL_BACKGROUND_SET false;
+        (* `CELL_BACKGROUND_SET false; *)
         `FOREGROUND_GDK (Gdk.Color.color_parse "red");
-        `FOREGROUND_SET false;],
+        (* `FOREGROUND_SET false; *)
+       ],
      [("text",column);
-      (* TODO: add a column to toggle fg & bg color *)
-      (* ("foreground-set", missing);
-       * ("background-set", duplicate) *)
-    ]) in
+      (* ("foreground-set", Attr.missing);
+       * ("cell-background-set", Attr.duplicate) *)
+     ]) in
+        
   
   (* save cell edits *)
   (match editable, library with
