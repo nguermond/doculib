@@ -39,7 +39,6 @@ module Attr :
     val get_name : int -> string
   end
 
-
 class model : GTree.model_filter -> GTree.list_store -> GTree.view ->
   object
     method get_row : Gtk.tree_path -> row
@@ -58,8 +57,8 @@ class model : GTree.model_filter -> GTree.list_store -> GTree.view ->
          
     method reset_sort_indicators : unit -> unit
          
-    method add_column : title:string -> width:int -> ?editable:bool -> ?library:string ->
-                        ?cell_renderer:(cell_renderer option) -> column -> unit
+    method add_column : title:string -> width:int ->
+                        cell_renderer:cell_renderer -> column -> unit
 
     (* Handle click events *)
     method handle_click_events : context_menu:GMenu.menu -> unit
@@ -69,12 +68,12 @@ class model : GTree.model_filter -> GTree.list_store -> GTree.view ->
     method get_selected_rows : Gtk.tree_path list
   end
 
-
     
-val make_document_list : ?height:int -> ?show_path:bool
-                         -> ?multiple:bool -> ?show_stars:bool ->
-                         ?editable:bool -> ?multidrag:bool -> ?library:string ->
-                         ?sort:(('a GTree.column) option) -> doc_type:string ->
-                         packing:(GObj.widget -> unit) -> (Path.rel * Doc.t) list -> model 
+val make_document_list : ?height:int -> ?library:string -> doc_type:string ->
+                         ?sort:(('a GTree.column) option) ->
+                         packing:(GObj.widget -> unit) -> (Path.rel * Doc.t) list -> model
 
                                                                                                                       
+val make_entry_list : ?height:int -> doc_type:string ->
+                      ?sort:(('a GTree.column) option) ->
+                      packing:(GObj.widget -> unit) -> (Path.rel * Doc.t) list -> model

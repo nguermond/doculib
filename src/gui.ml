@@ -328,8 +328,8 @@ let search_metadata ~(default : Doc.t) ~doc_type (search_str : string) : Doc.t o
 
   (* TODO: Nast hack *)
   let docs = (List.map (fun doc -> (Path.mk_rel "dummy", doc)) docs) in
-  let model = Model.make_document_list ~height:380 ~show_path:false ~show_stars:false
-                ~doc_type ~packing:dialog#vbox#pack docs in
+  let model = Model.make_entry_list ~height:380 ~doc_type
+                ~packing:dialog#vbox#pack docs in
   
   (match doc_type with
    | "article" -> database_l1#set_active true

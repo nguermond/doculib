@@ -19,14 +19,20 @@
 open Metadb
 
 type cell_renderer =
-  CellRenderer : ((#GTree.cell_renderer) * (string * 'b GTree.column) list) -> cell_renderer
+  | CellRenderer : ((#GTree.cell_renderer) * (string * 'b GTree.column) list) -> cell_renderer
 
 type column =
-  Str : string GTree.column -> column
-| Bool : bool GTree.column -> column
+  |  StrCol : string GTree.column -> column
+  | BoolCol : bool GTree.column -> column
 
 type packing = ?from:Gtk.Tags.pack_type -> ?expand:bool -> ?fill:bool -> ?padding:int -> GObj.widget -> unit
 
+type store = GTree.list_store
+
+type filter = GTree.model_filter
+           
+type view = GTree.view
+          
 type row = Gtk.tree_iter
 
          
@@ -38,11 +44,14 @@ let dnd_targets : Gtk.target_entry list = [
      * { target = "application/x-rootwin-drop"; flags = []; info = 1} *)
   ]
 
-
+(* TODO: Add columns for missing and duplicate files.
+ * possibly add tooltip column for message
+ *)
 module Attr =
   struct
     open Gobject.Data
-    let col_names = ["star"; "authors"; "title"; "year"; "doi"; "isbn"; "tags"; "path"]
+    let col_names = ["star"; "authors"; "title"; "year"; "doi"; "isbn"; "tags"; "path";
+                     (* "fg"; "bg" *)]
 
     let columns = new GTree.column_list
              
@@ -54,11 +63,12 @@ module Attr =
     let isbn = columns#add string
     let tags = columns#add string
     let path = columns#add string
+    (* let fg = columns#add boolean
+     * let bg = columns#add boolean *)
 
     let get_name i : string =
       List.nth col_names i
   end
-
 
 class model filter store view =
 object (self)
@@ -103,12 +113,6 @@ object (self)
         self#set_entry ~row key doc)
       data
 
-  (* method flag_entry doc : unit =
-   *   store#for_each (fun p _ ->
-   *       let row = self#get_row p in
-   *       if doc.path = (store#get ~row ~column:Attr.path) then *)
-          
-
   method reset_model () : unit =
     store#clear()
     
@@ -116,39 +120,11 @@ object (self)
     for i=0 to num_cols - 1 do
       (view#get_column i)#set_sort_indicator false;
     done
-    
-  method add_column ~title ~width ?(editable=false) ?(library:string = "")
-           ?(cell_renderer:cell_renderer option = None)
-           (column : column) : unit =
-    assert (library <> "" || (not editable));
-    
+
+  method add_column ~title ~width ~(cell_renderer:cell_renderer) (column : column) : unit =
     num_cols <- num_cols + 1;
-    let col : (GTree.view_column) =
-      (match cell_renderer, column with
-       | None, Str col ->
-          let renderer,values = (GTree.cell_renderer_text
-                                   [`EDITABLE editable;`YPAD 2;
-                                    `HEIGHT (Font.calc_font_height ~widget:view#coerce ~ypad:2 2);
-                                    `WRAP_WIDTH width;
-                                    `WRAP_MODE `WORD_CHAR],
-                                 ["text",col]) in
-          
-          (* save cell edits *)
-          ignore @@
-            renderer#connect#edited ~callback:(fun p str ->
-                let row = (self#get_row p) in
-                let path = Path.mk_rel (store#get ~row ~column:Attr.path) in
-                let key = (Attr.get_name (col.index)) in
-                let doc = Db.get ~library ~path in
-                let doc = Doc.edit_document (Doc.set_attribute key str) doc in
-                Db.set ~library ~path doc;
-                store#set ~row ~column:col str
-              );
-          GTree.view_column ~title ~renderer:(renderer,values) ()
-       | Some (CellRenderer (renderer,values)), Bool _ ->
-          GTree.view_column ~title ~renderer:(renderer,values) ()
-       | _ -> failwith "Unexpected column")
-    in
+    let CellRenderer(renderer,values) = cell_renderer in
+    let col = (GTree.view_column ~title ~renderer:(renderer,values) ()) in
     
     col#set_resizable(true);
     col#set_min_width(20);
@@ -157,17 +133,21 @@ object (self)
     col#set_fixed_width width;
     col#set_sort_order `DESCENDING;
 
-    col#connect#clicked ~callback:(fun () ->
-        let title = col#title in
-        let id = (match column with Str c -> c.index | Bool c -> c.index) in
-        (if col#sort_order = `DESCENDING
-         then (col#set_sort_order `ASCENDING)
-         else (col#set_sort_order `DESCENDING));
-        self#reset_sort_indicators ();
-        col#set_sort_indicator true;
-        store#set_sort_column_id id col#sort_order
-      );
-    ignore(view#append_column col)
+    (* Set sort index *)
+    ignore @@
+      col#connect#clicked ~callback:(fun () ->
+          let title = col#title in
+          let id = (match column with
+                      StrCol c -> c.index
+                    | BoolCol c -> c.index) in
+          (if col#sort_order = `DESCENDING
+           then (col#set_sort_order `ASCENDING)
+           else (col#set_sort_order `DESCENDING));
+          self#reset_sort_indicators ();
+          col#set_sort_indicator true;
+          store#set_sort_column_id id col#sort_order
+        );
+    ignore (view#append_column col)
 
   (* Handle click events *)
   method handle_click_events ~(context_menu : GMenu.menu) : unit =
@@ -254,13 +234,84 @@ object (self)
 end
 
 
-                                  
-let make_document_list ?(height=400) ?(show_path=true) ?(multiple=false)
-      ?(show_stars=true) ?(editable=false) ?(multidrag=false) ?(library:string = "")
-      ?(sort : ('a GTree.column) option=None) 
-      ~doc_type ~packing data : model =
-  assert (library <> "" || (not show_stars && not editable && not multidrag));
+let make_toggle_cell_renderer ~(store : store) ~(model : model) ~library ~(column : bool GTree.column) : cell_renderer =
+  let renderer,values = (GTree.cell_renderer_toggle [],
+                         ["active", column]) in
+  ignore @@
+    renderer#connect#toggled ~callback:(fun p ->
+        let row = (model#get_row p) in
+        let value = (not (store#get ~row ~column:Attr.star)) in
+        let path = Path.mk_rel (model#get ~row ~column:Attr.path) in
+        let doc = Db.get ~library ~path in
+        let doc = Doc.edit_document (Star value) doc in
+        Db.set ~library ~path doc;
+        store#set ~row ~column value);
+  CellRenderer(renderer,values)
+
+let make_text_cell_renderer ~(store : store) ~model ~view ~width ~editable ~(library : string option) ~(column : string GTree.column) : cell_renderer =
+  let renderer,values =
+    (GTree.cell_renderer_text
+       [`EDITABLE editable;`YPAD 2;
+        `HEIGHT (Font.calc_font_height
+                   ~widget:view#coerce ~ypad:2 2);
+        `WRAP_WIDTH width;
+        `WRAP_MODE `WORD_CHAR;
+        `CELL_BACKGROUND_GDK
+          (Gdk.Color.color_parse "light yellow");
+        `CELL_BACKGROUND_SET false;
+        `FOREGROUND_GDK (Gdk.Color.color_parse "red");
+        `FOREGROUND_SET false;],
+     [("text",column);
+      (* TODO: add a column to toggle fg & bg color *)
+      (* ("foreground-set", missing);
+       * ("background-set", duplicate) *)
+    ]) in
   
+  (* save cell edits *)
+  (match editable, library with
+   | true, Some library ->
+      ignore @@
+        renderer#connect#edited ~callback:(fun p str ->
+            let row = (model#get_row p) in
+            let path = Path.mk_rel (store#get ~row ~column:Attr.path) in
+            let key = (Attr.get_name (column.index)) in
+            let doc = Db.get ~library ~path in
+            let doc = Doc.edit_document (Doc.set_attribute key str) doc in
+            Db.set ~library ~path doc;
+            store#set ~row ~column str
+          );
+   | _ -> ());
+  CellRenderer(renderer,values)
+  
+   
+let enable_multidrag ~(store : store) ~(model : model) ~(view : view) ~library : unit =
+  GtkTree.TreeView.Dnd.enable_model_drag_source
+    view#as_tree_view
+    ~modi:[`BUTTON1]
+    ~targets:(Array.of_list dnd_targets)
+    ~actions:[`COPY];
+
+  ignore @@
+    view#drag#connect#data_get ~callback:
+      (fun ctx sel ~info ~time ->
+        let selection = view#selection#get_selected_rows in
+        let paths = (List.map (fun p ->
+                         Path.mk_rel @@
+                           (store#get ~row:(model#get_row p) ~column:Attr.path))
+                       selection) in
+        let data = (Doc.serialize_description ~library ~paths) in
+        sel#return data);
+
+  ignore @@
+    view#drag#connect#after#beginning ~callback:
+      (fun ctx ->
+        let image = (GMisc.image ~pixbuf:Icons.drag_icon ()) in
+        (ctx#set_icon_widget image#coerce ~hot_x:0 ~hot_y:0))
+
+  
+let make_document_list ?(height=400) ~(library:string) ~(doc_type:string)
+      ?(sort : ('a GTree.column) option=None)
+      ~(packing:(GObj.widget -> unit)) (data : (Path.rel * Doc.t) list) : model =  
   let swindow = GBin.scrolled_window
                   ~height ~shadow_type:`ETCHED_IN ~hpolicy:`AUTOMATIC
                   ~vpolicy:`AUTOMATIC ~packing () in
@@ -272,58 +323,77 @@ let make_document_list ?(height=400) ?(show_path=true) ?(multiple=false)
   let model = (new model filter store view) in
 
   view#set_enable_grid_lines `HORIZONTAL;
-  (if multiple then view#selection#set_mode `MULTIPLE);
+  view#selection#set_mode `MULTIPLE;
   
-  (* Columns *)
-  let renderer,values = (GTree.cell_renderer_toggle [], ["active", Attr.star]) in
-  ignore @@
-    renderer#connect#toggled ~callback:(fun p ->
-        let row = (model#get_row p) in
-        let value = (not (store#get ~row ~column:Attr.star)) in
-        let path = Path.mk_rel (model#get ~row ~column:Attr.path) in
-        let doc = Db.get ~library ~path in
-        let doc = Doc.edit_document (Star value) doc in
-        Db.set ~library ~path doc;
-        store#set ~row ~column:Attr.star value);
-  let star_cell_renderer = Some (CellRenderer (renderer,values)) in
+  let add_toggle_col ~title ~width col =
+    match col with
+    | BoolCol(attr) ->
+       let cell_renderer = (make_toggle_cell_renderer ~store ~model ~library ~column:attr) in
+       model#add_column ~title ~width ~cell_renderer col
+    | _ -> failwith "Impossible"
+  in
   
-  (if show_stars then
-     model#add_column ~title:"Star" ~width:40 ~cell_renderer:star_cell_renderer (Bool Attr.star));
-  model#add_column ~title:"Author(s)" ~width:200 ~editable ~library (Str Attr.authors);
-  model#add_column ~title:"Title" ~width:400 ~editable ~library (Str Attr.title);
-  model#add_column ~title:"Year" ~width:100 ~editable ~library (Str Attr.year);
-  model#add_column ~title:"Tags" ~width:200 ~editable ~library (Str Attr.tags);
+  let add_text_col ~title ~width ?(editable=true) col =
+    match col with
+    | StrCol(attr) ->
+       let cell_renderer = (make_text_cell_renderer ~store ~model ~view
+                              ~library:(Some library) ~width ~editable ~column:attr) in
+       model#add_column ~title ~width ~cell_renderer col
+    | _ -> failwith "Impossible"
+  in
+  
+  add_toggle_col ~title:"Star" ~width:40 (BoolCol Attr.star);
+  add_text_col ~title:"Authors(s)" ~width:200 (StrCol Attr.authors);                                                                         
+  add_text_col ~title:"Title" ~width:400 (StrCol Attr.title);
+  add_text_col ~title:"Year" ~width:100 (StrCol Attr.year);
+  add_text_col ~title:"Tags" ~width:200 (StrCol Attr.tags);
   (match doc_type with
-   | "article" -> model#add_column ~title:"DOI" ~width:80 ~editable ~library (Str Attr.doi)
-   | "book" -> model#add_column ~title:"ISBN" ~width:80 ~editable ~library (Str Attr.isbn)
+   | "article" -> add_text_col ~title:"DOI" ~width:80 (StrCol Attr.doi)
+   | "book" -> add_text_col ~title:"ISBN" ~width:80 (StrCol Attr.isbn)
    | _ -> ());
-  (if show_path then
-     ignore @@ model#add_column ~title:"Path" ~width:200 (Str Attr.path));
+  add_text_col ~title:"Path" ~width:200 ~editable:false (StrCol Attr.path);
+  
+  (enable_multidrag ~store ~model ~view ~library);
+  
+  (match sort with
+   | None -> ()
+   | Some col -> store#set_sort_column_id col.index (view#get_column col.index)#sort_order);
+  
+  (model#import_documents data);
+  model
 
-  (if multidrag then
-     (GtkTree.TreeView.Dnd.enable_model_drag_source
-        view#as_tree_view
-        ~modi:[`BUTTON1]
-        ~targets:(Array.of_list dnd_targets)
-        ~actions:[`COPY];
+let make_entry_list ?(height=400) ~doc_type ~packing
+      ?(sort : ('a GTree.column) option=None)
+      data : model =
+  
+  let swindow = GBin.scrolled_window
+                  ~height ~shadow_type:`ETCHED_IN ~hpolicy:`AUTOMATIC
+                  ~vpolicy:`AUTOMATIC ~packing () in
 
-      ignore @@
-        view#drag#connect#data_get ~callback:
-          (fun ctx sel ~info ~time ->
-            let selection = view#selection#get_selected_rows in
-            let paths = (List.map (fun p ->
-                             Path.mk_rel @@
-                               (store#get ~row:(model#get_row p) ~column:Attr.path))
-                           selection) in
-            let data = (Doc.serialize_description ~library ~paths) in
-            sel#return data);
+  let store = GTree.list_store Attr.columns in
+  let filter = (GTree.model_filter store) in
+  let view = GTree.view ~model:filter ~packing:swindow#add() in
+  let model = (new model filter store view) in
 
-      ignore @@
-        view#drag#connect#after#beginning ~callback:
-          (fun ctx ->
-            let image = (GMisc.image ~pixbuf:Icons.drag_icon ()) in
-            (ctx#set_icon_widget image#coerce ~hot_x:0 ~hot_y:0));
-  ));
+  view#set_enable_grid_lines `HORIZONTAL;
+  
+
+  let add_text_col ~title ~width col =
+    match col with
+    | StrCol(attr) ->
+       let cell_renderer = (make_text_cell_renderer ~store ~model ~view ~width ~library:None ~editable:false ~column:attr) in
+       model#add_column ~title ~width ~cell_renderer col
+    | _ -> failwith "Impossible"
+  in
+  (* Columns *)
+  add_text_col ~title:"Author(s)" ~width:200 (StrCol Attr.authors);
+  add_text_col ~title:"Title" ~width:400 (StrCol Attr.title);
+  add_text_col ~title:"Year" ~width:100 (StrCol Attr.year);
+  add_text_col ~title:"Tags" ~width:200 (StrCol Attr.tags);
+  (match doc_type with
+   | "article" -> add_text_col ~title:"DOI" ~width:80 (StrCol Attr.doi)
+   | "book" -> add_text_col ~title:"ISBN" ~width:80 (StrCol Attr.isbn)
+   | _ -> ());
     
   (match sort with
   | None -> ()
@@ -331,6 +401,5 @@ let make_document_list ?(height=400) ?(show_path=true) ?(multiple=false)
   
   (model#import_documents data);
   model
-
 
     

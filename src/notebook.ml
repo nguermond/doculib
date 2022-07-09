@@ -187,9 +187,8 @@ class notebook notebook context_menu filter_func = object (self)
       let doc_type = lib#get_doc_type in
       let page = lib#get_page in
       let data = (Db.get_documents ~library) in
-      let model = (Model.make_document_list ~multiple:true
-                     ~sort:(Some Model.Attr.star)
-                     ~editable:true ~multidrag:true ~library
+      let model = (Model.make_document_list
+                     ~sort:(Some Model.Attr.star) ~library
                      ~doc_type ~packing:page#add data) in
       model#handle_click_events ~context_menu;
       model#set_visible_func filter_func;
@@ -197,10 +196,11 @@ class notebook notebook context_menu filter_func = object (self)
       (self#refresh_library ~library)
 
   method refresh_library ~library : unit =
+    prerr_endline "Refreshing library";
     let lib = self#get_library library in
     let new_data = (Db.refresh_library ~library) in
     (lib#get_model#import_documents new_data);
-    (* TODO:: return list of unfound entries *)
+    (* returns a list of entries with missing files *)
     let bad_docs = (Db.resolve_missing_files ~library) in
     ()
 
