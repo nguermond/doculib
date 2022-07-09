@@ -37,13 +37,13 @@ class library library doc_type page label =
     val doc_type : string = doc_type
     val page : GPack.box = page
     val label : GMisc.label = label
-    val mutable model : Model.model option = None
+    val mutable model : Model.t option = None
 
     method get_name : string = library
     method get_doc_type : string = doc_type
     method get_page : GPack.box = page
     method get_label : GMisc.label = label
-    method get_model : Model.model =
+    method get_model : Model.t =
       match model with
       | Some m -> m
       | None -> raise (ModelNotLoaded library)
@@ -51,7 +51,7 @@ class library library doc_type page label =
     method rename (name : string) : unit =
       library <- name
               
-    method set_model (m : Model.model) : unit =
+    method set_model (m : Model.t) : unit =
       model <- Some m
 
     method is_loaded : bool =
@@ -108,9 +108,11 @@ class notebook notebook context_menu filter_func = object (self)
                 (List.length paths) from_lib to_lib);
     List.iter (fun path ->
         try (Db.migrate ~from_lib ~to_lib ~path;
-             (self#get_library from_lib)#get_model#remove_entry_from_path ~path;
+             let model = (self#get_library from_lib)#get_model in
+             Model.remove_entry_from_path model ~path;
              let doc = Db.get ~library:to_lib ~path in
-             (self#get_library to_lib)#get_model#import_documents [(path,doc)])
+             let model = (self#get_library to_lib)#get_model in
+             Model.import_documents model [(path,doc)])
         with
           Db.CannotMigrate ->
           Log.push (Format.sprintf "Could not move file: %s" (Path.string_of_rel path))
@@ -172,7 +174,7 @@ class notebook notebook context_menu filter_func = object (self)
       (match library with
        | None -> self#current_library
        | Some library -> (library, self#get_library library))
-    in lib#get_model#refilter()
+    in Model.refilter (lib#get_model)
 
   method private set_model ~library ~model : unit =
     List.iter (fun (name, lib) ->
@@ -190,8 +192,8 @@ class notebook notebook context_menu filter_func = object (self)
       let model = (Model.make_document_list
                      ~sort:(Some Model.Attr.star) ~library
                      ~doc_type ~packing:page#add data) in
-      model#handle_click_events ~context_menu;
-      model#set_visible_func filter_func;
+      Model.handle_click_events model ~context_menu;
+      Model.set_visible_func model filter_func;
       self#set_model library model;
       (self#refresh_library ~library)
 
@@ -199,7 +201,7 @@ class notebook notebook context_menu filter_func = object (self)
     prerr_endline "Refreshing library";
     let lib = self#get_library library in
     let new_data = (Db.refresh_library ~library) in
-    (lib#get_model#import_documents new_data);
+    (Model.import_documents (lib#get_model) new_data);
     (* returns a list of entries with missing files *)
     let bad_docs = (Db.resolve_missing_files ~library) in
     ()
@@ -208,19 +210,20 @@ class notebook notebook context_menu filter_func = object (self)
   method action_on_selected ~action : unit =
     let (library,lib) = self#current_library in
     List.iter (fun p ->
-        (action library lib#get_model (lib#get_model#get_row p)))
-      lib#get_model#get_selected_rows
+        (action library lib#get_model (Model.get_row (lib#get_model) p)))
+      (Model.get_selected_rows lib#get_model)
 
   method edit_selected ~editor : unit =
     let (library,lib) = self#current_library in
     let model = lib#get_model in
     iter_cancel (fun p ->
-        let path = Path.mk_rel (model#get ~row:(model#get_row p) ~column:Model.Attr.path) in
+        let path = Path.mk_rel (Model.get model ~row:(Model.get_row model p)
+                                  ~column:Model.Attr.path) in
         let doc = Db.get ~library ~path in
         let doc = (match (editor path doc) with
                    | None -> raise Cancel
                    | Some doc -> doc) in
         Db.set ~library ~path doc;
-        model#set_entry (model#get_row p) path doc)
-      model#get_selected_rows
+        Model.set_entry model (Model.get_row model p) path doc)
+      (Model.get_selected_rows model)
 end

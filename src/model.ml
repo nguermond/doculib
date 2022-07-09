@@ -70,185 +70,191 @@ module Attr =
       List.nth col_names i
   end
 
-class model filter store view =
-object (self)
-  val filter : GTree.model_filter = filter
-  val mutable store : GTree.list_store = store
-  val view : GTree.view = view
-  val mutable num_cols = 0
-                  
-  method get_row p =
-    (store#get_iter (filter#convert_path_to_child_path p))
+type t = {
+    mutable filter : filter;
+    store : store;
+    view : view;
+    mutable num_cols : int;
+  }
 
-  method get : 'a. row:Gtk.tree_iter -> column:('a GTree.column) -> 'a =
-    store#get
+let make filter store view : t =
+  {filter = filter;
+   store = store;
+   view = view;
+   num_cols = 0;
+  }
+  
+let get_row (m : t) p =
+  (m.store#get_iter (m.filter#convert_path_to_child_path p))
 
-  method remove ~row : unit =
-    ignore (store#remove row)
+let get (m : t) =
+  m.store#get
 
-  method remove_entry_from_path ~path : unit =
-    let path = Path.string_of_rel path in
-    (store#foreach (fun p _ ->
-         let row = (self#get_row p) in
-         let path' = self#get ~row ~column:Attr.path in
-         (if path = path' then
-            (ignore @@ store#remove row; true)
-          else false (* stop searching *))
-    ))
-    
-  method set_entry ~row (key : Path.rel) (doc : Doc.t) : unit =
-    store#set ~row ~column:Attr.star doc.star;
-    store#set ~row ~column:Attr.title doc.title;
-    store#set ~row ~column:Attr.authors (String.concat "; " doc.authors);
-    store#set ~row ~column:Attr.doi doc.doi;
-    store#set ~row ~column:Attr.isbn doc.isbn;
-    store#set ~row ~column:Attr.year doc.year;
-    store#set ~row ~column:Attr.tags (String.concat "; " doc.tags);
-    store#set ~row ~column:Attr.path (Path.string_of_rel key)
-    
-  method import_documents (data : (Path.rel * Doc.t) list) : unit =
-    List.iter
-      (fun (key,doc) ->
-        let row = store#append () in
-        self#set_entry ~row key doc)
-      data
+let remove (m : t) ~row : unit =
+  ignore (m.store#remove row)
 
-  method reset_model () : unit =
-    store#clear()
-    
-  method reset_sort_indicators () : unit =
-    for i=0 to num_cols - 1 do
-      (view#get_column i)#set_sort_indicator false;
-    done
+let remove_entry_from_path (m : t) ~path : unit =
+  let path = Path.string_of_rel path in
+  ignore @@
+    m.store#foreach (fun p _ ->
+        let row = (get_row m p) in
+        let path' = get m ~row ~column:Attr.path in
+        (if path = path' then
+           (ignore @@ m.store#remove row; true)
+         else false (* stop searching *))
+      )
+  
+let set_entry (m : t) ~row (key : Path.rel) (doc : Doc.t) : unit =
+  m.store#set ~row ~column:Attr.star doc.star;
+  m.store#set ~row ~column:Attr.title doc.title;
+  m.store#set ~row ~column:Attr.authors (String.concat "; " doc.authors);
+  m.store#set ~row ~column:Attr.doi doc.doi;
+  m.store#set ~row ~column:Attr.isbn doc.isbn;
+  m.store#set ~row ~column:Attr.year doc.year;
+  m.store#set ~row ~column:Attr.tags (String.concat "; " doc.tags);
+  m.store#set ~row ~column:Attr.path (Path.string_of_rel key)
+  
+let import_documents (m : t) (data : (Path.rel * Doc.t) list) : unit =
+  List.iter
+    (fun (key,doc) ->
+      let row = m.store#append () in
+      set_entry m ~row key doc)
+    data
 
-  method add_column ~title ~width ~(cell_renderer:cell_renderer) (column : column) : unit =
-    num_cols <- num_cols + 1;
-    let CellRenderer(renderer,values) = cell_renderer in
-    let col = (GTree.view_column ~title ~renderer:(renderer,values) ()) in
-    
-    col#set_resizable(true);
-    col#set_min_width(20);
-    col#set_reorderable(true);
-    col#set_clickable(true);
-    col#set_fixed_width width;
-    col#set_sort_order `DESCENDING;
+let reset_model (m : t) : unit =
+  m.store#clear()
+  
+let reset_sort_indicators (m : t) : unit =
+  for i=0 to m.num_cols - 1 do
+    (m.view#get_column i)#set_sort_indicator false;
+  done
 
-    (* Set sort index *)
-    ignore @@
-      col#connect#clicked ~callback:(fun () ->
-          let title = col#title in
-          let id = (match column with
-                      StrCol c -> c.index
-                    | BoolCol c -> c.index) in
-          (if col#sort_order = `DESCENDING
-           then (col#set_sort_order `ASCENDING)
-           else (col#set_sort_order `DESCENDING));
-          self#reset_sort_indicators ();
-          col#set_sort_indicator true;
-          store#set_sort_column_id id col#sort_order
-        );
-    ignore (view#append_column col)
+let add_column (m : t) ~title ~width ~(cell_renderer:cell_renderer) (column : column) : unit =
+  m.num_cols <- m.num_cols + 1;
+  let CellRenderer(renderer,values) = cell_renderer in
+  let col = (GTree.view_column ~title ~renderer:(renderer,values) ()) in
+  
+  col#set_resizable(true);
+  col#set_min_width(20);
+  col#set_reorderable(true);
+  col#set_clickable(true);
+  col#set_fixed_width width;
+  col#set_sort_order `DESCENDING;
 
-  (* Handle click events *)
-  method handle_click_events ~(context_menu : GMenu.menu) : unit =
-    (* Open selected files with default program on select
-     * -- conflicts with editing rows 
-     *)
-    (* view#connect#after#row_activated
-     *   ~callback:(fun _ _ ->
-     *     List.iter (fun p ->
-     *         open_doc (store#get ~row:(self#get_row p) ~column:path))
-     *       view#selection#get_selected_rows); *)
-    
-    (* Click events:
-     * - Spawn context menu on right click, do no deselect multiple selection
-     * - handle multiple selection for dragging
-     * The following code is derived from the MultiDragTreeView 
-     * of the quodlibet music software (licensed under GPLv2+):
-     *   https://github.com/quodlibet/quodlibet
-     * Specifically, see `quodlibet/qltk/views.py`
-     * The effect of this is that dragging a multiple selection
-     * does not deselect entries. 
-     * The key idea here is to use `set_select_function`.
-    *)
-    let defer_select = ref None in
+  (* Set sort index *)
+  ignore @@
+    col#connect#clicked ~callback:(fun () ->
+        let title = col#title in
+        let id = (match column with
+                    StrCol c -> c.index
+                  | BoolCol c -> c.index) in
+        (if col#sort_order = `DESCENDING
+         then (col#set_sort_order `ASCENDING)
+         else (col#set_sort_order `DESCENDING));
+        reset_sort_indicators m;
+        col#set_sort_indicator true;
+        m.store#set_sort_column_id id col#sort_order
+      );
+  ignore (m.view#append_column col)
 
-    (* TODO: If multiple rows are selected, one row is unselected with CONTROL,
-     * and then clicked, it is set to edit, not selected, and other rows remain selected!
-     *)
-    ignore @@
-      view#event#connect#button_press
-        ~callback:(fun ev ->
-          (if (GdkEvent.Button.button ev) = 3 then
-             (context_menu#popup ~button:3 ~time:(GdkEvent.Button.time ev);
-              (if (view#selection#count_selected_rows) > 1
-               then true (* do not deselect *)
-               else false (* select on right click *)))
-           else if (GdkEvent.Button.button ev) = 1 then
-             let x,y = (int_of_float (GdkEvent.Button.x ev),
-                        int_of_float (GdkEvent.Button.y ev)) in
-             let selection = view#selection in
-             let target = view#get_path_at_pos ~x ~y in
-             match target with
-             | Some (p,col,_,_) ->
-                (* if CONTROL or SHIFT not in effect, and entry not selected *)
-                if ((((GdkEvent.Button.state ev) land (4 lor 1)) = 0) 
-                    && selection#path_is_selected(p)) then
-                  (selection#set_select_function (fun p b -> false);
-    		       defer_select := Some p; false)
-                else (selection#set_select_function (fun p b -> true);
-    		          defer_select := None; false)
-             | None -> true
-           else false)
-        );
-    ignore @@
-      view#event#connect#button_release ~callback:(fun ev ->
-          (if (GdkEvent.Button.button ev) = 1 then
-             (match !defer_select with
-              | Some p ->
-                 let selection = view#selection in
-                 let x,y = (int_of_float (GdkEvent.Button.x ev),
-                            int_of_float (GdkEvent.Button.y ev)) in
-                 let target = view#get_path_at_pos ~x ~y in
-                 selection#set_select_function (fun p b -> true);
-                 (match target with
-                  | Some (q,col,_,_) ->
-                     (if ((p = q) && (not (x = 0 && y = 0))) then
-    		            (view#set_cursor ~edit:(view#selection#count_selected_rows = 1) p col;
-                         defer_select := None; false)
-                      else
-                        (defer_select := None; true))
-                  | None -> true)
-              | None -> false)
-           else false)
-        );
+(* Handle click events *)
+let handle_click_events (m : t) ~(context_menu : GMenu.menu) : unit =
+  (* Open selected files with default program on select
+   * -- conflicts with editing rows 
+   *)
+  (* view#connect#after#row_activated
+   *   ~callback:(fun _ _ ->
+   *     List.iter (fun p ->
+   *         open_doc (store#get ~row:(self#get_row p) ~column:path))
+   *       view#selection#get_selected_rows); *)
+  
+  (* Click events:
+   * - Spawn context menu on right click, do no deselect multiple selection
+   * - handle multiple selection for dragging
+   * The following code is derived from the MultiDragTreeView 
+   * of the quodlibet music software (licensed under GPLv2+):
+   *   https://github.com/quodlibet/quodlibet
+   * Specifically, see `quodlibet/qltk/views.py`
+   * The effect of this is that dragging a multiple selection
+   * does not deselect entries. 
+   * The key idea here is to use `set_select_function`.
+   *)
+  let defer_select = ref None in
 
-  method refilter () : unit =
-    filter#refilter()
-    
-  method set_visible_func (f : GTree.model -> Gtk.tree_iter -> bool) : unit =
-    filter#set_visible_func f
+  (* TODO: If multiple rows are selected, one row is unselected with CONTROL,
+   * and then clicked, it is set to edit, not selected, and other rows remain selected!
+   *)
+  ignore @@
+    m.view#event#connect#button_press
+      ~callback:(fun ev ->
+        (if (GdkEvent.Button.button ev) = 3 then
+           (context_menu#popup ~button:3 ~time:(GdkEvent.Button.time ev);
+            (if (m.view#selection#count_selected_rows) > 1
+             then true (* do not deselect *)
+             else false (* select on right click *)))
+         else if (GdkEvent.Button.button ev) = 1 then
+           let x,y = (int_of_float (GdkEvent.Button.x ev),
+                      int_of_float (GdkEvent.Button.y ev)) in
+           let selection = m.view#selection in
+           let target = m.view#get_path_at_pos ~x ~y in
+           match target with
+           | Some (p,col,_,_) ->
+              (* if CONTROL or SHIFT not in effect, and entry not selected *)
+              if ((((GdkEvent.Button.state ev) land (4 lor 1)) = 0) 
+                  && selection#path_is_selected(p)) then
+                (selection#set_select_function (fun p b -> false);
+    		     defer_select := Some p; false)
+              else (selection#set_select_function (fun p b -> true);
+    		        defer_select := None; false)
+           | None -> true
+         else false)
+      );
+  ignore @@
+    m.view#event#connect#button_release ~callback:(fun ev ->
+        (if (GdkEvent.Button.button ev) = 1 then
+           (match !defer_select with
+            | Some p ->
+               let selection = m.view#selection in
+               let x,y = (int_of_float (GdkEvent.Button.x ev),
+                          int_of_float (GdkEvent.Button.y ev)) in
+               let target = m.view#get_path_at_pos ~x ~y in
+               selection#set_select_function (fun p b -> true);
+               (match target with
+                | Some (q,col,_,_) ->
+                   (if ((p = q) && (not (x = 0 && y = 0))) then
+    		          (m.view#set_cursor ~edit:(m.view#selection#count_selected_rows = 1) p col;
+                       defer_select := None; false)
+                    else
+                      (defer_select := None; true))
+                | None -> true)
+            | None -> false)
+         else false)
+      )
 
-  method get_selected_rows : Gtk.tree_path list =
-    view#selection#get_selected_rows    
-end
+let refilter (m : t) : unit =
+  m.filter#refilter()
+  
+let set_visible_func (m : t) (f : GTree.model -> Gtk.tree_iter -> bool) : unit =
+  m.filter#set_visible_func f
 
+let get_selected_rows (m : t) : Gtk.tree_path list =
+  m.view#selection#get_selected_rows    
 
-let make_toggle_cell_renderer ~(store : store) ~(model : model) ~library ~(column : bool GTree.column) : cell_renderer =
+let make_toggle_cell_renderer ~(store : store) ~(model : t) ~library ~(column : bool GTree.column) : cell_renderer =
   let renderer,values = (GTree.cell_renderer_toggle [],
                          ["active", column]) in
   ignore @@
     renderer#connect#toggled ~callback:(fun p ->
-        let row = (model#get_row p) in
+        let row = (get_row model p) in
         let value = (not (store#get ~row ~column:Attr.star)) in
-        let path = Path.mk_rel (model#get ~row ~column:Attr.path) in
+        let path = Path.mk_rel (get model ~row ~column:Attr.path) in
         let doc = Db.get ~library ~path in
         let doc = Doc.edit_document (Star value) doc in
         Db.set ~library ~path doc;
         store#set ~row ~column value);
   CellRenderer(renderer,values)
 
-let make_text_cell_renderer ~(store : store) ~model ~view ~width ~editable ~(library : string option) ~(column : string GTree.column) : cell_renderer =
+let make_text_cell_renderer ~(store : store) ~(model:t) ~view ~width ~editable ~(library : string option) ~(column : string GTree.column) : cell_renderer =
   let renderer,values =
     (GTree.cell_renderer_text
        [`EDITABLE editable;`YPAD 2;
@@ -272,7 +278,7 @@ let make_text_cell_renderer ~(store : store) ~model ~view ~width ~editable ~(lib
    | true, Some library ->
       ignore @@
         renderer#connect#edited ~callback:(fun p str ->
-            let row = (model#get_row p) in
+            let row = (get_row model p) in
             let path = Path.mk_rel (store#get ~row ~column:Attr.path) in
             let key = (Attr.get_name (column.index)) in
             let doc = Db.get ~library ~path in
@@ -283,8 +289,8 @@ let make_text_cell_renderer ~(store : store) ~model ~view ~width ~editable ~(lib
    | _ -> ());
   CellRenderer(renderer,values)
   
-   
-let enable_multidrag ~(store : store) ~(model : model) ~(view : view) ~library : unit =
+  
+let enable_multidrag ~(store : store) ~(model : t) ~(view : view) ~library : unit =
   GtkTree.TreeView.Dnd.enable_model_drag_source
     view#as_tree_view
     ~modi:[`BUTTON1]
@@ -297,7 +303,7 @@ let enable_multidrag ~(store : store) ~(model : model) ~(view : view) ~library :
         let selection = view#selection#get_selected_rows in
         let paths = (List.map (fun p ->
                          Path.mk_rel @@
-                           (store#get ~row:(model#get_row p) ~column:Attr.path))
+                           (store#get ~row:(get_row model p) ~column:Attr.path))
                        selection) in
         let data = (Doc.serialize_description ~library ~paths) in
         sel#return data);
@@ -311,7 +317,8 @@ let enable_multidrag ~(store : store) ~(model : model) ~(view : view) ~library :
   
 let make_document_list ?(height=400) ~(library:string) ~(doc_type:string)
       ?(sort : ('a GTree.column) option=None)
-      ~(packing:(GObj.widget -> unit)) (data : (Path.rel * Doc.t) list) : model =  
+      ~(packing:(GObj.widget -> unit)) (data : (Path.rel * Doc.t) list)
+    : t =  
   let swindow = GBin.scrolled_window
                   ~height ~shadow_type:`ETCHED_IN ~hpolicy:`AUTOMATIC
                   ~vpolicy:`AUTOMATIC ~packing () in
@@ -320,7 +327,7 @@ let make_document_list ?(height=400) ~(library:string) ~(doc_type:string)
   let filter = (GTree.model_filter store) in
   let view = GTree.view (* ~reorderable:true *)
                ~model:filter ~packing:swindow#add() in
-  let model = (new model filter store view) in
+  let model = (make filter store view) in
 
   view#set_enable_grid_lines `HORIZONTAL;
   view#selection#set_mode `MULTIPLE;
@@ -329,7 +336,7 @@ let make_document_list ?(height=400) ~(library:string) ~(doc_type:string)
     match col with
     | BoolCol(attr) ->
        let cell_renderer = (make_toggle_cell_renderer ~store ~model ~library ~column:attr) in
-       model#add_column ~title ~width ~cell_renderer col
+       add_column model ~title ~width ~cell_renderer col
     | _ -> failwith "Impossible"
   in
   
@@ -338,7 +345,7 @@ let make_document_list ?(height=400) ~(library:string) ~(doc_type:string)
     | StrCol(attr) ->
        let cell_renderer = (make_text_cell_renderer ~store ~model ~view
                               ~library:(Some library) ~width ~editable ~column:attr) in
-       model#add_column ~title ~width ~cell_renderer col
+       add_column model ~title ~width ~cell_renderer col
     | _ -> failwith "Impossible"
   in
   
@@ -359,12 +366,12 @@ let make_document_list ?(height=400) ~(library:string) ~(doc_type:string)
    | None -> ()
    | Some col -> store#set_sort_column_id col.index (view#get_column col.index)#sort_order);
   
-  (model#import_documents data);
+  (import_documents model data);
   model
 
-let make_entry_list ?(height=400) ~doc_type ~packing
-      ?(sort : ('a GTree.column) option=None)
-      data : model =
+let make_entry_list ?(height=400) ~doc_type 
+      ?(sort : ('a GTree.column) option=None) ~packing
+      data : t =
   
   let swindow = GBin.scrolled_window
                   ~height ~shadow_type:`ETCHED_IN ~hpolicy:`AUTOMATIC
@@ -373,7 +380,7 @@ let make_entry_list ?(height=400) ~doc_type ~packing
   let store = GTree.list_store Attr.columns in
   let filter = (GTree.model_filter store) in
   let view = GTree.view ~model:filter ~packing:swindow#add() in
-  let model = (new model filter store view) in
+  let model = make filter store view in
 
   view#set_enable_grid_lines `HORIZONTAL;
   
@@ -382,7 +389,7 @@ let make_entry_list ?(height=400) ~doc_type ~packing
     match col with
     | StrCol(attr) ->
        let cell_renderer = (make_text_cell_renderer ~store ~model ~view ~width ~library:None ~editable:false ~column:attr) in
-       model#add_column ~title ~width ~cell_renderer col
+       add_column model ~title ~width ~cell_renderer col
     | _ -> failwith "Impossible"
   in
   (* Columns *)
@@ -394,12 +401,12 @@ let make_entry_list ?(height=400) ~doc_type ~packing
    | "article" -> add_text_col ~title:"DOI" ~width:80 (StrCol Attr.doi)
    | "book" -> add_text_col ~title:"ISBN" ~width:80 (StrCol Attr.isbn)
    | _ -> ());
-    
-  (match sort with
-  | None -> ()
-  | Some col -> store#set_sort_column_id col.index (view#get_column col.index)#sort_order);
   
-  (model#import_documents data);
+  (match sort with
+   | None -> ()
+   | Some col -> store#set_sort_column_id col.index (view#get_column col.index)#sort_order);
+  
+  (import_documents model data);
   model
 
     

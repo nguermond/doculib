@@ -343,10 +343,10 @@ let search_metadata ~(default : Doc.t) ~doc_type (search_str : string) : Doc.t o
         let search_type = (if database_l1#active then "article" else "book") in
         let docs = (try Search.search_document doc_type search_type search_str with
                       Search.SearchFailure msg -> (error_dialog msg); []) in
-        model#reset_model();
+        Model.reset_model model;
         (* TODO: Nasty hack *)
         let docs = (List.map (fun doc -> (Path.mk_rel "dummy", doc)) docs) in
-        model#import_documents docs;
+        Model.import_documents model docs;
         ());
 
   dialog#add_button "Select" `OK;
@@ -356,16 +356,18 @@ let search_metadata ~(default : Doc.t) ~doc_type (search_str : string) : Doc.t o
   let ret =
     (match dialog#run() with
      | `OK ->
-        let selection = (model#get_selected_rows) in
+        let selection = (Model.get_selected_rows model) in
         let p = (List.nth selection 0) in
         let doc : Doc.t =
           { star = false;
-            title = (model#get ~row:(model#get_row p) ~column:Model.Attr.title);
+            title = (Model.get model ~row:(Model.get_row model p)
+                       ~column:Model.Attr.title);
             authors = Str.split (Str.regexp "; +")
-                        (model#get ~row:(model#get_row p) ~column:Model.Attr.authors);
-            year = (model#get ~row:(model#get_row p) ~column:Model.Attr.year);
-            doi = (model#get ~row:(model#get_row p) ~column:Model.Attr.doi);
-            isbn = (model#get ~row:(model#get_row p) ~column:Model.Attr.isbn);
+                        (Model.get model ~row:(Model.get_row model p)
+                           ~column:Model.Attr.authors);
+            year = (Model.get model ~row:(Model.get_row model p) ~column:Model.Attr.year);
+            doi = (Model.get model ~row:(Model.get_row model p) ~column:Model.Attr.doi);
+            isbn = (Model.get model ~row:(Model.get_row model p) ~column:Model.Attr.isbn);
             tags = default.tags;
           } in Some doc
      | `CANCEL -> None
@@ -428,7 +430,7 @@ let main () =
     context_factory#add_item "Open"
       ~callback:(fun _ ->
         notebook#action_on_selected (fun library model row ->
-            let path = Path.mk_rel (model#get ~row ~column:Model.Attr.path) in
+            let path = Path.mk_rel (Model.get model ~row ~column:Model.Attr.path) in
             let file = (Db.get_file ~library ~path) in
             System.open_file file)
       );
@@ -452,11 +454,11 @@ let main () =
     context_factory#add_item "Open DOI"
       ~callback:(fun _ ->
         notebook#action_on_selected (fun library model row ->
-            let doi = (model#get ~row ~column:Model.Attr.doi) in
+            let doi = (Model.get model ~row ~column:Model.Attr.doi) in
             (if doi = "" then (error_dialog "No DOI for selected entry!")
              else
                let url = ("https://www.doi.org/" ^
-                            (model#get ~row ~column:Model.Attr.doi)) in
+                            (Model.get model ~row ~column:Model.Attr.doi)) in
                System.open_url url))
       );
   
@@ -474,7 +476,7 @@ let main () =
       ~callback:(fun _ ->
         let clipboard = GtkBase.Clipboard.get Gdk.Atom.clipboard in
         notebook#action_on_selected (fun library model row ->
-            let path = Path.mk_rel (model#get ~row ~column:Model.Attr.path) in
+            let path = Path.mk_rel (Model.get model ~row ~column:Model.Attr.path) in
             let file = (Db.get_file ~library ~path) in
             (GtkBase.Clipboard.set_text clipboard (Path.string_of_root file)))
       );
@@ -491,8 +493,8 @@ let main () =
 
         (match confirm_dialog#run() with
          | `OK -> notebook#action_on_selected (fun library model row ->
-                      let path = Path.mk_rel (model#get ~row ~column:Model.Attr.path) in
-                      model#remove row;
+                      let path = Path.mk_rel (Model.get model ~row ~column:Model.Attr.path) in
+                      Model.remove model row;
                       Db.remove_entry ~library ~path;
                       Db.remove_file ~library ~path)
          | _ -> ());

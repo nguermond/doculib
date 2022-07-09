@@ -39,41 +39,36 @@ module Attr :
     val get_name : int -> string
   end
 
-class model : GTree.model_filter -> GTree.list_store -> GTree.view ->
-  object
-    method get_row : Gtk.tree_path -> row
-         
-    method get : 'a. row:row -> column:('a GTree.column) -> 'a
+type t
+   
+val get_row : t -> Gtk.tree_path -> row
+  
+val get : t -> row:row -> column:('a GTree.column) -> 'a
 
-    method remove : row:row -> unit
+val remove : t -> row:row -> unit
 
-    method remove_entry_from_path : path:Path.rel -> unit
-      
-    method set_entry : row:row -> Path.rel -> Doc.t -> unit
-      
-    method import_documents : (Path.rel * Doc.t) list -> unit
-         
-    method reset_model : unit -> unit
-         
-    method reset_sort_indicators : unit -> unit
-         
-    method add_column : title:string -> width:int ->
-                        cell_renderer:cell_renderer -> column -> unit
+val remove_entry_from_path : t -> path:Path.rel -> unit
+  
+val set_entry : t -> row:row -> Path.rel -> Doc.t -> unit
+  
+val import_documents : t -> (Path.rel * Doc.t) list -> unit
+  
+val reset_model : t -> unit
+  
+val reset_sort_indicators : t -> unit
+  
+(* Handle click events *)
+val handle_click_events : t -> context_menu:GMenu.menu -> unit
 
-    (* Handle click events *)
-    method handle_click_events : context_menu:GMenu.menu -> unit
+val refilter : t -> unit
+val set_visible_func : t -> (GTree.model -> row -> bool) -> unit
+val get_selected_rows : t -> Gtk.tree_path list
 
-    method refilter : unit -> unit
-    method set_visible_func : (GTree.model -> row -> bool) -> unit
-    method get_selected_rows : Gtk.tree_path list
-  end
-
-    
-val make_document_list : ?height:int -> ?library:string -> doc_type:string ->
+val make_document_list : ?height:int -> library:string -> doc_type:string ->
                          ?sort:(('a GTree.column) option) ->
-                         packing:(GObj.widget -> unit) -> (Path.rel * Doc.t) list -> model
+                         packing:(GObj.widget -> unit) -> (Path.rel * Doc.t) list -> t
 
                                                                                                                       
 val make_entry_list : ?height:int -> doc_type:string ->
                       ?sort:(('a GTree.column) option) ->
-                      packing:(GObj.widget -> unit) -> (Path.rel * Doc.t) list -> model
+                      packing:(GObj.widget -> unit) -> (Path.rel * Doc.t) list -> t

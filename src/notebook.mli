@@ -29,10 +29,10 @@ class library : string -> string -> GPack.box -> GMisc.label ->
     method get_doc_type : string
     method get_page : GPack.box
     method get_label : GMisc.label
-    method get_model : Model.model
+    method get_model : Model.t
     method rename : string -> unit
     method is_loaded : bool
-    method set_model : Model.model -> unit
+    method set_model : Model.t -> unit
   end
                                
 class notebook : GPack.notebook -> GMenu.menu -> (GTree.model -> Model.row -> bool)
@@ -51,6 +51,6 @@ class notebook : GPack.notebook -> GMenu.menu -> (GTree.model -> Model.row -> bo
   method current_library : string * library
            
   method refilter : ?library:(string option) -> unit -> unit
-  method action_on_selected : action:(string -> Model.model -> Model.row -> unit) -> unit
+  method action_on_selected : action:(string -> Model.t -> Model.row -> unit) -> unit
   method edit_selected : editor:(Path.rel -> Doc.t -> Doc.t option) -> unit
 end
