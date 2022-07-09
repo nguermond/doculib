@@ -69,6 +69,29 @@ module Attr =
       List.nth col_names i
   end
 
+
+module Entry =
+  struct
+    type t = {
+        key : Path.rel;
+        doc : Doc.t;
+        missing : bool;
+        duplicate : bool;
+      }
+
+    let make key ?(missing=false) ?(duplicate=false) doc = {
+        key = key;
+        doc = doc;
+        missing = missing;
+        duplicate = duplicate;
+      }
+
+    let get_doc (e : t) = e.doc
+    let is_missing (e : t) = e.missing
+    let is_duplicate (e : t) = e.duplicate
+    let get_key (e : t) = e.key
+  end
+      
 type t = {
     mutable filter : filter;
     store : store;
@@ -89,19 +112,8 @@ let get_row (m : t) p =
 let get (m : t) =
   m.store#get
 
-let remove (m : t) ~row : unit =
+let remove_entry (m : t) ~row : unit =
   ignore (m.store#remove row)
-
-let remove_entry_from_path (m : t) ~path : unit =
-  let path = Path.string_of_rel path in
-  ignore @@
-    m.store#foreach (fun p _ ->
-        let row = (get_row m p) in
-        let path' = get m ~row ~column:Attr.path in
-        (if path = path' then
-           (ignore @@ m.store#remove row; true)
-         else false (* stop searching *))
-      )
 
 let get_row_from_path (m : t) ~path : row =
   let path = Path.string_of_rel path in
@@ -117,7 +129,8 @@ let get_row_from_path (m : t) ~path : row =
      (get_row m !p0)
   | None -> failwith "Row does not exist"
   
-let set_entry (m : t) ~row (key : Path.rel) (doc : Doc.t) : unit =
+let set_entry (m : t) ~row (e : Entry.t) : unit =
+  let doc = Entry.get_doc e in
   m.store#set ~row ~column:Attr.star doc.star;
   m.store#set ~row ~column:Attr.title doc.title;
   m.store#set ~row ~column:Attr.authors (String.concat "; " doc.authors);
@@ -125,21 +138,56 @@ let set_entry (m : t) ~row (key : Path.rel) (doc : Doc.t) : unit =
   m.store#set ~row ~column:Attr.isbn doc.isbn;
   m.store#set ~row ~column:Attr.year doc.year;
   m.store#set ~row ~column:Attr.tags (String.concat "; " doc.tags);
-  m.store#set ~row ~column:Attr.path (Path.string_of_rel key);
-  m.store#set ~row ~column:Attr.missing false;
-  m.store#set ~row ~column:Attr.duplicate false
+  m.store#set ~row ~column:Attr.path (Path.string_of_rel (Entry.get_key e));
+  m.store#set ~row ~column:Attr.missing (Entry.is_missing e);
+  m.store#set ~row ~column:Attr.duplicate (Entry.is_duplicate e)
 
-let flag_missing (m : t) row b : unit =
+let add_entry (m : t) (e : Entry.t) : unit =
+  let row = m.store#append () in
+  set_entry m ~row e
+
+let get_entry (m : t) ~row : Entry.t =
+  let star = get m ~row ~column:Attr.star in
+  let title = get m ~row ~column:Attr.title in
+  let authors = get m ~row ~column:Attr.authors in
+  let doi = get m ~row ~column:Attr.doi in
+  let isbn = get m ~row ~column:Attr.isbn in
+  let year = get m ~row ~column:Attr.year in
+  let tags = get m ~row ~column:Attr.tags in
+  let path = get m ~row ~column:Attr.path in
+  let missing = get m ~row ~column:Attr.missing in
+  let duplicate = get m ~row ~column:Attr.duplicate in
+  let doc =
+    Doc.init
+    |> Doc.edit_document (Doc.set_attribute "star" (string_of_bool star))
+    |> Doc.edit_document (Doc.set_attribute "title" title)
+    |> Doc.edit_document (Doc.set_attribute "authors" authors)
+    |> Doc.edit_document (Doc.set_attribute "doi" doi)
+    |> Doc.edit_document (Doc.set_attribute "isbn" isbn)
+    |> Doc.edit_document (Doc.set_attribute "tags" tags)
+  in
+  Entry.make (Path.mk_rel path) ~missing ~duplicate doc
+  
+let flag_missing (m : t) ~row b : unit =
   m.store#set ~row ~column:Attr.missing b
 
-let flag_duplicate (m : t) row b : unit =
-  failwith "NYI"
+let flag_duplicate (m : t) ~row b : unit =
+  m.store#set ~row ~column:Attr.duplicate b
+
+let is_missing (m : t) ~row : bool =
+  get m ~row ~column:Attr.missing
+
+let is_duplicate (m : t) ~row : bool =
+  get m ~row ~column:Attr.duplicate
+
+let get_path (m : t) ~row : Path.rel =
+  Path.mk_rel (get m ~row ~column:Attr.path)
   
 let import_documents (m : t) (data : (Path.rel * Doc.t) list) : unit =
   List.iter
     (fun (key,doc) ->
-      let row = m.store#append () in
-      set_entry m ~row key doc)
+      let e = Entry.make key doc in
+      add_entry m e)
     data
 
 let reset_model (m : t) : unit =
@@ -269,8 +317,7 @@ let make_toggle_cell_renderer ~(store : store) ~(model : t) ~library ~(column : 
     (GTree.cell_renderer_toggle
        [`CELL_BACKGROUND_GDK
           (Gdk.Color.color_parse "light yellow");],
-     [("active", column);
-      ("cell-background-set", Attr.duplicate)]) in
+     [("active", column)]) in
   ignore @@
     renderer#connect#toggled ~callback:(fun p ->
         let row = (get_row model p) in
@@ -283,8 +330,7 @@ let make_toggle_cell_renderer ~(store : store) ~(model : t) ~library ~(column : 
   CellRenderer(renderer,values)
 
 let make_text_cell_renderer ~(store : store) ~(model:t) ~view ~width ~editable ~(library : string option) ~(column : string GTree.column) : cell_renderer =
-  let renderer,values (* :
-         * ((#GTree.cell_renderer) * ((string * 'b . 'b GTree.column) list)) *) =
+  let renderer,values =
     (GTree.cell_renderer_text
        [`EDITABLE editable;`YPAD 2;
         `HEIGHT (Font.calc_font_height
@@ -293,14 +339,10 @@ let make_text_cell_renderer ~(store : store) ~(model:t) ~view ~width ~editable ~
         `WRAP_MODE `WORD_CHAR;
         `CELL_BACKGROUND_GDK
           (Gdk.Color.color_parse "light yellow");
-        (* `CELL_BACKGROUND_SET false; *)
         `FOREGROUND_GDK (Gdk.Color.color_parse "red");
-        (* `FOREGROUND_SET false; *)
        ],
-     [("text",column);
-      (* ("foreground-set", Attr.missing);
-       * ("cell-background-set", Attr.duplicate) *)
-     ]) in
+     [("text",column)])
+  in
         
   
   (* save cell edits *)
@@ -355,8 +397,7 @@ let make_document_list ?(height=400) ~(library:string) ~(doc_type:string)
 
   let store = GTree.list_store Attr.columns in
   let filter = (GTree.model_filter store) in
-  let view = GTree.view (* ~reorderable:true *)
-               ~model:filter ~packing:swindow#add() in
+  let view = GTree.view ~model:filter ~packing:swindow#add() in
   let model = (make filter store view) in
 
   view#set_enable_grid_lines `HORIZONTAL;
@@ -380,7 +421,7 @@ let make_document_list ?(height=400) ~(library:string) ~(doc_type:string)
   in
   
   add_toggle_col ~title:"Star" ~width:40 (BoolCol Attr.star);
-  add_text_col ~title:"Authors(s)" ~width:200 (StrCol Attr.authors);                                                                         
+  add_text_col ~title:"Authors(s)" ~width:200 (StrCol Attr.authors);
   add_text_col ~title:"Title" ~width:400 (StrCol Attr.title);
   add_text_col ~title:"Year" ~width:100 (StrCol Attr.year);
   add_text_col ~title:"Tags" ~width:200 (StrCol Attr.tags);

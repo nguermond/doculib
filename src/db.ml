@@ -48,16 +48,22 @@ let init () =
   Log.push "Initializing libraries";
   Libraries.init_libraries ()
 
-let flush_data () =
-  Log.push "Flushing libconfig";
-  Libraries.write_config libconfig;
+let flush_metadata () =
+  Log.push "Flushing metadata";
   Libraries.flush_metadata()
+  
+let flush_libconfig () =
+  Log.push "Flushing libconfig";
+  Libraries.write_config libconfig
 
 let add_library ~library ~root (libdata : Library.t) : unit =
   try
-    Libraries.new_library ~library root libdata
+    Libraries.new_library ~library root libdata;
+    flush_libconfig()
   with
-  | Metadb.LibraryExists -> raise LibraryExists
+  | Metadb.LibraryExists ->
+     raise LibraryExists
+                            
 
 let get_library_descriptions () : (string * Library.t) list =
   Libraries.get_libdata ()
@@ -89,7 +95,8 @@ let migrate ~from_lib ~to_lib ~path : unit =
      raise CannotMigrate
 
 let remove_library ~delete_metadata ~library : unit =
-  Libraries.remove_library ~delete_metadata ~library
+  Libraries.remove_library ~delete_metadata ~library;
+  flush_libconfig()
 
 let rename_library ~library name : unit =
   Libraries.rename_library ~library name
@@ -104,19 +111,21 @@ let refresh_library ~library : (Path.rel * Doc.t) list =
 (* Assumes library was just refreshed *)
 let resolve_missing_files ~library : Path.rel list =
   Libraries.index_files();
-  Seq.filter_map (function
-      | Libraries.Missing key ->
-         prerr_endline ("Missing file: "^(Path.string_of_rel key));
-         Some key
-      | Libraries.Remap (key,(library',key')) ->
-         prerr_endline ("Remapped file: "^(Path.string_of_rel key)
-                        ^"\n -> "^library'^" : "^(Path.string_of_rel key'));
-         None)
-    (Libraries.resolve_missing_files ~library)
-  |> List.of_seq
+  let keys =
+    Seq.filter_map (function
+        | Libraries.Missing key ->
+           prerr_endline ("Missing file: "^(Path.string_of_rel key));
+           Some key
+        | Libraries.Remap (key,(library',key')) ->
+           prerr_endline ("Remapped file: "^(Path.string_of_rel key)
+                          ^"\n -> "^library'^" : "^(Path.string_of_rel key'));
+           None)
+      (Libraries.resolve_missing_files ~library)
+    |> List.of_seq
+  in
+  Libraries.flush_metadata();
+  keys
 
-
-(* Assumes library was just refreshed *)
+(* Assumes library was just refreshed & files were indexed *)
 let find_duplicates () : (string * Path.rel) list =
-  Libraries.index_files();
   Libraries.find_duplicates ()

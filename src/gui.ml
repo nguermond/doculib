@@ -358,18 +358,11 @@ let search_metadata ~(default : Doc.t) ~doc_type (search_str : string) : Doc.t o
      | `OK ->
         let selection = (Model.get_selected_rows model) in
         let p = (List.nth selection 0) in
-        let doc : Doc.t =
-          { star = false;
-            title = (Model.get model ~row:(Model.get_row model p)
-                       ~column:Model.Attr.title);
-            authors = Str.split (Str.regexp "; +")
-                        (Model.get model ~row:(Model.get_row model p)
-                           ~column:Model.Attr.authors);
-            year = (Model.get model ~row:(Model.get_row model p) ~column:Model.Attr.year);
-            doi = (Model.get model ~row:(Model.get_row model p) ~column:Model.Attr.doi);
-            isbn = (Model.get model ~row:(Model.get_row model p) ~column:Model.Attr.isbn);
-            tags = default.tags;
-          } in Some doc
+        let row = Model.get_row model p in
+        let e = Model.get_entry model ~row in
+        let doc = Model.Entry.get_doc e
+                  |> Doc.edit_document (Doc.Tags default.tags) in
+        Some doc
      | `CANCEL -> None
      | `DELETE_EVENT -> Some default) in
 
@@ -377,7 +370,8 @@ let search_metadata ~(default : Doc.t) ~doc_type (search_str : string) : Doc.t o
   ret
 
 let exit () : unit =
-  Db.flush_data();
+  Db.flush_metadata();
+  Db.flush_libconfig();
   GMain.quit()
 
     
@@ -430,7 +424,7 @@ let main () =
     context_factory#add_item "Open"
       ~callback:(fun _ ->
         notebook#action_on_selected (fun library model row ->
-            let path = Path.mk_rel (Model.get model ~row ~column:Model.Attr.path) in
+            let path = Model.get_path model ~row in
             let file = (Db.get_file ~library ~path) in
             System.open_file file)
       );
@@ -454,18 +448,12 @@ let main () =
     context_factory#add_item "Open DOI"
       ~callback:(fun _ ->
         notebook#action_on_selected (fun library model row ->
-            let doi = (Model.get model ~row ~column:Model.Attr.doi) in
+            let path = (Model.get_path model ~row) in
+            let doi = (Db.get ~library ~path).doi in
             (if doi = "" then (error_dialog "No DOI for selected entry!")
-             else
-               let url = ("https://www.doi.org/" ^
-                            (Model.get model ~row ~column:Model.Attr.doi)) in
-               System.open_url url))
+             else System.open_url ("https://www.doi.org/" ^ doi)))
       );
   
-  (* Edit metadata for an entry *)
-  (* context_factory#add_item "Edit Entry"
-   *   ~callback:(fun _ -> notebook#edit_selected edit_document); *)
-
   ignore @@ context_factory#add_separator ();
 
   (* TODO: Copy file name *)
@@ -476,7 +464,7 @@ let main () =
       ~callback:(fun _ ->
         let clipboard = GtkBase.Clipboard.get Gdk.Atom.clipboard in
         notebook#action_on_selected (fun library model row ->
-            let path = Path.mk_rel (Model.get model ~row ~column:Model.Attr.path) in
+            let path = Model.get_path model ~row in
             let file = (Db.get_file ~library ~path) in
             (GtkBase.Clipboard.set_text clipboard (Path.string_of_root file)))
       );
@@ -493,8 +481,8 @@ let main () =
 
         (match confirm_dialog#run() with
          | `OK -> notebook#action_on_selected (fun library model row ->
-                      let path = Path.mk_rel (Model.get model ~row ~column:Model.Attr.path) in
-                      Model.remove model row;
+                      let path = (Model.get_path model ~row)  in
+                      Model.remove_entry model ~row;
                       Db.remove_entry ~library ~path;
                       Db.remove_file ~library ~path)
          | _ -> ());
@@ -523,16 +511,6 @@ let main () =
     library_factory#add_item "Manage Libraries"
       ~callback:(fun () -> (manage_libraries ~notebook)
       );
-
-  (* Export a library to an archive *)
-  (* file_factory#add_item "Export Library"
-   *   ~callback:(fun () -> ()
-   *   ); *)
-
-  (* Import library from archive *)
-  (* file_factory#add_item "Import Library"
-   *   ~callback:(fun () -> ()
-   *   ); *)
 
   ignore @@ library_factory#add_separator ();
 

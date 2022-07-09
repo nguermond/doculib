@@ -109,14 +109,20 @@ class notebook notebook context_menu filter_func = object (self)
     List.iter (fun path ->
         try (Db.migrate ~from_lib ~to_lib ~path;
              let model = (self#get_library from_lib)#get_model in
-             Model.remove_entry_from_path model ~path;
+             let row = Model.get_row_from_path model ~path in
              let doc = Db.get ~library:to_lib ~path in
+             let missing = Model.is_missing model ~row in
+             let duplicate = Model.is_duplicate model ~row in
+             let _ = Model.remove_entry model ~row in
              let model = (self#get_library to_lib)#get_model in
-             Model.import_documents model [(path,doc)])
+             let e = (Model.Entry.make path ~missing ~duplicate doc) in
+             (Model.add_entry model e))
         with
           Db.CannotMigrate ->
           Log.push (Format.sprintf "Could not move file: %s" (Path.string_of_rel path))
-      ) paths
+      ) paths;
+    Db.flush_metadata()
+    
 
 
   method remove_library ~delete_metadata ~library : unit =
@@ -207,7 +213,13 @@ class notebook notebook context_menu filter_func = object (self)
     List.iter (fun key ->
         let row = Model.get_row_from_path (lib#get_model) key in
         Model.flag_missing (lib#get_model) row true)
-      missing_docs
+      missing_docs;
+    let duplicates = (Db.find_duplicates()) in
+    List.iter (fun (library',key) ->
+        if library = library' then
+          let row = Model.get_row_from_path (lib#get_model) key in
+          Model.flag_duplicate (lib#get_model) row true)
+      duplicates;
 
 
   method action_on_selected ~action : unit =
@@ -220,13 +232,16 @@ class notebook notebook context_menu filter_func = object (self)
     let (library,lib) = self#current_library in
     let model = lib#get_model in
     iter_cancel (fun p ->
-        let path = Path.mk_rel (Model.get model ~row:(Model.get_row model p)
-                                  ~column:Model.Attr.path) in
+        let row = Model.get_row model p in
+        let path = Model.get_path model ~row in
         let doc = Db.get ~library ~path in
         let doc = (match (editor path doc) with
                    | None -> raise Cancel
                    | Some doc -> doc) in
         Db.set ~library ~path doc;
-        Model.set_entry model (Model.get_row model p) path doc)
+        let missing = Model.is_missing model row in
+        let duplicate = Model.is_duplicate model row in
+        let e = Model.Entry.make path ~missing ~duplicate doc in
+        Model.set_entry model row e)
       (Model.get_selected_rows model)
 end

@@ -26,10 +26,6 @@ type t = {star : bool;
           year : string;
           tags : string list;
           (* notes : string *)
-
-          (* path : string;
-           * doc_type : string;
-           * hash : string; *)
          }
 
 type attribute =  Star of bool
@@ -39,9 +35,6 @@ type attribute =  Star of bool
                 | Isbn of string
                 | Year of string
                 | Tags of string list
-                (* | Path of string
-                 * | DocType of string
-                 * | Hash of string *)
   
 val set_attribute : string -> string -> attribute
     

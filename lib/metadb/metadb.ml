@@ -75,9 +75,8 @@ module Entry (D : Metadata) =
   end
 
   
-module HashMap = Map.Make(Hash)
               
-type file_table = (string * Path.rel) HashMap.t
+type file_table = (Hash.t * (string * Path.rel)) list
 
 
                 
@@ -225,7 +224,7 @@ module Library (D : Metadata) (LD : LibData) =
           let library = lib.name in
           let hash = E.get_hash e in
           if (file_exists lib key) then
-            HashMap.add hash (library, key) tbl
+            ((hash,(library, key))::tbl)
           else tbl)
         lib.entries tbl
 
@@ -275,7 +274,7 @@ module Make (D : Metadata) (LD : LibData) =
     (* We keep a global index of files by their hash to deal
      * with moved/renamed files and duplicates.
      * file_index : file_hash -> (library, file_path) *)
-    let file_index : file_table ref = ref HashMap.empty
+    let file_index : file_table ref = ref []
 
     let refresh_library ~library : (Path.rel * D.t) Seq.t =
       L.refresh (List.assoc library !libraries)
@@ -342,7 +341,7 @@ module Make (D : Metadata) (LD : LibData) =
       file_index :=
         List.fold_left (fun tbl (library,lib) ->
             L.index_files lib tbl)
-          HashMap.empty !libraries 
+          [] !libraries 
 
     (* Move entry and file from one library to another *)
     let migrate_entry ~from_lib ~to_lib (key : Path.rel) : unit =
@@ -397,31 +396,42 @@ module Make (D : Metadata) (LD : LibData) =
     let resolve_missing_files ~library : resolution Seq.t =
       let lib = List.assoc library !libraries in
       let entries = (L.get_unmatched_entries lib) in
-      Seq.filter_map (fun (key,entry) ->
-          let hash = (L.E.get_hash entry) in
-          match (HashMap.find_opt hash !file_index) with
-          | Some (library',key') ->
-             (try Some(Remap(remap_entry ~from_lib:library
-                           ~to_lib:library' key key'))
-              with _ -> None)
-          | None ->
-             Some (Missing key))
-        entries
+      let resolutions =
+        Seq.filter_map (fun (key,entry) ->
+            let hash = (L.E.get_hash entry) in
+            match (List.assoc_opt hash !file_index) with
+            | Some (library',key') ->
+               (try Some(Remap (remap_entry ~from_lib:library
+                               ~to_lib:library' key key'))
+                with _ -> None)
+            | None ->
+               Some (Missing key))
+          entries
+      in
+      resolutions
 
     (* Return list of entries with duplicate files *)
+    (* TODO: Attempt to merge duplicates if one is more precise than another *)
     let find_duplicates () : (string * Path.rel) list =
       let rec find_dups dup_hashes dups bdgs =
         match bdgs with
         | [] -> dups
         | [(hash,v)] ->
-           if (hash = List.hd dup_hashes)
-           then v::dups else dups
-        | (hash,v)::(((hash',v')::_) as bdgs) ->
-           if (hash = hash' || hash = List.hd dup_hashes)
+           if ((dup_hashes <> []) &&
+                 (hash = List.hd dup_hashes))
+           then
+             (v::dups)
+           else dups
+        | (hash,v)::bdgs ->
+           let (hash',v') = List.hd bdgs in
+           if (hash = hash' || ((dup_hashes <> []) &&
+                                  (hash = List.hd dup_hashes)))
            then (find_dups (hash::dup_hashes) (v::dups) bdgs)
            else (find_dups dup_hashes dups bdgs)
       in
-      let bdgs = List.(HashMap.bindings !file_index) in
+      let bdgs = (List.sort (fun (h,u) (h',u') ->
+                      Hash.compare h h')
+                    !file_index) in
       (find_dups [] [] bdgs)
       
     let to_json () : Json.t =

@@ -35,10 +35,7 @@ type attribute =  Star of bool
                 | Isbn of string
                 | Year of string
                 | Tags of string list
-                (* | Path of string
-                 * | DocType of string
-                 * | Hash of string *)
-                           
+
 let set_attribute (field : string) (value : string) : attribute =
   match field with
   | "star" -> Star (match value with
@@ -51,9 +48,6 @@ let set_attribute (field : string) (value : string) : attribute =
   | "doi" -> Doi value
   | "isbn" -> Isbn value
   | "tags" -> Tags (Str.split (Str.regexp "; +") value)
-  (* | "path" -> Path value
-   * | "doc_type" -> DocType value
-   * | "hash" -> Hash value *)
   | _ -> failwith "Not a field"
 
 let edit_document (field : attribute) (doc : t) : t =
@@ -64,9 +58,6 @@ let edit_document (field : attribute) (doc : t) : t =
    isbn = (match field with Isbn v -> v | _ -> doc.isbn);
    year = (match field with Year v -> v | _ -> doc.year);
    tags = (match field with Tags v -> v | _ -> doc.tags);
-   (* path = (match field with Path v -> v | _ -> doc.path); *)
-   (* doc_type = (match field with DocType v -> v | _ -> doc.doc_type);
-    * hash = (match field with Hash v -> v | _ -> doc.hash); *)
   }         
   
 let pp_doc ppf (d : t) =
@@ -86,9 +77,6 @@ let pp_doc ppf (d : t) =
       else (sprintf "  Year: %s@\n" d.year))
      (if d.tags = [] then ""
       else (sprintf "  Tags: %s@\n" (String.concat "; " d.tags)))
-     (* (sprintf "  Path: %s@\n" d.path)
-      * (sprintf "  Document Type: %s@\n" d.doc_type)
-      * (sprintf "  Hash: %s@\n" d.hash) *)
   )
 
                
@@ -102,8 +90,6 @@ let to_json (doc : t) : Json.t =
           ("isbn", `String doc.isbn);
           ("year", `String doc.year);
           ("tags", `List (List.map (fun x -> `String x) doc.tags));
-          (* ("doc_type", `String doc.doc_type);
-           * ("hash", `String doc.hash); *)
     ]
 
 let from_json (json : Json.t) : t =

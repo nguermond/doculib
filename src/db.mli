@@ -49,4 +49,7 @@ val refresh_library : library:string -> (Path.rel * Doc.t) list
 
 val resolve_missing_files : library:string -> Path.rel list
 
-val flush_data : unit -> unit
+val find_duplicates : unit -> (string * Path.rel) list
+  
+val flush_metadata : unit -> unit
+val flush_libconfig : unit -> unit

@@ -7,6 +7,7 @@ type root = string
 type rel = string
 type name = string
 
+(* TODO: Look at the Fpath library & Fileutils *)
 
 
 let debug = ref true

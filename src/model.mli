@@ -26,38 +26,52 @@ type row = Gtk.tree_iter
 val dnd_targets : Gtk.target_entry list
   
 module Attr :
-  sig
-    val star : bool GTree.column
-    val authors : string GTree.column
-    val title : string GTree.column
-    val year : string GTree.column
-    val doi : string GTree.column
-    val isbn : string GTree.column
-    val tags : string GTree.column
-    val path : string GTree.column
-    val missing : bool GTree.column
-    val duplicate : bool GTree.column
-      
-    val get_name : int -> string
-  end
+sig
+  val star : bool GTree.column
+  val authors : string GTree.column
+  val title : string GTree.column
+  val year : string GTree.column
+  val doi : string GTree.column
+  val isbn : string GTree.column
+  val tags : string GTree.column
+  val path : string GTree.column
+  val missing : bool GTree.column
+  val duplicate : bool GTree.column
+    
+  val get_name : int -> string
+end
 
 type t
-   
-val get_row : t -> Gtk.tree_path -> row
-  
-val get : t -> row:row -> column:('a GTree.column) -> 'a
 
-val remove : t -> row:row -> unit
+module Entry :
+sig
+  type t
+  val make : Path.rel -> ?missing:bool -> ?duplicate:bool -> Doc.t -> t
+  val get_doc : t -> Doc.t
+  val is_missing : t -> bool
+  val is_duplicate : t -> bool
+  val get_key : t -> Path.rel
+end
+     
+val get_row : t -> Gtk.tree_path -> row
 
 val get_row_from_path : t -> path:Path.rel -> row
 
-val remove_entry_from_path : t -> path:Path.rel -> unit
+val remove_entry : t -> row:row -> unit
+
+val set_entry : t -> row:row -> Entry.t -> unit
+
+val add_entry : t -> Entry.t -> unit
+
+val get_entry : t -> row:row -> Entry.t
+
+val is_missing : t -> row:row -> bool
+val is_duplicate : t -> row:row -> bool
+val get_path : t -> row:row -> Path.rel
   
-val set_entry : t -> row:row -> Path.rel -> Doc.t -> unit
+val flag_missing : t -> row:row -> bool -> unit
 
-val flag_missing : t -> row -> bool -> unit
-
-val flag_duplicate : t -> row -> bool -> unit
+val flag_duplicate : t -> row:row -> bool -> unit
   
 val import_documents : t -> (Path.rel * Doc.t) list -> unit
   
