@@ -1,9 +1,18 @@
 
 include Yojson.Basic
 
+      
 exception ParsingFailure of string
 
-let write_string = to_string
+let write_string (j : t) : string =
+  to_string j
+
+let pretty_to_string  (j : t) : string =
+  pretty_to_string j
+
+
+let from_string (s : string) : t =
+  from_string s
 
 let get (key : string) (json : t) : t option =
   match json with
@@ -11,7 +20,7 @@ let get (key : string) (json : t) : t option =
      (match (List.assoc_opt key kv_lst) with
       | Some v -> Some v
       | None -> None)
-  | _ -> None
+  | _ -> raise (ParsingFailure "Not an association list")
 
 let to_list (json : t) : t list =
   match json with
@@ -46,6 +55,8 @@ let default d (x : 'a option) : 'a =
   | Some `Null -> d
   | Some x -> x
 
+let get_err (key : string) (json : t) : t =
+  raise_opt ("Unbound key: `"^key^"`") (get key json)
 
 let add_entry (k : string) (v : t) (json : t) : t =
   match json with
@@ -56,3 +67,9 @@ let remove_entry (k : string) (json : t) : t =
   match json with
   | `Assoc kv_lst -> (`Assoc (List.remove_assoc k kv_lst))
   | _ -> raise (ParsingFailure "Not an association list")
+
+let to_file (path : Path.root) (json : t) : unit =
+  to_file (Path.string_of_root path) json
+
+let from_file (path : Path.root) : t =
+  from_file (Path.string_of_root path)

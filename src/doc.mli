@@ -1,4 +1,23 @@
-
+(******************************************************************************)
+(* DocuLib                                                                    *)
+(* Copyright (C) 2022 Nathan Guermond                                         *)
+(*                                                                            *)
+(* This program is free software: you can redistribute it and/or modify it    *)
+(* under the terms of the GNU General Public License as published by the Free *)
+(* Software Foundation, either version 3 of the License, or (at your option)  *)
+(* any later version.                                                         *)
+(*                                                                            *)
+(* This program is distributed in the hope that it will be useful, but        *)
+(* WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY *)
+(* or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License    *)
+(* for more details.                                                          *)
+(*                                                                            *)
+(* You should have received a copy of the GNU General Public License along    *)
+(* with this program. If not, see <https://www.gnu.org/licenses/>.            *)
+(*                                                                            *)
+(******************************************************************************)
+open Metadb
+   
 type t = {star : bool;
           title : string;
           authors : string list;
@@ -6,9 +25,7 @@ type t = {star : bool;
           isbn : string;
           year : string;
           tags : string list;
-          path : string;
-          doc_type : string;
-          hash : string;
+          (* notes : string *)
          }
 
 type attribute =  Star of bool
@@ -18,18 +35,21 @@ type attribute =  Star of bool
                 | Isbn of string
                 | Year of string
                 | Tags of string list
-                | Path of string
-                | DocType of string
-                | Hash of string
   
 val set_attribute : string -> string -> attribute
     
 val pp_doc : Format.formatter -> t -> unit
 val edit_document : attribute -> t -> t
 
-val doc_to_json : t -> Json.t
-val json_to_doc : string -> Json.t -> t
-val make_doc_from_file : string -> string -> string -> t
+val to_json : t -> Json.t
+val from_json : Json.t -> t
+(* val make_doc_from_file : string -> string -> string -> t *)
 
-val serialize_description : library:string -> paths:(string list) -> string
-val deserialize_description : string -> (string * (string list))
+val serialize_description : library:string -> paths:(Path.rel list) -> string
+val deserialize_description : string -> (string * (Path.rel list))
+
+
+val init : t
+
+
+val to_string : t -> string

@@ -1,6 +1,26 @@
+(******************************************************************************)
+(* DocuLib                                                                    *)
+(* Copyright (C) 2022 Nathan Guermond                                         *)
+(*                                                                            *)
+(* This program is free software: you can redistribute it and/or modify it    *)
+(* under the terms of the GNU General Public License as published by the Free *)
+(* Software Foundation, either version 3 of the License, or (at your option)  *)
+(* any later version.                                                         *)
+(*                                                                            *)
+(* This program is distributed in the hope that it will be useful, but        *)
+(* WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY *)
+(* or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License    *)
+(* for more details.                                                          *)
+(*                                                                            *)
+(* You should have received a copy of the GNU General Public License along    *)
+(* with this program. If not, see <https://www.gnu.org/licenses/>.            *)
+(*                                                                            *)
+(******************************************************************************)
 
 open Utilities
 
+open Metadb
+   
 exception LibraryDoesNotExist of string
 exception ModelNotLoaded of string
 exception Cancel
@@ -17,13 +37,13 @@ class library library doc_type page label =
     val doc_type : string = doc_type
     val page : GPack.box = page
     val label : GMisc.label = label
-    val mutable model : Model.model option = None
+    val mutable model : Model.t option = None
 
     method get_name : string = library
     method get_doc_type : string = doc_type
     method get_page : GPack.box = page
     method get_label : GMisc.label = label
-    method get_model : Model.model =
+    method get_model : Model.t =
       match model with
       | Some m -> m
       | None -> raise (ModelNotLoaded library)
@@ -31,7 +51,7 @@ class library library doc_type page label =
     method rename (name : string) : unit =
       library <- name
               
-    method set_model (m : Model.model) : unit =
+    method set_model (m : Model.t) : unit =
       model <- Some m
 
     method is_loaded : bool =
@@ -40,9 +60,8 @@ class library library doc_type page label =
       | None -> false
   end
   
-class notebook notebook db context_menu filter_func = object (self)
+class notebook notebook context_menu filter_func = object (self)
   val notebook : GPack.notebook = notebook
-  val db : Db.db = db
   val context_menu : GMenu.menu = context_menu
   val filter_func : GTree.model -> Gtk.tree_iter -> bool = filter_func
   val mutable libraries : (string * library) list = []
@@ -70,41 +89,51 @@ class notebook notebook db context_menu filter_func = object (self)
     
     page_label#drag#dest_set Model.dnd_targets ~actions:[`COPY];
     
-    ignore(page_label#drag#connect#data_received ~callback:(fun ctx ~x ~y data ~info ~time ->
-               self#load_library ~library;
-               if data#format = 8 then
-                 (let (from_lib,paths) = Doc.deserialize_description data#data in
-                  (self#move_documents ~from_lib ~to_lib:library paths);
-                  ctx#finish ~success:true ~del:false ~time)
-               else ctx#finish ~success:false ~del:false ~time
-      ))
+    ignore @@
+      page_label#drag#connect#data_received
+        ~callback:(fun ctx ~x ~y data ~info ~time ->
+          self#load_library ~library;
+          if data#format = 8 then
+            (let (from_lib,paths) = Doc.deserialize_description data#data in
+             (self#move_documents ~from_lib ~to_lib:library paths);
+             ctx#finish ~success:true ~del:false ~time)
+          else ctx#finish ~success:false ~del:false ~time
+        )
 
   method private move_documents ~from_lib ~to_lib paths : unit =
-    prerr_endline ("Moving documents: "^from_lib^" ---> "^to_lib);
     (* 1. move physical files to new location (preserving directory structure)
      * 2. move metadata files to new location (preserving directory structure)
      *)
+    Log.push (Format.sprintf "Moving (%d) files from `%s` to `%s`"
+                (List.length paths) from_lib to_lib);
     List.iter (fun path ->
-        try (let _ = db#move_document ~from_lib ~to_lib ~path in
-             let _ = ((self#get_library ~library:from_lib)#get_model#remove_entry_from_path ~path) in
-             let doc = db#get_document ~library:to_lib ~path in
-             (self#get_library ~library:to_lib)#get_model#import_documents [doc])
+        try (Db.migrate ~from_lib ~to_lib ~path;
+             let model = (self#get_library from_lib)#get_model in
+             let row = Model.get_row_from_path model ~path in
+             let doc = Db.get ~library:to_lib ~path in
+             let missing = Model.is_missing model ~row in
+             let duplicate = Model.is_duplicate model ~row in
+             let _ = Model.remove_entry model ~row in
+             let model = (self#get_library to_lib)#get_model in
+             let e = (Model.Entry.make path ~missing ~duplicate doc) in
+             (Model.add_entry model e))
         with
-          Db.CannotMoveFile ->
-          prerr_endline ("Could not move file: "^path)
-      ) paths
+          Db.CannotMigrate ->
+          Log.push (Format.sprintf "Could not move file: %s" (Path.string_of_rel path))
+      ) paths;
+    Db.flush_metadata()
+    
 
 
-  method remove_library ~library : unit =
-    (prerr_endline ("Removing library "^library^" @"
-                    ^(string_of_int (self#get_index ~library))));
-    (db#remove_library library);
+  method remove_library ~delete_metadata ~library : unit =
+    Log.push (Format.sprintf "Removing library `%s`" library);
+    (Db.remove_library ~delete_metadata ~library);
     notebook#remove_page (self#get_index ~library);
     libraries <- (List.remove_assoc library libraries)
 
   method rename_library ~library new_name : bool =
     try
-      ((db#rename_library ~library new_name);
+      ((Db.rename_library ~library new_name);
        let lib = (List.assoc library libraries) in
        (lib#rename new_name);
        libraries <- (new_name,lib) :: (List.remove_assoc library libraries);
@@ -115,17 +144,19 @@ class notebook notebook db context_menu filter_func = object (self)
       Db.LibraryExists -> false
     
   method init (libs : (string * string) list) : unit =
-    (List.iter (fun (library,doc_type) -> self#add_library ~library ~doc_type ~prepend:true)
+    (List.iter (fun (library,doc_type) ->
+         self#add_library ~library ~doc_type ~prepend:true)
        (List.rev libs));
     (* On page switch *)
-    notebook#connect#switch_page ~callback:(fun index ->
-        let n = (List.length libs) in
-        if n > 0 then
-          (let (library,lib) = (List.nth libraries index) in
-           (self#load_library ~library);
-           self#refilter ~library:(Some library) ())
-        else ()
-      );
+    ignore @@
+      notebook#connect#switch_page ~callback:(fun index ->
+          let n = (List.length libs) in
+          if n > 0 then
+            (let (library,lib) = (List.nth libraries index) in
+             (self#load_library ~library);
+             self#refilter ~library:(Some library) ())
+          else ()
+        );
     if (List.length libs) > 0 then
       (notebook#goto_page 0;
        let library = (fst (self#current_library)) in
@@ -141,15 +172,15 @@ class notebook notebook db context_menu filter_func = object (self)
     try (List.nth libraries page) with
       _ -> raise NoLibrary
 
-  method private get_library ~library : library =
+  method private get_library library : library =
     List.assoc library libraries
     
   method refilter ?(library=None) () : unit =
     let (library,lib) =
       (match library with
        | None -> self#current_library
-       | Some library -> (library, self#get_library ~library))
-    in lib#get_model#refilter()
+       | Some library -> (library, self#get_library library))
+    in Model.refilter (lib#get_model)
 
   method private set_model ~library ~model : unit =
     List.iter (fun (name, lib) ->
@@ -163,41 +194,54 @@ class notebook notebook db context_menu filter_func = object (self)
       let library = lib#get_name in
       let doc_type = lib#get_doc_type in
       let page = lib#get_page in
-      let data = (db#get_documents ~library) in
-      let model = (Model.make_document_list ~db:db ~multiple:true ~sort:(Some Model.Attr.star)
-                     ~editable:true ~multidrag:true ~library ~doc_type ~packing:page#add data) in
-      model#handle_click_events ~context_menu;
-      model#set_visible_func filter_func;
+      let data = (Db.get_documents ~library) in
+      let model = (Model.make_document_list
+                     ~sort:(Some Model.Attr.star) ~library
+                     ~doc_type ~packing:page#add data) in
+      Model.handle_click_events model ~context_menu;
+      Model.set_visible_func model filter_func;
       self#set_model library model;
       (self#refresh_library ~library)
 
   method refresh_library ~library : unit =
-    let lib = self#get_library ~library in
-    let data = (db#refresh_library ~library) in
-    (lib#get_model#import_documents data);
-    let bad_docs = (db#check_library_integrity ~library) in
-    (* (List.iter (fun doc ->
-     *      let model = (self#get_library ~library)#get_model in
-     *    bad_docs) *)
-    ()
+    prerr_endline "Refreshing library";
+    let lib = self#get_library library in
+    let new_data = (Db.refresh_library ~library) in
+    (Model.import_documents (lib#get_model) new_data);
+    (* returns a list of entries with missing files *)
+    let missing_docs = (Db.resolve_missing_files ~library) in
+    List.iter (fun key ->
+        let row = Model.get_row_from_path (lib#get_model) key in
+        Model.flag_missing (lib#get_model) row true)
+      missing_docs;
+    let duplicates = (Db.find_duplicates()) in
+    List.iter (fun (library',key) ->
+        if library = library' then
+          let row = Model.get_row_from_path (lib#get_model) key in
+          Model.flag_duplicate (lib#get_model) row true)
+      duplicates;
 
 
   method action_on_selected ~action : unit =
     let (library,lib) = self#current_library in
     List.iter (fun p ->
-        (action library lib#get_model (lib#get_model#get_row p)))
-      lib#get_model#get_selected_rows
+        (action library lib#get_model (Model.get_row (lib#get_model) p)))
+      (Model.get_selected_rows lib#get_model)
 
   method edit_selected ~editor : unit =
     let (library,lib) = self#current_library in
     let model = lib#get_model in
     iter_cancel (fun p ->
-        let path = (model#get ~row:(model#get_row p) ~column:Model.Attr.path) in
-        let doc = db#get_document ~library ~path in
-        let doc = (match (editor doc) with
+        let row = Model.get_row model p in
+        let path = Model.get_path model ~row in
+        let doc = Db.get ~library ~path in
+        let doc = (match (editor path doc) with
                    | None -> raise Cancel
                    | Some doc -> doc) in
-        db#set_document ~library ~path doc;
-        model#set_entry (model#get_row p) doc)
-      model#get_selected_rows
+        Db.set ~library ~path doc;
+        let missing = Model.is_missing model row in
+        let duplicate = Model.is_duplicate model row in
+        let e = Model.Entry.make path ~missing ~duplicate doc in
+        Model.set_entry model row e)
+      (Model.get_selected_rows model)
 end

@@ -1,7 +1,26 @@
+(******************************************************************************)
+(* DocuLib                                                                    *)
+(* Copyright (C) 2022 Nathan Guermond                                         *)
+(*                                                                            *)
+(* This program is free software: you can redistribute it and/or modify it    *)
+(* under the terms of the GNU General Public License as published by the Free *)
+(* Software Foundation, either version 3 of the License, or (at your option)  *)
+(* any later version.                                                         *)
+(*                                                                            *)
+(* This program is distributed in the hope that it will be useful, but        *)
+(* WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY *)
+(* or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License    *)
+(* for more details.                                                          *)
+(*                                                                            *)
+(* You should have received a copy of the GNU General Public License along    *)
+(* with this program. If not, see <https://www.gnu.org/licenses/>.            *)
+(*                                                                            *)
+(******************************************************************************)
 
 open Cohttp
 open Cohttp_lwt_unix
-
+open Metadb
+   
 exception UnexpectedDocumentType of string
 exception SearchFailure of string
                                   
@@ -37,7 +56,7 @@ let query_article_string (search_str : string) : string Lwt.t =
   (prerr_endline "Successful search...");
   body
 
-let parse_article (doc_type : string) (article : Json.t) : Db.doc =
+let parse_article (doc_type : string) (article : Json.t) : Doc.t =
   let title = (Json.to_string (Json.default (`String "") (Json.get "title" article))) in
   let authors = (List.map (fun author ->
                      (Json.raise_opt "No name" (Json.get "name" author))
@@ -49,21 +68,21 @@ let parse_article (doc_type : string) (article : Json.t) : Db.doc =
   let doi = Json.default `Null (Json.get "externalIds" article)
             |> (fun x -> Json.default (`String "") (Json.get "DOI" x))
             |> Json.to_string in
-  let doc : Db.doc = {star = false;
+  let doc : Doc.t = {star = false;
                       title = title;
                       authors = authors;
                       year = year;
                       doi = doi;
                       isbn = "";
                       tags = [];
-                      path = "";
-                      doc_type = doc_type;
-                      hash = "";
+                      (* path = "";
+                       * doc_type = doc_type;
+                       * hash = ""; *)
                      }
   in doc
 
    
-let parse_book (doc_type : string) (book : Json.t) : Db.doc =
+let parse_book (doc_type : string) (book : Json.t) : Doc.t =
   let title = (Json.to_string (Json.default (`String "") (Json.get "title" book))) in
   let authors = (List.map Json.to_string
                    (Json.default (`List []) (Json.get "author_name" book)
@@ -74,21 +93,21 @@ let parse_book (doc_type : string) (book : Json.t) : Db.doc =
   let isbn = (Json.to_string (Json.default (`String "") (List.nth_opt isbns 0))) in
   let book_str = Json.pretty_to_string book in
   prerr_endline ("Output:\n" ^ book_str);
-  let doc : Db.doc = {star = false;
+  let doc : Doc.t = {star = false;
                       title = title;
                       authors = authors;
                       year = year;
                       doi = "";
                       isbn = isbn;
                       tags = [];
-                      path = "";
-                      doc_type = doc_type;
-                      hash = "";
+                      (* path = "";
+                       * doc_type = doc_type;
+                       * hash = ""; *)
                      }
   in doc
 
   
-let search_article (doc_type : string) (search_str : string) : Db.doc list =
+let search_article (doc_type : string) (search_str : string) : Doc.t list =
   let body = Lwt_main.run (query_article_string search_str) in
   let json = Json.from_string body in
   let data =
@@ -104,7 +123,7 @@ let search_article (doc_type : string) (search_str : string) : Db.doc list =
   in (List.map (parse_article doc_type) data)                 
 
 
-let search_book (doc_type : string) (search_str : string) : Db.doc list =
+let search_book (doc_type : string) (search_str : string) : Doc.t list =
   let body = Lwt_main.run (query_book_string search_str) in
   let json = Json.from_string body in
   let data = try Json.to_list (Json.raise_opt "Unexpected result" (Json.get "docs" json)) with
@@ -115,7 +134,7 @@ let search_book (doc_type : string) (search_str : string) : Db.doc list =
   in (List.map (parse_book doc_type) data)                 
 
 
-let search_document (doc_type : string) (search_type : string) (search_str : string) : Db.doc list =
+let search_document (doc_type : string) (search_type : string) (search_str : string) : Doc.t list =
   match search_type with
   | "article" -> search_article doc_type search_str
   | "book" -> search_book doc_type search_str

@@ -1,5 +1,3 @@
-(executables
-  (names doculib)
-  (public_names doculib)
-  (libraries doculib_gui)
-)	
+(executable
+ (name doculib)
+ (libraries doculib_gui))

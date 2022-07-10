@@ -16,42 +16,44 @@
 (* with this program. If not, see <https://www.gnu.org/licenses/>.            *)
 (*                                                                            *)
 (******************************************************************************)
-
-exception EnvVarNotSet
-       
-exception LibraryExists
-   
-exception CannotMigrate
-
-exception InitializationError of string
+exception InvalidDocType
 
 open Metadb
 
-val init : unit -> unit
-  
-val add_library : library:string -> root:Path.root -> Library.t -> unit
-val remove_library : delete_metadata:bool -> library:string -> unit
-val rename_library : library:string -> string -> unit
+(* The database is versioned, to prevent data loss upon upgrade. *)
+let branches = ["3.0"; "2.1"; "2.0"]
+let current_branch = "3.0"
 
+type doc_type = [`Book | `Article]
 
-val get_library_root : library:string -> Path.root
+let string_of_doc_type = function
+  | `Book -> "book"
+  | `Article -> "article"
+               
+let doc_type_of_string = function
+  | "book" -> `Book
+  | "article" -> `Article
+  | _ -> raise (InvalidDocType)
 
-val get_file : library:string -> path:Path.rel -> Path.root
-val get : library:string -> path:Path.rel -> Doc.t
-val set : library:string -> path:Path.rel -> Doc.t -> unit
-val remove_entry : library:string -> path:Path.rel -> unit
-val remove_file : library:string -> path:Path.rel -> unit
-val migrate : from_lib:string -> to_lib:string -> path:Path.rel -> unit
+type t = {
+    version : string;
+    doc_type : doc_type;
+  }
+let to_json (lib : t) : Json.t =
+  (`Assoc [("version",`String lib.version);
+           ("doc_type", `String (string_of_doc_type lib.doc_type))
+  ])
+let from_json (j : Json.t) : t =
+  let v = (Json.to_string (Json.get_err "version" j)) in
+  let dtype = (doc_type_of_string (Json.to_string (Json.get_err "doc_type" j)))
+  in {version = v ; doc_type = dtype}
 
+let get_doc_type (ld : t) : doc_type =
+  ld.doc_type
 
-val get_documents : library:string -> (Path.rel * Doc.t) list
-val get_library_descriptions : unit -> (string * Library.t) list
+let get_version (ld : t) : string =
+  ld.version
 
-val refresh_library : library:string -> (Path.rel * Doc.t) list
-
-val resolve_missing_files : library:string -> Path.rel list
-
-val find_duplicates : unit -> (string * Path.rel) list
-  
-val flush_metadata : unit -> unit
-val flush_libconfig : unit -> unit
+let make (dtype : doc_type) : t =
+  {version = current_branch;
+   doc_type = dtype}
