@@ -63,7 +63,7 @@ class library library doc_type page label =
 class notebook notebook context_menu filter_func = object (self)
   val notebook : GPack.notebook = notebook
   val context_menu : GMenu.menu = context_menu
-  val filter_func : GTree.model -> Gtk.tree_iter -> bool = filter_func
+  val filter_func : string -> bool = filter_func
   val mutable libraries : (string * library) list = []
    
   method add_library ~library ~doc_type ~prepend : unit =
@@ -102,25 +102,24 @@ class notebook notebook context_menu filter_func = object (self)
 
   method private move_documents ~from_lib ~to_lib paths : unit =
     (* 1. move physical files to new location (preserving directory structure)
-     * 2. move metadata files to new location (preserving directory structure)
-     *)
+     * 2. move metadata files to new location (preserving directory structure) *)
     Log.push (Format.sprintf "Moving (%d) files from `%s` to `%s`"
                 (List.length paths) from_lib to_lib);
-    List.iter (fun path ->
+    let model = (self#get_library from_lib)#get_model in
+    let model' = (self#get_library to_lib)#get_model in    
+    Model.iter model (fun key path () ->
         try (Db.migrate ~from_lib ~to_lib ~path;
-             let model = (self#get_library from_lib)#get_model in
-             let row = Model.get_row_from_path model ~path in
              let doc = Db.get ~library:to_lib ~path in
-             let missing = Model.is_missing model ~row in
-             let duplicate = Model.is_duplicate model ~row in
-             let _ = Model.remove_entry model ~row in
-             let model = (self#get_library to_lib)#get_model in
+             let missing = Model.is_missing model ~key in
+             let duplicate = Model.is_duplicate model ~key in
+             let _ = Model.remove_entry model ~key in
              let e = (Model.Entry.make path ~missing ~duplicate doc) in
-             (Model.add_entry model e))
+             (Model.add_entry model' e))
         with
           Db.CannotMigrate ->
-          Log.push (Format.sprintf "Could not move file: %s" (Path.string_of_rel path))
-      ) paths;
+          Log.push (Format.sprintf "Could not move file: %s"
+                      (Path.string_of_rel path))
+      ) (List.map (fun x -> (x,())) paths);
     Db.flush_metadata()
     
 
@@ -168,10 +167,14 @@ class notebook notebook context_menu filter_func = object (self)
     | Some i -> i
 
   method current_library : (string * library) =
-    let page = notebook#current_page in
-    try (List.nth libraries page) with
-      _ -> raise NoLibrary
-
+    let (library,lib) =
+      let page = notebook#current_page in
+      try (List.nth libraries page) with
+        _ -> raise NoLibrary
+    in
+    prerr_endline (Format.sprintf "Library: %s" library);
+    (library,lib)
+    
   method private get_library library : library =
     List.assoc library libraries
     
@@ -204,44 +207,42 @@ class notebook notebook context_menu filter_func = object (self)
       (self#refresh_library ~library)
 
   method refresh_library ~library : unit =
-    prerr_endline "Refreshing library";
+    Log.push (Format.sprintf "Refreshing library %s" library);
     let lib = self#get_library library in
     let new_data = (Db.refresh_library ~library) in
     (Model.import_documents (lib#get_model) new_data);
     (* returns a list of entries with missing files *)
     let missing_docs = (Db.resolve_missing_files ~library) in
-    List.iter (fun key ->
-        let row = Model.get_row_from_path (lib#get_model) key in
-        Model.flag_missing (lib#get_model) row true)
-      missing_docs;
+    let model = lib#get_model in
+    Model.iter model ~action:(fun key path () ->
+        prerr_endline (Format.asprintf "Missing: %a" Path.pp_rel path);
+        Model.flag_missing model ~key true)
+      (List.map (fun x -> (x, ())) missing_docs);
     let duplicates = (Db.find_duplicates()) in
-    List.iter (fun (library',key) ->
+    Model.iter model (fun key path library' ->
         if library = library' then
-          let row = Model.get_row_from_path (lib#get_model) key in
-          Model.flag_duplicate (lib#get_model) row true)
-      duplicates;
-
+          (prerr_endline (Format.asprintf "Duplicate: %a" Path.pp_rel path);
+           Model.flag_duplicate model ~key true))
+      (List.map (fun (lib,path) -> (path,lib)) duplicates)
 
   method action_on_selected ~action : unit =
     let (library,lib) = self#current_library in
-    List.iter (fun p ->
-        (action library lib#get_model (Model.get_row (lib#get_model) p)))
-      (Model.get_selected_rows lib#get_model)
+    Model.iter_selected lib#get_model (fun key path ->
+        (action lib#get_model library key path))
 
   method edit_selected ~editor : unit =
     let (library,lib) = self#current_library in
     let model = lib#get_model in
-    iter_cancel (fun p ->
-        let row = Model.get_row model p in
-        let path = Model.get_path model ~row in
-        let doc = Db.get ~library ~path in
-        let doc = (match (editor path doc) with
-                   | None -> raise Cancel
-                   | Some doc -> doc) in
-        Db.set ~library ~path doc;
-        let missing = Model.is_missing model row in
-        let duplicate = Model.is_duplicate model row in
-        let e = Model.Entry.make path ~missing ~duplicate doc in
-        Model.set_entry model row e)
-      (Model.get_selected_rows model)
+    try
+      Model.iter_selected model (fun key path ->
+          let doc = Db.get ~library ~path in
+          let doc = (match (editor path doc) with
+                     | None -> raise Cancel
+                     | Some doc -> doc) in
+          Db.set ~library ~path doc;
+          let missing = Model.is_missing model ~key in
+          let duplicate = Model.is_duplicate model ~key in
+          let e = Model.Entry.make path ~missing ~duplicate doc in
+          Model.set_entry model ~key e)
+    with Cancel -> ()
 end

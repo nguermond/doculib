@@ -21,7 +21,6 @@ open Metadb
 type cell_renderer
 type column
 type packing
-type row = Gtk.tree_iter
 
 val dnd_targets : Gtk.target_entry list
   
@@ -42,6 +41,7 @@ sig
 end
 
 type t
+type key
 
 module Entry :
 sig
@@ -50,28 +50,23 @@ sig
   val get_doc : t -> Doc.t
   val is_missing : t -> bool
   val is_duplicate : t -> bool
-  val get_key : t -> Path.rel
+  val get_path : t -> Path.rel
 end
      
-val get_row : t -> Gtk.tree_path -> row
+val remove_entry : t -> key:key -> unit
 
-val get_row_from_path : t -> path:Path.rel -> row
-
-val remove_entry : t -> row:row -> unit
-
-val set_entry : t -> row:row -> Entry.t -> unit
+val set_entry : t -> key:key -> Entry.t -> unit
 
 val add_entry : t -> Entry.t -> unit
 
-val get_entry : t -> row:row -> Entry.t
+val get_entry : t -> key:key -> Entry.t
 
-val is_missing : t -> row:row -> bool
-val is_duplicate : t -> row:row -> bool
-val get_path : t -> row:row -> Path.rel
+val is_missing : t -> key:key -> bool
+val is_duplicate : t -> key:key -> bool
   
-val flag_missing : t -> row:row -> bool -> unit
+val flag_missing : t -> key:key -> bool -> unit
 
-val flag_duplicate : t -> row:row -> bool -> unit
+val flag_duplicate : t -> key:key -> bool -> unit
   
 val import_documents : t -> (Path.rel * Doc.t) list -> unit
   
@@ -83,9 +78,15 @@ val reset_sort_indicators : t -> unit
 val handle_click_events : t -> context_menu:GMenu.menu -> unit
 
 val refilter : t -> unit
-val set_visible_func : t -> (GTree.model -> row -> bool) -> unit
-val get_selected_rows : t -> Gtk.tree_path list
 
+val set_visible_func : t -> (string -> bool) -> unit
+
+val iter_selected : t -> action:(key -> Path.rel -> unit) -> unit
+
+val on_selected : t -> (key -> Path.rel -> 'a) -> 'a
+  
+val iter : t -> action:(key -> Path.rel -> 'a -> unit) -> (Path.rel * 'a) list -> unit
+  
 val make_document_list : ?height:int -> library:string -> doc_type:string ->
                          ?sort:(('a GTree.column) option) ->
                          packing:(GObj.widget -> unit) -> (Path.rel * Doc.t) list -> t

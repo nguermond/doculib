@@ -35,7 +35,7 @@ class library : string -> string -> GPack.box -> GMisc.label ->
     method set_model : Model.t -> unit
   end
                                
-class notebook : GPack.notebook -> GMenu.menu -> (GTree.model -> Model.row -> bool)
+class notebook : GPack.notebook -> GMenu.menu -> (string -> bool)
   -> object
   val mutable libraries : (string * library) list
                                                  
@@ -51,6 +51,7 @@ class notebook : GPack.notebook -> GMenu.menu -> (GTree.model -> Model.row -> bo
   method current_library : string * library
            
   method refilter : ?library:(string option) -> unit -> unit
-  method action_on_selected : action:(string -> Model.t -> Model.row -> unit) -> unit
+  method action_on_selected : action:(Model.t -> string -> Model.key -> Path.rel -> unit)
+                              -> unit
   method edit_selected : editor:(Path.rel -> Doc.t -> Doc.t option) -> unit
 end

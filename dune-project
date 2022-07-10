@@ -16,7 +16,7 @@
   dune
   (fileutils (>= 0.5.3))
   (yojson (>= 2.0.0))
-  (ocaml (>= 4.12.0))
+  (ocaml (>= 4.13.0))
 ))
 
 (package

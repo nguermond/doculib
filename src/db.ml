@@ -115,7 +115,9 @@ let refresh_library ~library : (Path.rel * Doc.t) list =
 
 (* Assumes library was just refreshed *)
 let resolve_missing_files ~library : Path.rel list =
+  Log.push (Format.sprintf "Indexing libraries");
   Libraries.index_files();
+  Log.push (Format.sprintf "Resolving missing files for library %s" library);
   let keys =
     Seq.filter_map (function
         | Libraries.Missing key ->
@@ -128,9 +130,11 @@ let resolve_missing_files ~library : Path.rel list =
       (Libraries.resolve_missing_files ~library)
     |> List.of_seq
   in
+  Log.push (Format.sprintf "Flushing metadata for library %s" library);
   Libraries.flush_metadata();
   keys
 
 (* Assumes library was just refreshed & files were indexed *)
 let find_duplicates () : (string * Path.rel) list =
+  Log.push (Format.sprintf "Finding duplicates");
   Libraries.find_duplicates ()

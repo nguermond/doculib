@@ -84,3 +84,9 @@ let get_leaf (root : root) : name =
 let hidden (path : root) : bool =
   let leaf = get_leaf (strip_root "/" path) in
   leaf.[0] = '.'
+
+let pp_root ppf (path : root) =
+  Format.fprintf ppf "%s" (string_of_root path)
+
+let pp_rel ppf (path : rel) =
+  Format.fprintf ppf "%s" (string_of_rel path)

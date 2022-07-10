@@ -36,6 +36,8 @@ jobs:
       - name: Build and deploy documentation
         if: matrix.os == 'ubuntu-latest'    
         uses: ocaml/setup-ocaml/deploy-doc@v2
+        with:
+          destination-dir: doc
 
       - name: Rename binary (macOS)
         if: matrix.os == 'macOS-latest'

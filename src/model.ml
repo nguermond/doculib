@@ -73,14 +73,14 @@ module Attr =
 module Entry =
   struct
     type t = {
-        key : Path.rel;
+        path : Path.rel;
         doc : Doc.t;
         missing : bool;
         duplicate : bool;
       }
 
-    let make key ?(missing=false) ?(duplicate=false) doc = {
-        key = key;
+    let make path ?(missing=false) ?(duplicate=false) doc = {
+        path = path;
         doc = doc;
         missing = missing;
         duplicate = duplicate;
@@ -89,9 +89,11 @@ module Entry =
     let get_doc (e : t) = e.doc
     let is_missing (e : t) = e.missing
     let is_duplicate (e : t) = e.duplicate
-    let get_key (e : t) = e.key
+    let get_path (e : t) = e.path
+
   end
-      
+
+  
 type t = {
     mutable filter : filter;
     store : store;
@@ -99,37 +101,22 @@ type t = {
     mutable num_cols : int;
   }
 
+type key = row
 let make filter store view : t =
   {filter = filter;
    store = store;
    view = view;
    num_cols = 0;
   }
-  
+
 let get_row (m : t) p =
   (m.store#get_iter (m.filter#convert_path_to_child_path p))
 
-let get (m : t) =
-  m.store#get
-
-let remove_entry (m : t) ~row : unit =
-  ignore (m.store#remove row)
-
-let get_row_from_path (m : t) ~path : row =
-  let path = Path.string_of_rel path in
-  match m.store#get_iter_first with
-  | Some iter ->
-     let p0 = ref (m.store#get_path iter) in
-     m.store#foreach (fun p _ ->
-         let row = (get_row m p) in
-         let path' = get m ~row ~column:Attr.path in
-         (if path = path' then
-            (p0 := p; true)
-          else false));
-     (get_row m !p0)
-  | None -> failwith "Row does not exist"
+let remove_entry (m : t) ~key : unit =
+  ignore (m.store#remove key)
   
-let set_entry (m : t) ~row (e : Entry.t) : unit =
+let set_entry (m : t) ~key (e : Entry.t) : unit =
+  let row = key in
   let doc = Entry.get_doc e in
   m.store#set ~row ~column:Attr.star doc.star;
   m.store#set ~row ~column:Attr.title doc.title;
@@ -138,25 +125,26 @@ let set_entry (m : t) ~row (e : Entry.t) : unit =
   m.store#set ~row ~column:Attr.isbn doc.isbn;
   m.store#set ~row ~column:Attr.year doc.year;
   m.store#set ~row ~column:Attr.tags (String.concat "; " doc.tags);
-  m.store#set ~row ~column:Attr.path (Path.string_of_rel (Entry.get_key e));
+  m.store#set ~row ~column:Attr.path (Path.string_of_rel (Entry.get_path e));
   m.store#set ~row ~column:Attr.missing (Entry.is_missing e);
   m.store#set ~row ~column:Attr.duplicate (Entry.is_duplicate e)
 
 let add_entry (m : t) (e : Entry.t) : unit =
-  let row = m.store#append () in
-  set_entry m ~row e
+  let key = m.store#append () in
+  set_entry m ~key e
 
-let get_entry (m : t) ~row : Entry.t =
-  let star = get m ~row ~column:Attr.star in
-  let title = get m ~row ~column:Attr.title in
-  let authors = get m ~row ~column:Attr.authors in
-  let doi = get m ~row ~column:Attr.doi in
-  let isbn = get m ~row ~column:Attr.isbn in
-  let year = get m ~row ~column:Attr.year in
-  let tags = get m ~row ~column:Attr.tags in
-  let path = get m ~row ~column:Attr.path in
-  let missing = get m ~row ~column:Attr.missing in
-  let duplicate = get m ~row ~column:Attr.duplicate in
+let get_entry (m : t) ~key : Entry.t =
+  let row = key in
+  let star = m.store#get ~row ~column:Attr.star in
+  let title = m.store#get ~row ~column:Attr.title in
+  let authors = m.store#get ~row ~column:Attr.authors in
+  let doi = m.store#get ~row ~column:Attr.doi in
+  let isbn = m.store#get ~row ~column:Attr.isbn in
+  let year = m.store#get ~row ~column:Attr.year in
+  let tags = m.store#get ~row ~column:Attr.tags in
+  let path = m.store#get ~row ~column:Attr.path in
+  let missing = m.store#get ~row ~column:Attr.missing in
+  let duplicate = m.store#get ~row ~column:Attr.duplicate in
   let doc =
     Doc.init
     |> Doc.edit_document (Doc.set_attribute "star" (string_of_bool star))
@@ -167,22 +155,28 @@ let get_entry (m : t) ~row : Entry.t =
     |> Doc.edit_document (Doc.set_attribute "tags" tags)
   in
   Entry.make (Path.mk_rel path) ~missing ~duplicate doc
+
+
+let string_of_row (m : GTree.model ) ~row : string =
+  String.concat " "
+    [m#get ~row ~column:Attr.title;
+     m#get ~row ~column:Attr.authors;
+     m#get ~row ~column:Attr.tags;
+     m#get ~row ~column:Attr.path
+    ]
   
-let flag_missing (m : t) ~row b : unit =
-  m.store#set ~row ~column:Attr.missing b
+let flag_missing (m : t) ~key b : unit =
+  m.store#set ~row:key ~column:Attr.missing b
 
-let flag_duplicate (m : t) ~row b : unit =
-  m.store#set ~row ~column:Attr.duplicate b
+let flag_duplicate (m : t) ~key b : unit =
+  m.store#set ~row:key ~column:Attr.duplicate b
 
-let is_missing (m : t) ~row : bool =
-  get m ~row ~column:Attr.missing
+let is_missing (m : t) ~key : bool =
+  m.store#get ~row:key ~column:Attr.missing
 
-let is_duplicate (m : t) ~row : bool =
-  get m ~row ~column:Attr.duplicate
+let is_duplicate (m : t) ~key : bool =
+  m.store#get ~row:key ~column:Attr.duplicate
 
-let get_path (m : t) ~row : Path.rel =
-  Path.mk_rel (get m ~row ~column:Attr.path)
-  
 let import_documents (m : t) (data : (Path.rel * Doc.t) list) : unit =
   List.iter
     (fun (key,doc) ->
@@ -306,12 +300,36 @@ let handle_click_events (m : t) ~(context_menu : GMenu.menu) : unit =
 let refilter (m : t) : unit =
   m.filter#refilter()
   
-let set_visible_func (m : t) (f : GTree.model -> Gtk.tree_iter -> bool) : unit =
-  m.filter#set_visible_func f
+let set_visible_func (m : t) (f : string -> bool) : unit =
+  m.filter#set_visible_func (fun m row -> f (string_of_row m ~row))
 
-let get_selected_rows (m : t) : Gtk.tree_path list =
-  m.view#selection#get_selected_rows    
+let on_selected (m : t) (f : key -> Path.rel -> 'a) : 'a = 
+  let row = get_row m (List.nth m.view#selection#get_selected_rows 0) in
+  let path = Path.mk_rel (m.store#get ~row ~column:Attr.path) in
+  (f row path)
 
+  
+let iter_selected (m : t) ~(action:(key -> Path.rel -> unit)) =
+  List.iter (fun p ->
+      let row = get_row m p in
+      let path = m.store#get ~row ~column:Attr.path in
+      (action row (Path.mk_rel path)))
+  m.view#selection#get_selected_rows
+
+(* Worst case quadratic on number of entries *)
+let iter (m : t) ~(action:(key -> Path.rel -> 'a -> unit)) paths =
+  let n = ref (List.length paths) in
+  m.store#foreach (fun p _ ->
+      let row = (get_row m p) in
+      let path = Path.mk_rel(m.store#get ~row ~column:Attr.path) in
+      (match (List.assoc_opt path paths) with
+       | None -> ()
+       | Some v ->
+          n := !n - 1;
+          (action row path v));
+      (if !n = 0 then true else false))
+       
+  
 let make_toggle_cell_renderer ~(store : store) ~(model : t) ~library ~(column : bool GTree.column) : cell_renderer =
   let renderer,values =
     (GTree.cell_renderer_toggle
@@ -322,7 +340,7 @@ let make_toggle_cell_renderer ~(store : store) ~(model : t) ~library ~(column : 
     renderer#connect#toggled ~callback:(fun p ->
         let row = (get_row model p) in
         let value = (not (store#get ~row ~column)) in
-        let path = Path.mk_rel (get model ~row ~column:Attr.path) in
+        let path = Path.mk_rel (model.store#get ~row ~column:Attr.path) in
         let doc = Db.get ~library ~path in
         let doc = Doc.edit_document (Star value) doc in
         Db.set ~library ~path doc;

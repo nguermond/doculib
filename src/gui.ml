@@ -48,16 +48,14 @@ class search_bar search_box search_entry =
 object
   val search_box : GPack.box = search_box
 
-  val filter_func = (fun (model : GTree.model) row ->
+  val filter_func = (fun search_string ->
     let search_query = search_entry#text in
-    (* prerr_endline ("Searching query: "^search_query); *)
-    let search_string = (String.concat " " (List.map (fun column -> model#get ~row ~column)
-                                              [Model.Attr.title; Model.Attr.authors; Model.Attr.tags; Model.Attr.path])) in
     let open Agrep in
     if search_query = "" then true
     else
       let pat = (pattern ~transl:Iso8859_15.case_and_accent_insensitive search_query) in
-      (string_match pat ~numerrs:(if (String.length search_string > 2) then 1 else 0) search_string)
+      (string_match pat ~numerrs:(if (String.length search_string > 2) then 1 else 0)
+         search_string)
   )
   val search_entry : GEdit.entry = search_entry
 
@@ -274,8 +272,7 @@ let manage_libraries ~notebook : unit =
         | None -> ()
       );
 
-  (* TODO:: Removing a library no longer deletes metadata. 
-   * Add checkbox to remove metadata *)
+  (* Add checkbox to remove metadata *)
   ignore @@
     remove_b#connect#clicked ~callback:(fun() ->
         let p = (List.nth (view#selection#get_selected_rows) 0) in
@@ -327,8 +324,7 @@ let search_metadata ~(default : Doc.t) ~doc_type (search_str : string) : Doc.t o
                       ~label:(Search.get_database_name "book")
                       ~packing:(radio_hbox#pack ~from:`END) () in
 
-  (* TODO: Nast hack *)
-  let docs = (List.map (fun doc -> (Path.mk_rel "dummy", doc)) docs) in
+  let docs = (List.mapi (fun i doc -> (Path.mk_rel (string_of_int i), doc)) docs) in
   let model = Model.make_entry_list ~height:380 ~doc_type
                 ~packing:dialog#vbox#pack docs in
   
@@ -345,8 +341,7 @@ let search_metadata ~(default : Doc.t) ~doc_type (search_str : string) : Doc.t o
         let docs = (try Search.search_document doc_type search_type search_str with
                       Search.SearchFailure msg -> (error_dialog msg); []) in
         Model.reset_model model;
-        (* TODO: Nasty hack *)
-        let docs = (List.map (fun doc -> (Path.mk_rel "dummy", doc)) docs) in
+        let docs = (List.mapi (fun i doc -> (Path.mk_rel (string_of_int i), doc)) docs) in
         Model.import_documents model docs;
         ());
 
@@ -356,14 +351,11 @@ let search_metadata ~(default : Doc.t) ~doc_type (search_str : string) : Doc.t o
   
   let ret =
     (match dialog#run() with
-     | `OK ->
-        let selection = (Model.get_selected_rows model) in
-        let p = (List.nth selection 0) in
-        let row = Model.get_row model p in
-        let e = Model.get_entry model ~row in
-        let doc = Model.Entry.get_doc e
-                  |> Doc.edit_document (Doc.Tags default.tags) in
-        Some doc
+     | `OK -> Model.on_selected model (fun key path ->
+                  let e = Model.get_entry model ~key in
+                  let doc = Model.Entry.get_doc e
+                            |> Doc.edit_document (Doc.Tags default.tags) in
+                  Some doc)
      | `CANCEL -> None
      | `DELETE_EVENT -> Some default) in
 
@@ -426,10 +418,12 @@ let main () =
   ignore @@
     context_factory#add_item "Open"
       ~callback:(fun _ ->
-        notebook#action_on_selected (fun library model row ->
-            let path = Model.get_path model ~row in
+        notebook#action_on_selected (fun model library key path ->
             let file = (Db.get_file ~library ~path) in
-            System.open_file file)
+            if System.file_exists file then
+              System.open_file file
+            else
+              (error_dialog "File does not exist!"))
       );
   
   (* Search for metadata *)
@@ -450,8 +444,7 @@ let main () =
   ignore @@
     context_factory#add_item "Open DOI"
       ~callback:(fun _ ->
-        notebook#action_on_selected (fun library model row ->
-            let path = (Model.get_path model ~row) in
+        notebook#action_on_selected (fun model library key path ->
             let doi = (Db.get ~library ~path).doi in
             (if doi = "" then (error_dialog "No DOI for selected entry!")
              else System.open_url ("https://www.doi.org/" ^ doi)))
@@ -464,8 +457,7 @@ let main () =
     context_factory#add_item "Copy File Name"
       ~callback:(fun _ ->
         let clipboard = GtkBase.Clipboard.get Gdk.Atom.clipboard in
-        notebook#action_on_selected (fun library model row ->
-            let path = (Model.get_path model ~row) in
+        notebook#action_on_selected (fun model library key path ->
             let name = (Path.get_leaf (Db.get_file ~library ~path)) in
             (GtkBase.Clipboard.set_text clipboard (Path.string_of_name name)))
       );
@@ -475,8 +467,7 @@ let main () =
     context_factory#add_item "Copy File Path"
       ~callback:(fun _ ->
         let clipboard = GtkBase.Clipboard.get Gdk.Atom.clipboard in
-        notebook#action_on_selected (fun library model row ->
-            let path = Model.get_path model ~row in
+        notebook#action_on_selected (fun model library key path ->
             let file = (Db.get_file ~library ~path) in
             (GtkBase.Clipboard.set_text clipboard (Path.string_of_root file)))
       );
@@ -492,9 +483,8 @@ let main () =
                                ~message_type:`QUESTION () in
 
         (match confirm_dialog#run() with
-         | `OK -> notebook#action_on_selected (fun library model row ->
-                      let path = (Model.get_path model ~row)  in
-                      Model.remove_entry model ~row;
+         | `OK -> notebook#action_on_selected (fun model library key path ->
+                      Model.remove_entry model ~key;
                       Db.remove_entry ~library ~path;
                       Db.remove_file ~library ~path)
          | _ -> ());

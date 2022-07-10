@@ -74,3 +74,8 @@ val drop_leaf : root -> root
 
 (** [hidden path] will return true if the {{!get_leaf} leaf} of [path] is a hidden file, that is starts with ['.'] *)
 val hidden : root -> bool
+
+(** Pretty print path *)
+val pp_root : Format.formatter -> root -> unit
+
+val pp_rel : Format.formatter -> rel -> unit
