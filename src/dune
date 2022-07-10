@@ -20,9 +20,10 @@
     Utilities
     Library
     Log
-    ; Update_db
+
+    update_db
   )
-  )
+)
 
 (env
   (dev

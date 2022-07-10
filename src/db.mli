@@ -23,6 +23,8 @@ exception LibraryExists
    
 exception CannotMigrate
 
+exception InitializationError of string
+
 open Metadb
 
 val init : unit -> unit

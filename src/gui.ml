@@ -22,6 +22,7 @@ open Gobject.Data
 open Metadb
    
 exception InternalError of string
+exception InitializationError
     
 let choose_dir (title : string) : string option =
   let dialog = GWindow.file_chooser_dialog ~action:`SELECT_FOLDER ~title () in
@@ -399,8 +400,10 @@ let main () =
   let search_bar = search_bar ~packing:(vbox#pack ~from:`START) in
 
   (* Database *)
-  (* Update_db.init(); *)
-  Db.init();
+  (try Db.init() with
+   | Db.InitializationError msg ->
+      (error_dialog msg);
+      raise InitializationError);
 
   (* Notebook *)
   let notebook = GPack.notebook ~packing:vbox#add () in
@@ -437,13 +440,13 @@ let main () =
         notebook#edit_selected (fun path doc ->
             let search_str =
               (if doc.title = "" then
-                 (Str.global_replace (Str.regexp ("[-_\\()]"))
+                 (Str.global_replace (Str.regexp ("[-_\\()]\\|\\.[^\\.]+$"))
                     " " (Path.string_of_name (Path.get_leaf path)))
                else doc.title) in
             search_metadata ~default:doc ~doc_type search_str)
       );
 
-    (* Open DOI of selected files *)
+  (* Open DOI of selected files *)
   ignore @@
     context_factory#add_item "Open DOI"
       ~callback:(fun _ ->

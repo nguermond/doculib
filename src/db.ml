@@ -22,7 +22,8 @@ open Metadb
 
 exception LibraryExists
 exception EntryDoesNotExist of string * Path.rel
-exception CannotMigrate          
+exception CannotMigrate
+exception InitializationError of string
 
                    
 let configdir : Path.root =
@@ -43,6 +44,10 @@ let libconfig : Path.root =
 module Libraries = Make(Doc)(Library)
 
 let init () =
+  Log.push "Checking database compatilibity";
+  (try Update_db.init()
+   with (Update_db.CannotMigrate msg) ->
+     raise (InitializationError msg));
   Log.push "Loading library configuration file";
   Libraries.load_config libconfig;
   Log.push "Initializing libraries";
