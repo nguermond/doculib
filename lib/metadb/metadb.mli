@@ -149,7 +149,8 @@ module Make : functor (D : Metadata) (LD : LibData) ->
         This function assumes 
         - All libraries are {{!init_libraries} freshly initialized} or have been {{!refresh_library} refreshed}
         - Files have been {{!index_files} indexed}
-        Note: This function cannot resolve duplicate conflicts 
+
+        Note: This function cannot resolve duplicate conflicts.
         Library metadata should be flushed after calling this function to prevent data loss
 *)
     val resolve_missing_files : library:string -> resolution Seq.t
@@ -158,6 +159,7 @@ module Make : functor (D : Metadata) (LD : LibData) ->
         This function assumes 
         - All libraries are {{!init_libraries} freshly initialized} or have been {{!refresh_library} refreshed}
         - Files have been {{!index_files} indexed}
+       
         This may be called immediately after {!resolve_missing_files}
 *)
     val find_duplicates : unit -> (string * Path.rel) list

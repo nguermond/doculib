@@ -103,13 +103,11 @@ module Library (D : Metadata) (LD : LibData) =
 
     let load_entries (lib : t) : unit =
       let root = (store lib) in
-      prerr_endline ("Loading entries in "^(Path.string_of_root root));
       (Seq.iter 
          (fun path ->
            let entry = (E.read_file path) in
            let path = (Path.remove_file_ext "json" path) in
            let key = (Path.strip_root root path) in
-           prerr_endline ("Adding entry: "^(Path.string_of_rel key));
            Hashtbl.add lib.entries key entry)
          (System.get_files ~hidden:true root))
 
@@ -134,7 +132,6 @@ module Library (D : Metadata) (LD : LibData) =
           if (entry_exists lib key) then None
           else
             let d = D.init in
-            prerr_endline ("No entry for "^(Path.string_of_rel key));
             let h = Hash.hash_file path in
             let entry = (E.make d h) in
             Hashtbl.add lib.entries key entry;
@@ -236,12 +233,9 @@ module Library (D : Metadata) (LD : LibData) =
 
     (* write modified entries to disk *)
     let flush_modified_entries (lib : t) : unit =
-      prerr_endline ("flushing: "^lib.name);
       Hashtbl.iter 
         (fun key entry ->
           if (E.modified entry) then
-            let _ = prerr_endline (Path.string_of_rel key) in
-            prerr_endline (D.to_string (E.get_data entry));
             let path = (Path.merge (store lib) key) in
             let file = (Path.add_file_ext "json" path) in
             E.write_file file entry
@@ -294,7 +288,6 @@ module Make (D : Metadata) (LD : LibData) =
       L.get lib key
 
     let set_entry ~library (key : Path.rel) (m : D.t) : unit =
-      prerr_endline ("Setting entry ~ "^(D.to_string m));
       let lib = (List.assoc library !libraries) in
       L.set lib key m
 
@@ -372,9 +365,6 @@ module Make (D : Metadata) (LD : LibData) =
 
       
     let remap_entry ~from_lib ~to_lib key key' : (Path.rel * (string * Path.rel)) =
-      prerr_endline (Format.sprintf "Remapping %s:%s -> %s:%s"
-                       from_lib (Path.string_of_rel key)
-                       to_lib (Path.string_of_rel key'));
       let lib = (List.assoc from_lib !libraries) in
       let lib' = (List.assoc to_lib !libraries) in
       if ((L.entry_exists lib' key')
@@ -403,7 +393,8 @@ module Make (D : Metadata) (LD : LibData) =
             | Some (library',key') ->
                (try Some(Remap (remap_entry ~from_lib:library
                                ~to_lib:library' key key'))
-                with _ -> None)
+                with _ ->
+                  (Some (Missing key)))
             | None ->
                Some (Missing key))
           entries
