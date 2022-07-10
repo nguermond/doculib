@@ -1,5 +1,15 @@
 # Changes
 
+## v1.3.0
+* major refactoring of JSON database
+* library configuration is now stored in `$XDG_CONFIG_HOME/doculib` (or `$HOME/.config/doculib` if the former does not exist) instead of `$HOME/.doculib`
+* library metadata is now stored relative to each library in `/path/to/library/.metadata/`
+* searching for moved/renamed/duplicate files is now $O(n)$ instead of $O(n^2)$, and search will span across all libraries
+* add "copy file name" and "copy file path" to the context menu options
+* add option to remove library without removing metadata
+* highlight or mark duplicate and missing entries
+* can only migrate metadata from v1.2.1. Upgrade to v1.2.1 before upgrading to this version
+
 ## v1.2.1
 * icon is now encoded in source (no longer needs to be installed)
 * reorganized new library dialog
