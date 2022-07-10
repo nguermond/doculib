@@ -15,7 +15,7 @@ jobs:
           - ubuntu-latest
           - macos-latest
         ocaml-compiler:
-          - 4.12.0
+          - 4.13.0
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
@@ -34,6 +34,7 @@ jobs:
         run: opam exec -- dune build
 
       - name: Build and deploy documentation
+        if: matrix.os == 'ubuntu-latest'    
         uses: ocaml/setup-ocaml/deploy-doc@v2
 
       - name: Rename binary (macOS)
