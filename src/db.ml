@@ -135,6 +135,6 @@ let resolve_missing_files ~library : Path.rel list =
   keys
 
 (* Assumes library was just refreshed & files were indexed *)
-let find_duplicates () : (string * Path.rel) list =
+let find_duplicates () : ((string * Path.rel) list) list =
   Log.push (Format.sprintf "Finding duplicates");
   Libraries.find_duplicates ()

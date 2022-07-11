@@ -50,7 +50,7 @@ let dnd_targets : Gtk.target_entry list = [
 module Attr =
   struct
     open Gobject.Data
-    let col_names = ["star"; "authors"; "title"; "year"; "doi"; "isbn"; "tags"; "path"; "missing" ; "duplicate"]
+    let col_names = ["star"; "authors"; "title"; "year"; "doi"; "isbn"; "tags"; "path"; "missing" ; "duplicate" ; "msg"]
 
     let columns = new GTree.column_list
              
@@ -64,9 +64,14 @@ module Attr =
     let path = columns#add string
     let missing = columns#add boolean
     let duplicate = columns#add boolean
+    let msg = columns#add string
 
     let get_name i : string =
       List.nth col_names i
+
+    let get_index col : int =
+      List.assoc col (List.combine col_names
+                        (List.init (List.length col_names) (fun i -> i)))
   end
 
 
@@ -170,6 +175,9 @@ let flag_missing (m : t) ~key b : unit =
 
 let flag_duplicate (m : t) ~key b : unit =
   m.store#set ~row:key ~column:Attr.duplicate b
+
+let set_message (m : t) ~key msg : unit =
+  m.store#set ~row:key ~column:Attr.msg msg
 
 let is_missing (m : t) ~key : bool =
   m.store#get ~row:key ~column:Attr.missing
@@ -415,7 +423,8 @@ let make_document_list ?(height=400) ~(library:string) ~(doc_type:string)
 
   let store = GTree.list_store Attr.columns in
   let filter = (GTree.model_filter store) in
-  let view = GTree.view ~model:filter ~packing:swindow#add() in
+  let view = GTree.view ~tooltip_column:(Attr.get_index "msg")
+               ~model:filter ~packing:swindow#add() in
   let model = (make filter store view) in
 
   view#set_enable_grid_lines `HORIZONTAL;

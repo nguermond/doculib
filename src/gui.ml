@@ -159,6 +159,9 @@ let new_library ~(notebook:Notebook.notebook) : (string * Path.root) option =
   let doc_type_l = GMisc.label ~text:"Type" ~packing:(grid#attach ~left:0 ~top:2) () in
   let doc_type_combo = GEdit.combo_box_text ~active:0 ~strings:["article"; "book"]
                          ~packing:(grid#attach ~left:1 ~top:2)() in
+  let warning_l = GMisc.label ~xpad:8 ~ypad:8
+                    ~text:"(Warning: this may take some time for large libraries!)"
+                    ~packing:(dialog#vbox#pack)() in
   
   ignore @@
     root_path_b#connect#clicked ~callback:(fun () ->
@@ -167,10 +170,9 @@ let new_library ~(notebook:Notebook.notebook) : (string * Path.root) option =
           | Some path -> path
           | None -> "" in
         root_path_e#set_text root_path;
-        let key = (String.split_on_char '/' root_path) in
-        let library = (List.nth key ((List.length key) - 1)) in
+        let default_name = (Path.get_leaf (Path.mk_root root_path)) in
         (if name_e#text = "" then
-           name_e#set_text library)
+           name_e#set_text (Path.string_of_name default_name))
       );
 
   dialog#add_button_stock `OK `OK;
@@ -181,22 +183,26 @@ let new_library ~(notebook:Notebook.notebook) : (string * Path.root) option =
       let doc_type = match GEdit.text_combo_get_active doc_type_combo with
         | None -> raise (InternalError "Not possible: doc_type not selected")
         | Some s -> s in
-      let root = Path.mk_root (root_path_e#text) in
-      let library = name_e#text in
+      let root_txt = (root_path_e#text) in
+      let name_txt = Font.pango_quote (name_e#text) in
       dialog#destroy();
-      (try
-         (let lib = (Library.make (Library.doc_type_of_string doc_type)) in
-          Db.add_library ~library ~root lib;
-          notebook#add_library ~library ~doc_type ~prepend:false;
-          notebook#load_library ~library;
-          (Some (library, root)))
-       with
-       | Db.LibraryExists
-         -> (error_dialog (Format.sprintf "Library `%s` already exists!" library));
-            None
-      )
-   | `CANCEL | `DELETE_EVENT ->
-      dialog#destroy(); None)
+      (if root_txt = "" then
+         None
+       else
+         let root = Path.mk_root root_txt in
+         let library = name_txt in
+         (try
+            let lib = (Library.make (Library.doc_type_of_string doc_type)) in
+            Db.add_library ~library ~root lib;
+            notebook#add_library ~library ~doc_type ~prepend:false;
+            notebook#load_library ~library;
+            (Some (library, root))
+          with
+          | Db.LibraryExists
+            -> (error_dialog (Format.sprintf "Library `%s` already exists!" library));
+               None))
+      | `CANCEL | `DELETE_EVENT ->
+         dialog#destroy(); None)
 
   
 let manage_libraries ~notebook : unit =
@@ -227,17 +233,21 @@ let manage_libraries ~notebook : unit =
                                    ["text",path]) in
                     
   (* save cell edits *)
+  (* TODO: There is still a `Not found` error with a newly renamed *)
   ignore @@
     name_renderer#connect#edited ~callback:(fun p str ->
         let row = (store#get_iter p) in
         let column = name in
+        let new_name = str in
         let library = (store#get ~row ~column) in
-        (* TODO: escaped quotes can be problematic! *)
-        let new_name = (Str.global_replace (Str.regexp "/")
-                          (Str.quote "\\") str) in
-        (prerr_endline ("Rename: "^library^" ~> "^new_name));
+        (Log.push (Format.sprintf "Rename library: %s -> %s"
+                     library new_name));
         (if (notebook#rename_library ~library new_name) then
-           store#set ~row ~column new_name)
+           begin
+             store#set ~row ~column new_name;
+             Db.rename_library ~library new_name;
+             Db.flush_libconfig()
+           end)
       );
 
   let name_col = GTree.view_column ~title:"Library" ~renderer:(name_renderer,name_values) () in

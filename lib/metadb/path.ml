@@ -16,7 +16,7 @@ let set_debug (d : bool) : unit =
   debug := d
           
 (* TODO: Maybe we should distinguish between files and directories? *)
-let root_type = (Str.regexp "\\(/\\|\\(/[^/]+\\)*\\)$")
+let root_type = (Str.regexp "\\(/\\|\\(/[^/]+\\)+\\)$")
 let rel_type = (Str.regexp "[^/]+\\(/[^/]+\\)*$")
 let name_type = (Str.regexp "[^/]+$")
 let leaf_type = (Str.regexp "/[^/]+$")

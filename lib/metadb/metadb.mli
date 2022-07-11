@@ -155,14 +155,21 @@ module Make : functor (D : Metadata) (LD : LibData) ->
 *)
     val resolve_missing_files : library:string -> resolution Seq.t
 
-    (** Return a list of entries and their libraries for which there exists another entry (across all libraries) pointing to a file of the same hash.
+    (** Return a partition of the duplicate files, of the form:
+        {[
+        [[(lib11, file11), ... (lib1n, file1n)]
+         [(lib21, file21), ... (lib2n, file2n)]
+         ...
+         [(libm1, filem1), ... (libmn, filemn)]]
+        ]}
+        such that entries in each row are duplicate files having the same hash.
         This function assumes 
         - All libraries are {{!init_libraries} freshly initialized} or have been {{!refresh_library} refreshed}
         - Files have been {{!index_files} indexed}
        
         This may be called immediately after {!resolve_missing_files}
 *)
-    val find_duplicates : unit -> (string * Path.rel) list
+    val find_duplicates : unit -> ((string * Path.rel) list) list
       
     (** {2 Writing data to disk} *)
       

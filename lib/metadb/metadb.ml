@@ -91,13 +91,16 @@ module Library (D : Metadata) (LD : LibData) =
   struct
     module E = Entry(D)
     type t = {
-        name : string;
+        mutable name : string;
         root : Path.root;
         libdata : LD.t;
         entries : (Path.rel, E.t) Hashtbl.t;
       }
 
-      
+           
+    let rename (lib : t) new_name : t =
+      lib.name <- new_name; lib
+
     let store (lib : t) : Path.root =
       Path.merge lib.root (Path.mk_rel ".metadata")
 
@@ -279,10 +282,6 @@ module Make (D : Metadata) (LD : LibData) =
     let init_libraries () : unit =
       List.iter (fun (name,lib) -> L.init lib) !libraries
 
-    (* let add_entry ~library (key : Path.rel) (m : D.t) : unit =
-     *   let lib = (List.assoc library !libraries) in
-     *   L.add lib key m *)
-
     let get_entry ~library (key : Path.rel) : D.t option =
       let lib = (List.assoc library !libraries) in
       L.get lib key
@@ -316,6 +315,7 @@ module Make (D : Metadata) (LD : LibData) =
 
     let rename_library ~library new_name : unit =
       let lib = List.assoc library !libraries in
+      let lib = L.rename lib new_name in
       remove_library ~delete_metadata:false ~library;
       libraries := (library,lib) :: !libraries
 
@@ -379,7 +379,6 @@ module Make (D : Metadata) (LD : LibData) =
             (key,(to_lib,key'))
          | None -> raise InternalError)
         
-    (* We must resolve duplicates before we can resolve missing files! *)
     (* This function assumes 
      * 1. libraries are freshly initialized or have been refreshed
      * 2. files have been indexed *)
@@ -401,24 +400,36 @@ module Make (D : Metadata) (LD : LibData) =
       in
       resolutions
 
-    (* Return list of entries with duplicate files *)
+    (* Return type is a partition of the duplicate files, of the form:
+        [[(lib11, file11), ... (lib1n, file1n)]
+         [(lib21, file21), ... (lib2n, file2n)]
+         ...
+         [(libm1, filem1), ... (libmn, filemn)]]
+       such that entries in each row are duplicates
+     *)
     (* TODO: Attempt to merge duplicates if one is more precise than another *)
-    let find_duplicates () : (string * Path.rel) list =
+    let find_duplicates () : ((string * Path.rel) list) list =
       let rec find_dups dup_hashes dups bdgs =
-        match bdgs with
-        | [] -> dups
-        | [(hash,v)] ->
-           if ((dup_hashes <> []) &&
-                 (hash = List.hd dup_hashes))
+        match bdgs, dup_hashes, dups with
+        | [], _, dups -> dups
+        | [(hash,v)], [], [] -> []
+        | [(hash,v)], h::_, dup::dups ->
+           if ((hash = h))
            then
-             (v::dups)
-           else dups
-        | (hash,v)::bdgs ->
-           let (hash',v') = List.hd bdgs in
-           if (hash = hash' || ((dup_hashes <> []) &&
-                                  (hash = List.hd dup_hashes)))
-           then (find_dups (hash::dup_hashes) (v::dups) bdgs)
-           else (find_dups dup_hashes dups bdgs)
+             ((v::dup)::dups)
+           else (dup::dups)
+        | (hash,v)::bdgs, h::_, dup::dups -> 
+           if (hash = h) then
+             (find_dups dup_hashes ((v::dup)::dups) bdgs)
+           else if (hash = fst (List.hd bdgs)) then
+             (find_dups (hash::dup_hashes) ([v]::(dup::dups)) bdgs)
+           else (find_dups dup_hashes (dup::dups) bdgs)
+        | (hash,v)::bdgs, [], [] ->
+           if (hash = fst (List.hd bdgs)) then
+             (find_dups ([hash]) ([[v]]) bdgs)
+           else
+             (find_dups [] [] bdgs)
+        | _ -> raise (InternalError)
       in
       let bdgs = (List.sort (fun (h,u) (h',u') ->
                       Hash.compare h h')

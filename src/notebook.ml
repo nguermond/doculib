@@ -67,7 +67,7 @@ class notebook notebook context_menu filter_func = object (self)
   val mutable libraries : (string * library) list = []
    
   method add_library ~library ~doc_type ~prepend : unit =
-    (prerr_endline ("Adding library "^library));
+    Log.push (Format.sprintf "Adding library: %s" library);
     let label = (GMisc.label ~text:library ()) in
     let page = (GPack.vbox ~border_width:8 ~spacing:8
                   ~packing:(fun w ->
@@ -172,7 +172,6 @@ class notebook notebook context_menu filter_func = object (self)
       try (List.nth libraries page) with
         _ -> raise NoLibrary
     in
-    prerr_endline (Format.sprintf "Library: %s" library);
     (library,lib)
     
   method private get_library library : library =
@@ -215,16 +214,29 @@ class notebook notebook context_menu filter_func = object (self)
     let missing_docs = (Db.resolve_missing_files ~library) in
     let model = lib#get_model in
     Model.iter model ~action:(fun key path () ->
-        prerr_endline (Format.asprintf "Missing: %a" Path.pp_rel path);
         Model.flag_missing model ~key true)
       (List.map (fun x -> (x, ())) missing_docs);
     let duplicates = (Db.find_duplicates()) in
-    Model.iter model (fun key path library' ->
-        if library = library' then
-          (prerr_endline (Format.asprintf "Duplicate: %a" Path.pp_rel path);
-           Model.flag_duplicate model ~key true))
-      (List.map (fun (lib,path) -> (path,lib)) duplicates)
-
+    (* Display list of duplicates *)
+    Model.iter model (fun key path (library,dups) ->
+        let msg = Font.pango_quote
+                    (String.concat "\n"
+                       (List.map (fun (library',path) ->
+                            Format.asprintf "%s//%a"
+                              library' Path.pp_rel path)
+                          dups))
+        in
+        Model.set_message model ~key
+          (Format.sprintf "File is a duplicate:\n%s" msg);
+        Model.flag_duplicate model ~key true)
+      ((Seq.filter (fun (path,(library',_)) ->
+            (library = library'))
+          (Seq.concat_map (fun dups ->
+               (Seq.map (fun (library,path) ->
+                    (path,(library,dups))) (List.to_seq dups)))
+             (List.to_seq duplicates)))
+       |> List.of_seq)
+    
   method action_on_selected ~action : unit =
     let (library,lib) = self#current_library in
     Model.iter_selected lib#get_model (fun key path ->

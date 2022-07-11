@@ -25,3 +25,8 @@ let calc_font_height ~(widget : GObj.widget) ?(ypad = 0) (num_lines : int) : int
   let ascent = metrics#ascent in
   let descent = metrics#descent in
   GPango.to_pixels((2 * (GPango.from_pixels ypad)) + (num_lines * (ascent + descent)))
+
+(* ampersands must be escaped for Pango *)
+let pango_quote (str : string) : string =
+    Str.global_replace (Str.regexp (Str.quote "&")) "&amp;" str
+                  

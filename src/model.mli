@@ -62,11 +62,14 @@ val add_entry : t -> Entry.t -> unit
 val get_entry : t -> key:key -> Entry.t
 
 val is_missing : t -> key:key -> bool
+
 val is_duplicate : t -> key:key -> bool
   
 val flag_missing : t -> key:key -> bool -> unit
 
 val flag_duplicate : t -> key:key -> bool -> unit
+
+val set_message : t -> key:key -> string -> unit
   
 val import_documents : t -> (Path.rel * Doc.t) list -> unit
   

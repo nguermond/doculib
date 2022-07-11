@@ -1,5 +1,10 @@
 # Changes
 
+* loading speed of large libraries is now linear in number of duplicates
+* add error dialog when trying to open missing file
+* renamed libraries are now saved on exit
+* Add tooltip message to list file duplicates
+
 ## v1.3.0
 * major refactoring of JSON database
 * library configuration is now stored in `$XDG_CONFIG_HOME/doculib` (or `$HOME/.config/doculib` if the former does not exist) instead of `$HOME/.doculib`
