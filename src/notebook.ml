@@ -99,6 +99,7 @@ class notebook notebook context_menu filter_func = object (self)
     notebook#set_tab_reorderable page#coerce true;
     ignore @@
       notebook#connect#page_reordered ~callback:(fun page i ->
+          (* TODO: Only do this once! *)
           let library = (GMisc.label_cast (notebook#get_tab_label page))#text in
           Log.push (Format.sprintf "Reordered tab: %s -> %d" library i);
           let lib = List.assoc library libraries in

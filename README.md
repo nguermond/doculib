@@ -12,8 +12,8 @@ A simple GUI for managing document metadata for books, textbooks, or articles.
 ## Installation (Debian/Ubuntu)
 On Debian/Ubuntu:
 ```
-wget https://github.com/nguermond/doculib/releases/download/v1.3.0/doculib_1.3.0_amd64.deb
-sudo dpkg -i doculib_1.3.0_amd64.deb
+wget https://github.com/nguermond/doculib/releases/download/v1.3.1/doculib_1.3.1_amd64.deb
+sudo dpkg -i doculib_1.3.1_amd64.deb
 sudo apt -f install
 ```
 and run with `doculib`.

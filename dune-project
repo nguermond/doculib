@@ -10,7 +10,7 @@
 
 (package
  (name metadb)
-  (version 1.0.0)
+  (version 1.0.1)
  (synopsis "A database for storing and managing file metadata in JSON format")
  (depends
   dune
@@ -21,7 +21,7 @@
 
 (package
  (name doculib)
-  (version 1.3.0)
+  (version 1.3.1)
  (synopsis "A GUI for tagging and managing document metadata for books, textbooks, or articles")
  (depends
   dune
