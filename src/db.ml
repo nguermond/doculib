@@ -57,9 +57,9 @@ let flush_metadata () =
   Log.push "Flushing metadata";
   Libraries.flush_metadata()
   
-let flush_libconfig () =
+let flush_libconfig ?(ord = []) () =
   Log.push "Flushing libconfig";
-  Libraries.write_config libconfig
+    Libraries.write_config ~ord libconfig
 
 let add_library ~library ~root (libdata : Library.t) : unit =
   try

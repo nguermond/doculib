@@ -54,4 +54,4 @@ val resolve_missing_files : library:string -> Path.rel list
 val find_duplicates : unit -> ((string * Path.rel) list) list
   
 val flush_metadata : unit -> unit
-val flush_libconfig : unit -> unit
+val flush_libconfig : ?ord:(string list) -> unit -> unit

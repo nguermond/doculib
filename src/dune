@@ -9,18 +9,17 @@
     agrep
     metadb)
   (modules
-    Icons
-    Font
-    Gui
-    Doc
-    Db
-    Search
-    Model
-    Notebook
-    Utilities
-    Library
-    Log
-
+    icons
+    font
+    gui
+    doc
+    db
+    search
+    model
+    notebook
+    library
+    log
+    listutil
     update_db
   )
 )

@@ -317,7 +317,7 @@ module Make (D : Metadata) (LD : LibData) =
       let lib = List.assoc library !libraries in
       let lib = L.rename lib new_name in
       remove_library ~delete_metadata:false ~library;
-      libraries := (library,lib) :: !libraries
+      libraries := (new_name,lib) :: !libraries
 
     let move_library ~library (root : Path.root) : unit =
       let lib = List.assoc library !libraries in
@@ -437,10 +437,10 @@ module Make (D : Metadata) (LD : LibData) =
       (find_dups [] [] bdgs)
       
     let to_json () : Json.t =
-      (`List (List.map (fun (name,lib) ->
-                  (L.to_json lib))
+      (`List (List.map (fun (library,lib) ->
+                  L.to_json lib)
                 !libraries))
-      
+        
     let from_json (json : Json.t) : (string * L.t) list =
       let libs = Json.to_list json in
       (List.map L.from_json libs)
@@ -455,7 +455,12 @@ module Make (D : Metadata) (LD : LibData) =
          libraries := [])
         
 
-    let write_config (libconfig : Path.root) : unit =
+    let write_config ?(ord = []) (libconfig : Path.root) : unit =
+      libraries := 
+        (if ord = [] then !libraries else
+           (List.init (List.length !libraries) (fun i ->
+                let library = (List.nth ord i) in
+                (library, List.assoc library !libraries))));
       let jlibs = to_json () in
       Json.to_file libconfig jlibs
 

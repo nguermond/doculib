@@ -233,7 +233,6 @@ let manage_libraries ~notebook : unit =
                                    ["text",path]) in
                     
   (* save cell edits *)
-  (* TODO: There is still a `Not found` error with a newly renamed *)
   ignore @@
     name_renderer#connect#edited ~callback:(fun p str ->
         let row = (store#get_iter p) in
@@ -242,12 +241,8 @@ let manage_libraries ~notebook : unit =
         let library = (store#get ~row ~column) in
         (Log.push (Format.sprintf "Rename library: %s -> %s"
                      library new_name));
-        (if (notebook#rename_library ~library new_name) then
-           begin
-             store#set ~row ~column new_name;
-             Db.rename_library ~library new_name;
-             Db.flush_libconfig()
-           end)
+        if (notebook#rename_library ~library new_name) then
+          store#set ~row ~column new_name;
       );
 
   let name_col = GTree.view_column ~title:"Library" ~renderer:(name_renderer,name_values) () in
@@ -410,6 +405,7 @@ let main () =
   (* Notebook *)
   let notebook = GPack.notebook ~packing:vbox#add () in
   let notebook = new Notebook.notebook notebook context_menu search_bar#get_filter in
+
   
   let libraries = (Db.get_library_descriptions ()) in
   let libraries = (List.map (fun (name,desc) ->

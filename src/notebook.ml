@@ -17,15 +17,13 @@
 (*                                                                            *)
 (******************************************************************************)
 
-open Utilities
-
 open Metadb
    
 exception LibraryDoesNotExist of string
 exception ModelNotLoaded of string
 exception Cancel
 exception NoLibrary
-                                      
+
 let iter_cancel f lst : unit =
   try (List.iter f lst) with
   | Cancel -> ()
@@ -59,13 +57,36 @@ class library library doc_type page label =
       | Some _ -> true
       | None -> false
   end
-  
+
 class notebook notebook context_menu filter_func = object (self)
   val notebook : GPack.notebook = notebook
   val context_menu : GMenu.menu = context_menu
   val filter_func : string -> bool = filter_func
   val mutable libraries : (string * library) list = []
-   
+
+  method init (libs : (string * string) list) : unit =
+    (List.iter (fun (library,doc_type) ->
+         self#add_library ~library ~doc_type ~prepend:false;
+         prerr_endline (string_of_int (List.length libraries)))
+       libs);
+    (* On page switch *)
+    ignore @@
+      notebook#connect#switch_page ~callback:(fun index ->
+          let n = (List.length libs) in
+          if n > 0 then
+            (let (library,lib) = (List.nth libraries index) in
+             Log.push (Format.sprintf "Switching to library: %s[%d]" library index);
+             (self#load_library ~library);
+             self#refilter ~library:(Some library) ())
+          else ()
+        );
+    if (List.length libs) > 0 then
+      begin
+        notebook#goto_page 0;
+        let library = (fst (self#current_library)) in
+        self#load_library ~library
+      end
+
   method add_library ~library ~doc_type ~prepend : unit =
     Log.push (Format.sprintf "Adding library: %s" library);
     let label = (GMisc.label ~text:library ()) in
@@ -74,14 +95,28 @@ class notebook notebook context_menu filter_func = object (self)
                     let add_page = (if prepend then notebook#prepend_page
                                else notebook#append_page) in
                     ignore (add_page ~tab_label:(label#coerce) w)) ()) in
+
+    notebook#set_tab_reorderable page#coerce true;
+    ignore @@
+      notebook#connect#page_reordered ~callback:(fun page i ->
+          let library = (GMisc.label_cast (notebook#get_tab_label page))#text in
+          Log.push (Format.sprintf "Reordered tab: %s -> %d" library i);
+          let lib = List.assoc library libraries in
+          libraries <- List.remove_assoc library libraries;
+          libraries <- Listutil.insert libraries i (library,lib);
+          Db.flush_libconfig ~ord:(fst (List.split libraries)) ()
+        );
+
+
     let lib = new library library doc_type page label in
     self#init_DnD_dest lib;
     
-    let libs = (library, lib) :: libraries in
     (if prepend then
        (libraries <- (library, lib) :: libraries)
      else
-       (libraries <- (List.rev ((library,lib) :: (List.rev libraries)))))
+       (let index = (List.length libraries) in
+        Log.push (Format.sprintf "Adding library %s at [%d]" library index);
+        libraries <- (Listutil.insert libraries index (library,lib))))
 
   method private init_DnD_dest (lib : library) : unit =
     let page_label = lib#get_label in
@@ -131,38 +166,22 @@ class notebook notebook context_menu filter_func = object (self)
     libraries <- (List.remove_assoc library libraries)
 
   method rename_library ~library new_name : bool =
+    Log.push (Format.sprintf "Renaming library %s -> %s"
+                library new_name);
     try
-      ((Db.rename_library ~library new_name);
+      (Db.rename_library ~library new_name;
+       Db.flush_libconfig();
        let lib = (List.assoc library libraries) in
        (lib#rename new_name);
-       libraries <- (new_name,lib) :: (List.remove_assoc library libraries);
+       libraries <- Listutil.rename_assoc library new_name libraries;
        let label = lib#get_label in
        label#set_text new_name;
        true)
     with
       Db.LibraryExists -> false
     
-  method init (libs : (string * string) list) : unit =
-    (List.iter (fun (library,doc_type) ->
-         self#add_library ~library ~doc_type ~prepend:true)
-       (List.rev libs));
-    (* On page switch *)
-    ignore @@
-      notebook#connect#switch_page ~callback:(fun index ->
-          let n = (List.length libs) in
-          if n > 0 then
-            (let (library,lib) = (List.nth libraries index) in
-             (self#load_library ~library);
-             self#refilter ~library:(Some library) ())
-          else ()
-        );
-    if (List.length libs) > 0 then
-      (notebook#goto_page 0;
-       let library = (fst (self#current_library)) in
-       self#load_library ~library)    
-
   method private get_index ~library : int =
-    match (List.assoc_index libraries library) with
+    match (Listutil.assoc_index libraries library) with
     | None -> raise (LibraryDoesNotExist library)
     | Some i -> i
 
@@ -191,6 +210,8 @@ class notebook notebook context_menu filter_func = object (self)
       libraries
     
   method load_library ~library : unit =
+    Log.push (Format.sprintf "Loading library: %s[%d]"
+                library (Option.get (Listutil.assoc_index libraries library)));
     let lib = (List.assoc library libraries) in
     if lib#is_loaded then () else
       let library = lib#get_name in
@@ -214,6 +235,8 @@ class notebook notebook context_menu filter_func = object (self)
     let missing_docs = (Db.resolve_missing_files ~library) in
     let model = lib#get_model in
     Model.iter model ~action:(fun key path () ->
+        Model.set_message model ~key
+          (Format.sprintf "File is missing");
         Model.flag_missing model ~key true)
       (List.map (fun x -> (x, ())) missing_docs);
     let duplicates = (Db.find_duplicates()) in

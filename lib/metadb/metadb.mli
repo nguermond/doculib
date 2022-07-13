@@ -69,8 +69,9 @@ module Make : functor (D : Metadata) (LD : LibData) ->
     (** Load database configurations from file *)
     val load_config : Path.root -> unit
 
-    (** Write database configuration to file *)  
-    val write_config : Path.root -> unit
+    (** Write database configuration to file.
+        Optional argument is ordering in which libraries should be written *)  
+    val write_config : ?ord:(string list) -> Path.root -> unit
 
     (** {2 Managing libraries} *)
       

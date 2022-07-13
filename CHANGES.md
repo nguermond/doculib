@@ -1,9 +1,11 @@
 # Changes
 
+## v1.3.1
 * loading speed of large libraries is now linear in number of duplicates
 * add error dialog when trying to open missing file
 * renamed libraries are now saved on exit
-* Add tooltip message to list file duplicates
+* add tooltip message to list locations of duplicates
+* tabs can now be reordered
 
 ## v1.3.0
 * major refactoring of JSON database
