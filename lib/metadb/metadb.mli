@@ -1,6 +1,4 @@
-(** [Metadb] is a library to locally store and manipulate a JSON database of file metadata. 
-    A key feature of [Metadb] is that the user may rename or move files within a library, or move files between directories,
-    and [Metadb] will resolve missing or renamed files according to their MD5 hash. [Metadb] can also find duplicate files across libraries.
+(** [Metadb] is a library to locally store and manipulate a JSON database of file metadata. A key feature of Metadb is that a user may rename or move files within or between libraries, and Metadb will resolve missing or renamed files according to their MD5 hash. Metadb can also find duplicate files across libraries.
 
     A database is composed of one or more libraries, each of which points to a specific directory in the [$HOME] path.
     A library may have metadata specified by {!LibData}, such as its version of the type of its entries. 
@@ -158,10 +156,10 @@ module Make : functor (D : Metadata) (LD : LibData) ->
 
     (** Return a partition of the duplicate files, of the form:
         {[
-        [[(lib11, file11), ... (lib1n, file1n)]
-         [(lib21, file21), ... (lib2n, file2n)]
+        [[(lib_11, file_11), (lib_12, file_12),...]
+         [(lib_21, file_21), (lib_22, file_22),...]
          ...
-         [(libm1, filem1), ... (libmn, filemn)]]
+         [(lib_n1, file_n1), (lib_n2, file_n2),...]]
         ]}
         such that entries in each row are duplicate files having the same hash.
         This function assumes 
