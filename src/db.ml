@@ -114,6 +114,7 @@ let refresh_library ~library : (Path.rel * Doc.t) list =
   List.of_seq (Libraries.refresh_library ~library)
 
 (* Assumes library was just refreshed *)
+(* TODO: Remapped files need to be updated in the notebook *)
 let resolve_missing_files ~library : Path.rel list =
   Log.push (Format.sprintf "Indexing libraries");
   Libraries.index_files();
