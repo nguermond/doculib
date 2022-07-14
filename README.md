@@ -1,5 +1,5 @@
 # DocuLib
-![screenshot.png](/icons/screenshot.png)
+![screenshot.png](/icons/screenshot-1.png)
 A simple GUI for managing document metadata for books, textbooks, or articles.
 
 ## Features
