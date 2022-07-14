@@ -46,6 +46,10 @@ sig
   (** An constant value must be specified for initialization *)
   val init : t
 
+  (** How two entries can be merged to resolve conflicts.
+      If value is None, entries will not be merged *)
+  val merge : t -> t -> t option
+    
   (** For debugging purposes *)
   val to_string : t -> string
 end
@@ -143,14 +147,13 @@ module Make : functor (D : Metadata) (LD : LibData) ->
     type resolution = Remap of (Path.rel * (string * Path.rel))
                     | Missing of Path.rel
       
-    (** Resolve moved or renamed files. Entries may no longer point to a file if the user moves or renames files.
-        For each entry no longer pointing to a file, this function searches accross all libraries for a file with matching hash.
+    (** Attempt to resolve entries that are no longer pointing to a file.
+        For each entry no longer pointing to a file, this function searches accross all libraries for a file with matching hash. If an entry to the corresponding file exists, attempt to {{!Metadata.merge} merge} both entries.
         This function assumes 
         - All libraries are {{!init_libraries} freshly initialized} or have been {{!refresh_library} refreshed}
         - Files have been {{!index_files} indexed}
 
-        Note: This function cannot resolve duplicate conflicts.
-        Library metadata should be flushed after calling this function to prevent data loss
+        Note: Library metadata should be flushed after calling this function to prevent data loss
 *)
     val resolve_missing_files : library:string -> resolution Seq.t
 

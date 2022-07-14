@@ -115,19 +115,20 @@ let refresh_library ~library : (Path.rel * Doc.t) list =
 
 (* Assumes library was just refreshed *)
 (* TODO: Remapped files need to be updated in the notebook *)
-let resolve_missing_files ~library : Path.rel list =
+let resolve_missing_files ~library : (Path.rel * bool) list =
   Log.push (Format.sprintf "Indexing libraries");
   Libraries.index_files();
   Log.push (Format.sprintf "Resolving missing files for library %s" library);
   let keys =
-    Seq.filter_map (function
+    Seq.map (function
         | Libraries.Missing key ->
-           prerr_endline ("Missing file: "^(Path.string_of_rel key));
-           Some key
+           Log.push (Format.sprintf "Missing file: %s" (Path.string_of_rel key));
+           (key,true)
         | Libraries.Remap (key,(library',key')) ->
-           prerr_endline ("Remapped file: "^(Path.string_of_rel key)
-                          ^"\n -> "^library'^" : "^(Path.string_of_rel key'));
-           None)
+           Log.push (Format.sprintf "Remapped file: %s\n -> %s : %s"
+                       (Path.string_of_rel key) library'
+                       (Path.string_of_rel key'));
+           (key,false))
       (Libraries.resolve_missing_files ~library)
     |> List.of_seq
   in

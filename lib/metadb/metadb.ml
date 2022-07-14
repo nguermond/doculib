@@ -40,6 +40,7 @@ sig
   val to_json : t -> Json.t
   val from_json : Json.t -> t
   val init : t
+  val merge : t -> t -> t option
   val to_string : t -> string
 end
 
@@ -279,11 +280,12 @@ module Library (D : Metadata) (LD : LibData) =
       Seq.map (fun (path,e) -> (path,E.get_data e))
         (Hashtbl.to_seq lib.entries)
   end
-                 
+
 module Make (D : Metadata) (LD : LibData) =
   struct
     module L = Library(D)(LD)
-                               
+    module E = Entry(D)
+             
     let libraries : ((string * L.t) list) ref = ref []
                                               
     (* We keep a global index of files by their hash to deal
@@ -381,21 +383,23 @@ module Make (D : Metadata) (LD : LibData) =
     type resolution = Remap of (Path.rel * (string * Path.rel))
                     | Missing of Path.rel
 
-      
     let remap_entry ~from_lib ~to_lib key key' : (Path.rel * (string * Path.rel)) =
       let lib = (List.assoc from_lib !libraries) in
       let lib' = (List.assoc to_lib !libraries) in
-      if ((L.entry_exists lib' key')
-          && (not (L.entry_empty lib' key'))
-          && (not (L.get lib key = L.get lib' key'))) then
-        raise(EntryExists (to_lib,key'))
-      else
-        (match L.get_entry lib key with
-         | Some entry ->
-            L.set_entry lib' key' entry;
-            L.remove_entry lib key;
-            (key,(to_lib,key'))
-         | None -> raise InternalError)
+      match L.get_entry lib key, L.get_entry lib' key' with
+      | Some entry, None ->
+         L.set_entry lib' key' entry;
+         L.remove_entry lib key;
+         (key,(to_lib,key'))
+      | Some entry, Some entry' ->
+         (match D.merge (E.get_data entry) (E.get_data entry') with
+          | Some d -> prerr_endline "Remap: Merging entries";
+             let hash = E.get_hash entry' in
+             L.set_entry lib' key' (E.make d hash);
+             L.remove_entry lib key;
+             (key,(to_lib,key'))
+          | None -> raise(EntryExists(to_lib,key')))
+      | None, _ -> raise(InternalError)
         
     (* This function assumes 
      * 1. libraries are freshly initialized or have been refreshed
@@ -419,13 +423,14 @@ module Make (D : Metadata) (LD : LibData) =
       resolutions
 
     (* Return type is a partition of the duplicate files, of the form:
-        [[(lib11, file11), ... (lib1n, file1n)]
-         [(lib21, file21), ... (lib2n, file2n)]
+        [[(lib_11, file_11), (lib_12, file_12),...]
+         [(lib_21, file_21), (lib_22, file_22),...]
          ...
-         [(libm1, filem1), ... (libmn, filemn)]]
+         [(lib_n1, file_n1), (lib_n2, file_n2),...]]
        such that entries in each row are duplicates
      *)
-    (* TODO: Attempt to merge duplicates if one is more precise than another *)
+    (* TODO: Attempt to merge duplicates if one is more precise than another 
+     * use D.merge *)
     let find_duplicates () : ((string * Path.rel) list) list =
       let rec find_dups dup_hashes dups bdgs =
         match bdgs, dup_hashes, dups with

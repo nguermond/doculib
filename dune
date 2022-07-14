@@ -1,3 +1,5 @@
 (executable
  (name doculib)
+ (public_name doculib)
+ (package doculib)
  (libraries doculib_gui))

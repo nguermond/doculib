@@ -17,7 +17,9 @@
 (*                                                                            *)
 (******************************************************************************)
 open Metadb
-   
+
+exception CannotMerge
+        
 type t = {star : bool;
           title : string;
           authors : string list;
@@ -103,9 +105,6 @@ let from_json (json : Json.t) : t =
     year = (to_string (raise_opt "year" (get "year" json)));
     tags = (List.map to_string
               (to_list (raise_opt "tags" (get "tags" json))));
-    (* path = path;
-     * doc_type = (to_string (raise_opt "doc_type" (get "doc_type" json)));
-     * hash = (to_string (default (`String "hash") (get "hash" json))); *)
   }
 
 
@@ -135,3 +134,28 @@ let init : t =
   }
 
 let to_string doc = (Format.asprintf "%a" pp_doc doc)
+
+let merge_str str1 str2 =
+  if str1 = "" then str2
+  else if str2 = "" then str1
+  else if str1 = str2 then str1
+  else (raise (CannotMerge))
+
+let merge_lst lst1 lst2 =
+  if (lst1 = []) then lst2
+  else if (lst2 = []) then lst1
+  else if (lst1 = lst2) then lst1
+  else (raise (CannotMerge))
+                  
+let merge doc1 doc2 =
+  try
+    Some
+      {star = doc1.star || doc2.star;
+       title = merge_str doc1.title doc2.title;
+       authors = merge_lst doc1.authors doc2.authors;
+       doi = merge_str doc1.doi doc2.doi;
+       isbn = merge_str doc1.doi doc2.doi;
+       year = merge_str doc1.year doc2.year;
+       tags = merge_lst doc1.tags doc2.tags;
+      }
+  with CannotMerge -> Log.push ("Could not merge!");None

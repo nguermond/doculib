@@ -235,11 +235,14 @@ class notebook notebook context_menu filter_func = object (self)
     (* returns a list of entries with missing files *)
     let missing_docs = (Db.resolve_missing_files ~library) in
     let model = lib#get_model in
-    Model.iter model ~action:(fun key path () ->
-        Model.set_message model ~key
-          (Format.sprintf "File is missing");
-        Model.flag_missing model ~key true)
-      (List.map (fun x -> (x, ())) missing_docs);
+    Model.iter model ~action:(fun key path missing ->
+        if missing then
+          (Model.set_message model ~key
+             (Format.sprintf "File is missing");
+           Model.flag_missing model ~key true)
+        else
+          Model.remove_entry model ~key)
+      missing_docs;
     let duplicates = (Db.find_duplicates()) in
     (* Display list of duplicates *)
     Model.iter model (fun key path (library,dups) ->

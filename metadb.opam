@@ -8,6 +8,7 @@ maintainer: ["nguermond@proton.me"]
 authors: ["Nathan Guermond"]
 license: "GPL-3.0-or-later"
 homepage: "https://github.com/nguermond/doculib"
+doc: "https://nguermond.github.io/doculib/docs/metadb"
 bug-reports: "https://github.com/nguermond/doculib/issues"
 depends: [
   "dune" {>= "2.9"}
