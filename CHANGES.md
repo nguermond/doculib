@@ -6,6 +6,7 @@
 * renamed libraries are now saved on exit
 * add tooltip message to list locations of duplicates
 * tabs can now be reordered
+* remapping missing entries now attempts to merge
 
 ## v1.3.0
 * major refactoring of JSON database
