@@ -52,8 +52,9 @@ sig
   val is_duplicate : t -> bool
   val get_path : t -> Path.rel
 end
-     
-val remove_entry : t -> key:key -> unit
+
+(* unsafe, only remove entries with iter *)
+(* val remove_entry : t -> key:key -> unit *)
 
 val set_entry : t -> key:key -> Entry.t -> unit
 
@@ -84,11 +85,12 @@ val refilter : t -> unit
 
 val set_visible_func : t -> (string -> bool) -> unit
 
-val iter_selected : t -> action:(key -> Path.rel -> unit) -> unit
+val iter_selected : t -> action:(key -> Path.rel -> bool) -> unit
 
 val on_selected : t -> (key -> Path.rel -> 'a) -> 'a
   
-val iter : t -> action:(key -> Path.rel -> 'a -> unit) -> (Path.rel * 'a) list -> unit
+val iter : t -> action:(key -> Path.rel -> 'a -> bool) -> (Path.rel * 'a) list -> unit
+(* val iter_remove : t -> action:(key -> Path.rel -> 'a -> unit) -> (Path.rel * 'a) list -> unit *)
   
 val make_document_list : ?height:int -> library:string -> doc_type:string ->
                          ?sort:(('a GTree.column) option) ->

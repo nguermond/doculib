@@ -1,5 +1,7 @@
 # Changes
 
+* fix bug preventing moving and deleting of multiple entries
+
 ## v1.3.1
 * loading speed of large libraries is now linear in number of duplicates
 * add error dialog when trying to open missing file

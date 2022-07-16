@@ -424,12 +424,13 @@ let main () =
   ignore @@
     context_factory#add_item "Open"
       ~callback:(fun _ ->
-        notebook#action_on_selected (fun model library key path ->
+        notebook#action_on_selected (fun library path ->
             let file = (Db.get_file ~library ~path) in
             if System.file_exists file then
               System.open_file file
             else
-              (error_dialog "File does not exist!"))
+              (error_dialog "File does not exist!");
+            false)
       );
   
   (* Search for metadata *)
@@ -450,10 +451,11 @@ let main () =
   ignore @@
     context_factory#add_item "Open DOI"
       ~callback:(fun _ ->
-        notebook#action_on_selected (fun model library key path ->
+        notebook#action_on_selected (fun library path ->
             let doi = (Db.get ~library ~path).doi in
             (if doi = "" then (error_dialog "No DOI for selected entry!")
-             else System.open_url ("https://www.doi.org/" ^ doi)))
+             else System.open_url ("https://www.doi.org/" ^ doi));
+            false)
       );
   
   ignore @@ context_factory#add_separator ();
@@ -463,9 +465,12 @@ let main () =
     context_factory#add_item "Copy File Name"
       ~callback:(fun _ ->
         let clipboard = GtkBase.Clipboard.get Gdk.Atom.clipboard in
-        notebook#action_on_selected (fun model library key path ->
+        let text = ref "" in
+        notebook#action_on_selected (fun library path ->
             let name = (Path.get_leaf (Db.get_file ~library ~path)) in
-            (GtkBase.Clipboard.set_text clipboard (Path.string_of_name name)))
+            text := (if !text="" then "" else !text^"\n")^(Path.string_of_name name);
+            false);
+        (GtkBase.Clipboard.set_text clipboard !text)
       );
 
   (* Copy file location to clipboard *)
@@ -473,9 +478,12 @@ let main () =
     context_factory#add_item "Copy File Path"
       ~callback:(fun _ ->
         let clipboard = GtkBase.Clipboard.get Gdk.Atom.clipboard in
-        notebook#action_on_selected (fun model library key path ->
+        let text = ref "" in
+        notebook#action_on_selected (fun library path ->
             let file = (Db.get_file ~library ~path) in
-            (GtkBase.Clipboard.set_text clipboard (Path.string_of_root file)))
+            text := (if !text="" then "" else !text^"\n")^(Path.string_of_root file);
+            false);
+          (GtkBase.Clipboard.set_text clipboard !text)
       );
 
   (* Delete physical file *)
@@ -489,10 +497,10 @@ let main () =
                                ~message_type:`QUESTION () in
 
         (match confirm_dialog#run() with
-         | `OK -> notebook#action_on_selected (fun model library key path ->
-                      Model.remove_entry model ~key;
+         | `OK -> notebook#action_on_selected (fun library path ->
                       Db.remove_entry ~library ~path;
-                      Db.remove_file ~library ~path)
+                      Db.remove_file ~library ~path;
+                      true)
          | _ -> ());
         confirm_dialog#destroy()
       );

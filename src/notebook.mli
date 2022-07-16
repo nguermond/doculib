@@ -51,7 +51,6 @@ class notebook : GPack.notebook -> GMenu.menu -> (string -> bool)
   method current_library : string * library
            
   method refilter : ?library:(string option) -> unit -> unit
-  method action_on_selected : action:(Model.t -> string -> Model.key -> Path.rel -> unit)
-                              -> unit
+  method action_on_selected : action:(string -> Path.rel -> bool) -> unit
   method edit_selected : editor:(Path.rel -> Doc.t -> Doc.t option) -> unit
 end

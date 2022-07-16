@@ -148,14 +148,17 @@ class notebook notebook context_menu filter_func = object (self)
              let doc = Db.get ~library:to_lib ~path in
              let missing = Model.is_missing model ~key in
              let duplicate = Model.is_duplicate model ~key in
-             let _ = Model.remove_entry model ~key in
              let e = (Model.Entry.make path ~missing ~duplicate doc) in
-             (Model.add_entry model' e))
+             (Model.add_entry model' e);
+             true (* mark entry for deletion *))
         with
           Db.CannotMigrate ->
           Log.push (Format.sprintf "Could not move file: %s"
-                      (Path.string_of_rel path))
-      ) (List.map (fun x -> (x,())) paths);
+                      (Path.string_of_rel path));
+          false
+      ) (List.map (fun x -> prerr_endline (Format.asprintf "File: %a"
+                                             Path.pp_rel x);
+                              (x,())) paths);
     Db.flush_metadata()
     
 
@@ -239,9 +242,9 @@ class notebook notebook context_menu filter_func = object (self)
         if missing then
           (Model.set_message model ~key
              (Format.sprintf "File is missing");
-           Model.flag_missing model ~key true)
-        else
-          Model.remove_entry model ~key)
+           Model.flag_missing model ~key true;
+          false)
+        else true (* entry was remapped; mark entry for deletion *))
       missing_docs;
     let duplicates = (Db.find_duplicates()) in
     (* Display list of duplicates *)
@@ -255,7 +258,8 @@ class notebook notebook context_menu filter_func = object (self)
         in
         Model.set_message model ~key
           (Format.sprintf "File is a duplicate:\n%s" msg);
-        Model.flag_duplicate model ~key true)
+        Model.flag_duplicate model ~key true;
+        false)
       ((Seq.filter (fun (path,(library',_)) ->
             (library = library'))
           (Seq.concat_map (fun dups ->
@@ -267,7 +271,7 @@ class notebook notebook context_menu filter_func = object (self)
   method action_on_selected ~action : unit =
     let (library,lib) = self#current_library in
     Model.iter_selected lib#get_model (fun key path ->
-        (action lib#get_model library key path))
+        (action library path))
 
   method edit_selected ~editor : unit =
     let (library,lib) = self#current_library in
@@ -282,6 +286,7 @@ class notebook notebook context_menu filter_func = object (self)
           let missing = Model.is_missing model ~key in
           let duplicate = Model.is_duplicate model ~key in
           let e = Model.Entry.make path ~missing ~duplicate doc in
-          Model.set_entry model ~key e)
+          Model.set_entry model ~key e;
+          false)
     with Cancel -> ()
 end

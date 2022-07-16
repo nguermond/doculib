@@ -4,6 +4,7 @@ A simple GUI for managing document metadata for books, textbooks, or articles.
 
 ## Features
 * files can be moved or renamed without losing metadata
+* mark duplicate files
 * metadata includes authors, title, publishing year, tags, bookmark, and DOI/ISBN
 * search for metadata on [openlibrary.org](https://openlibrary.org/) and [semanticscholar.org](https://www.semanticscholar.org/)
 * manage multiple libraries in different locations

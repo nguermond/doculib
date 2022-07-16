@@ -317,16 +317,21 @@ let on_selected (m : t) (f : key -> Path.rel -> 'a) : 'a =
   (f row path)
 
   
-let iter_selected (m : t) ~(action:(key -> Path.rel -> unit)) =
+let iter_selected (m : t) ~(action:(key -> Path.rel -> bool)) =
+  let del_rows = ref [] in
   List.iter (fun p ->
       let row = get_row m p in
       let path = m.store#get ~row ~column:Attr.path in
-      (action row (Path.mk_rel path)))
-  m.view#selection#get_selected_rows
+      if (action row (Path.mk_rel path)) then
+        del_rows := row::!del_rows)
+    m.view#selection#get_selected_rows;
+  List.iter (fun key -> (remove_entry m ~key)) !del_rows
 
 (* Worst case quadratic on number of entries *)
-let iter (m : t) ~(action:(key -> Path.rel -> 'a -> unit)) paths =
+(* We cannot remove entries while doing foreach! *)
+let iter (m : t) ~(action:(key -> Path.rel -> 'a -> bool)) paths =
   let n = ref (List.length paths) in
+  let del_rows = ref [] in
   m.store#foreach (fun p _ ->
       let row = (get_row m p) in
       let path = Path.mk_rel(m.store#get ~row ~column:Attr.path) in
@@ -334,9 +339,10 @@ let iter (m : t) ~(action:(key -> Path.rel -> 'a -> unit)) paths =
        | None -> ()
        | Some v ->
           n := !n - 1;
-          (action row path v));
-      (if !n = 0 then true else false))
-       
+          if (action row path v) then
+            del_rows := row::!del_rows);
+      (if !n = 0 then true else false));
+    List.iter (fun key -> (remove_entry m ~key)) !del_rows
   
 let make_toggle_cell_renderer ~(store : store) ~(model : t) ~library ~(column : bool GTree.column) : cell_renderer =
   let renderer,values =
