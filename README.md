@@ -10,23 +10,15 @@ A simple GUI for managing document metadata for books, textbooks, or articles.
 * manage multiple libraries in different locations
 * error permissive search
 
-## Installation (Debian/Ubuntu)
+## Installation
 On Debian/Ubuntu:
 ```
-wget https://github.com/nguermond/doculib/releases/download/v1.3.1/doculib_1.3.1_amd64.deb
-sudo dpkg -i doculib_1.3.1_amd64.deb
+wget https://github.com/nguermond/doculib/releases/download/v1.3.2/doculib_1.3.2_amd64.deb
+sudo dpkg -i doculib_1.3.2_amd64.deb
 sudo apt -f install
 ```
-and run with `doculib`.
 
-## Build from source (linux):
-Build with [opam](https://opam.ocaml.org/). Sytem dependencies:
+With the Opam package manager (see [how to install opam](https://opam.ocaml.org/doc/Install.html))
 ```
-pkg-config libev-dev libgmp-dev libcairo2-dev libexpat1-dev libgtk-3-dev
-```
-
-## Build from source (MacOS):
-Build with [opam](https://opam.ocaml.org/). System dependencies:
-```
-pkg-config libev gmp cairo expat gtk+3
+opam install doculib
 ```
