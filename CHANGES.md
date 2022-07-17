@@ -1,5 +1,6 @@
 # Changes
 
+## v1.3.2
 * fix bug preventing moving and deleting of multiple entries
 
 ## v1.3.1
