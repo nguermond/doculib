@@ -44,9 +44,6 @@ let dnd_targets : Gtk.target_entry list = [
      * { target = "application/x-rootwin-drop"; flags = []; info = 1} *)
   ]
 
-(* TODO: Add columns for missing and duplicate files.
- * possibly add tooltip column for message
- *)
 module Attr =
   struct
     open Gobject.Data
@@ -134,9 +131,10 @@ let set_entry (m : t) ~key (e : Entry.t) : unit =
   m.store#set ~row ~column:Attr.missing (Entry.is_missing e);
   m.store#set ~row ~column:Attr.duplicate (Entry.is_duplicate e)
 
-let add_entry (m : t) (e : Entry.t) : unit =
+let add_entry (m : t) (e : Entry.t) : key =
   let key = m.store#append () in
-  set_entry m ~key e
+  let _ = set_entry m ~key e in
+  key
 
 let get_entry (m : t) ~key : Entry.t =
   let row = key in
@@ -185,11 +183,14 @@ let is_missing (m : t) ~key : bool =
 let is_duplicate (m : t) ~key : bool =
   m.store#get ~row:key ~column:Attr.duplicate
 
+let get_message (m : t) ~key : string =
+  m.store#get ~row:key ~column:Attr.msg
+  
 let import_documents (m : t) (data : (Path.rel * Doc.t) list) : unit =
   List.iter
     (fun (key,doc) ->
       let e = Entry.make key doc in
-      add_entry m e)
+      ignore @@ add_entry m e)
     data
 
 let reset_model (m : t) : unit =

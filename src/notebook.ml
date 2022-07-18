@@ -148,8 +148,10 @@ class notebook notebook context_menu filter_func = object (self)
              let doc = Db.get ~library:to_lib ~path in
              let missing = Model.is_missing model ~key in
              let duplicate = Model.is_duplicate model ~key in
+             let tooltip = Model.get_message model ~key in
              let e = (Model.Entry.make path ~missing ~duplicate doc) in
-             (Model.add_entry model' e);
+             let key = (Model.add_entry model' e) in
+             (Model.set_message model' ~key tooltip);
              true (* mark entry for deletion *))
         with
           Db.CannotMigrate ->

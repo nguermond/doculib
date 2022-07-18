@@ -58,13 +58,17 @@ end
 
 val set_entry : t -> key:key -> Entry.t -> unit
 
-val add_entry : t -> Entry.t -> unit
+val add_entry : t -> Entry.t -> key
 
 val get_entry : t -> key:key -> Entry.t
 
 val is_missing : t -> key:key -> bool
 
 val is_duplicate : t -> key:key -> bool
+
+val get_message : t -> key:key -> string
+
+val set_message : t -> key:key -> string -> unit
   
 val flag_missing : t -> key:key -> bool -> unit
 
