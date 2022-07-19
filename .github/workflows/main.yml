@@ -19,45 +19,53 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
-        
+        uses: actions/checkout@v3
+        with:
+          path: doculib
+
+      - name: Checkout library
+        uses: actions/checkout@v3
+        with:
+          repository: nguermond/metadb
+          path: metadb
+
       - name: Setup OCaml ${{ matrix.ocaml-compiler }}
         uses: ocaml/setup-ocaml@v2
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
           dune-cache: true
 
+      - name: Install metadb
+        run: opam install metadb
+
       - name: Install dependencies
-        run: opam install . --deps-only
+        run: opam install doculib
 
-      - name: Build doculib
-        run: opam exec -- dune build
-
-      - name: Build and deploy documentation
-        if: matrix.os == 'ubuntu-latest'    
-        uses: ocaml/setup-ocaml/deploy-doc@v2
-        with:
-          destination-dir: docs
+#      - name: Build and deploy documentation
+#        if: matrix.os == 'ubuntu-latest'
+#        uses: ocaml/setup-ocaml/deploy-doc@v2
+#        with:
+#          destination-dir: docs
 
       - name: Rename binary (macOS)
         if: matrix.os == 'macOS-latest'
-        run: mv _build/default/doculib.exe _build/default/doculib
+        run: mv doculib/_build/default/doculib.exe doculib/_build/default/doculib
 
       - name: Save binary (macOS)
         if: matrix.os == 'macOS-latest'
         uses: actions/upload-artifact@v2
         with:
           name: doculib-${{ github.ref_name }}-${{ runner.os }}-x86_64
-          path: _build/default/doculib
+          path: doculib/_build/default/doculib
 
       - name: Build package (debian)
         if: matrix.os == 'ubuntu-latest'
-        run: mkdir release/packages &&
-             bash release/release_amd64.sh
+        run: mkdir doculib/release/packages &&
+             bash doculib/release/release_amd64.sh
 
       - name: Save package (debian)
         if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v2
         with:
           name: doculib-${{ github.ref_name }}-${{ runner.os }}-x86_64
-          path: release/packages/doculib_*_amd64.deb
+          path: doculib/release/packages/doculib_*_amd64.deb
