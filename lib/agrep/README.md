@@ -1,4 +1,5 @@
-This code was obtained from https://github.com/xavierleroy/ocamlagrep
+This library was obtained from [xavierleroy/ocamlagrep](https://github.com/xavierleroy/ocamlagrep).
+It is written by Xavier Leroy and licensed under the LGPLv2.
 
 # agrep
 
