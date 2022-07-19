@@ -39,6 +39,9 @@ jobs:
         run: opam install metadb/
 
       - name: Install dependencies
+        run: opam install doculib/ --deps-only
+
+      - name: Install doculib
         run: opam install doculib/
 
 #      - name: Build and deploy documentation
