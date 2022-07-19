@@ -36,10 +36,10 @@ jobs:
           dune-cache: true
 
       - name: Install metadb
-        run: opam install metadb
+        run: opam install metadb/
 
       - name: Install dependencies
-        run: opam install doculib
+        run: opam install doculib/
 
 #      - name: Build and deploy documentation
 #        if: matrix.os == 'ubuntu-latest'
