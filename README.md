@@ -1,8 +1,11 @@
 # DocuLib
-![screenshot-1.png](https://github.com/nguermond/doculib/blob/screenshots/screenshots/screenshot-1.png)
-![screenshot-4.png](https://github.com/nguermond/doculib/blob/screenshots/screenshots/screenshot-4.png)
-![screenshot-1.png](https://github.com/nguermond/doculib/blob/screenshots/screenshots/screenshot-3.png)
 A simple GUI for managing document metadata for books, textbooks, or articles.
+
+![screenshot-1.png](https://github.com/nguermond/doculib/blob/screenshots/screenshots/screenshot-1.png)
+
+![screenshot-4.png](https://github.com/nguermond/doculib/blob/screenshots/screenshots/screenshot-4.png)
+
+![screenshot-1.png](https://github.com/nguermond/doculib/blob/screenshots/screenshots/screenshot-3.png)
 
 ## Features
 * files can be moved or renamed without losing metadata
