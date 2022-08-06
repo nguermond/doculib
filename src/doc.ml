@@ -102,16 +102,19 @@ let to_json (doc : t) : Json.t =
 
 let from_json (json : Json.t) : t =
   let open Json in
-  { star = (to_bool (raise_opt "star" (get "star" json)));
-    title = (to_string (raise_opt "title" (get "title" json)));
+  let get_field key json =
+    let msg = (Format.sprintf "Could not get field `%s`" key) in
+    (raise_opt msg (get key json)) in
+  { star = (to_bool (get_field "star" json));
+    title = (to_string (get_field "title" json));
     authors = (List.map to_string
-                 (to_list (raise_opt "authors" (get "authors" json))));
-    doi = (to_string (raise_opt "doi" (get "doi" json)));
-    isbn = (to_string (raise_opt "isbn" (get "isbn" json)));
-    year = (to_string (raise_opt "year" (get "year" json)));
+                 (to_list (get_field "authors" json)));
+    doi = (to_string (get_field "doi" json));
+    isbn = (to_string (get_field "isbn" json));
+    year = (to_string (get_field "year" json));
     tags = (List.map to_string
-              (to_list (raise_opt "tags" (get "tags" json))));
-    notes = (to_string (raise_opt "notes" (get "notes" json)));
+              (to_list (get_field "tags" json)));
+    notes = (to_string (get_field "notes" json));
   }
 
 

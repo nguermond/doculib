@@ -151,9 +151,9 @@ let mutate_library_2 ~library root : unit =
   Log.push (Format.sprintf "Migrating library: %s @ %s"
               library (Path.string_of_root root));
   let library_md = (Path.merge_lst (data_dir_2_1()) [Path.mk_name library]) in
-  let files = (System.get_files library_md) in
+  let files = List.of_seq (System.get_files library_md) in
   let new_library_md = Path.merge_lst root [Path.mk_name ".metadata"] in
-  Seq.iter (fun file ->
+  List.iter (fun file ->
       let name = Path.strip_root library_md file in
       let new_file = Path.merge new_library_md name in
       let physical_file = (Path.remove_file_ext "json" (Path.merge root name)) in
@@ -175,7 +175,7 @@ let mutate_library_3 ~library root : unit =
   Log.push (Format.sprintf "Migrating library: %s @ %s"
               library (Path.string_of_root root));
   let library_md = Path.merge_lst root [Path.mk_name ".metadata"] in      
-  Seq.iter (fun file ->
+  List.iter (fun file ->
       let doc,hash = (read_and_mutate_doc_3 file) in
       let json = (`Assoc [("data", Doc.to_json(doc));
                           ("hash", `String (Hash.to_string hash))])
@@ -184,7 +184,7 @@ let mutate_library_3 ~library root : unit =
                   (Path.string_of_root file));
       (Json.to_file file json)
     )
-    (System.get_files library_md)
+    (List.of_seq (System.get_files library_md))
 
 (* Create libconfig for 3.1 library from a 2.X library *)
 let mutate_libconfig_2 (libs : (string * library_2) list) : unit =
