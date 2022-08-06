@@ -10,7 +10,7 @@
 
 (package
  (name doculib)
- (version 1.3.2)
+ (version 1.3.3)
  (synopsis "A GUI for tagging and managing document metadata for books, textbooks, or articles")
  (description
    "DocuLib manages locally stored libraries of books, textbooks, or articles by keeping track of data such as authors, title, year, tags, and DOI/ISBN. Metadata can be searched through openlibrary.org and semanticscholar.org. DocuLib automatically detects renamed, moved, and duplicate files."

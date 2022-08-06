@@ -27,7 +27,7 @@ type t = {star : bool;
           isbn : string;
           year : string;
           tags : string list;
-          (* notes : string *)
+          notes : string;
          }
 
 type attribute =  Star of bool
@@ -37,6 +37,7 @@ type attribute =  Star of bool
                 | Isbn of string
                 | Year of string
                 | Tags of string list
+                | Notes of string
 
 let set_attribute (field : string) (value : string) : attribute =
   match field with
@@ -50,6 +51,7 @@ let set_attribute (field : string) (value : string) : attribute =
   | "doi" -> Doi value
   | "isbn" -> Isbn value
   | "tags" -> Tags (Str.split (Str.regexp "; +") value)
+  | "notes" -> Notes value
   | _ -> failwith "Not a field"
 
 let edit_document (field : attribute) (doc : t) : t =
@@ -60,11 +62,12 @@ let edit_document (field : attribute) (doc : t) : t =
    isbn = (match field with Isbn v -> v | _ -> doc.isbn);
    year = (match field with Year v -> v | _ -> doc.year);
    tags = (match field with Tags v -> v | _ -> doc.tags);
+   notes = (match field with Notes v -> v | _ -> doc.notes);
   }         
   
 let pp_doc ppf (d : t) =
   let open Format in
-  (fprintf ppf "{@\n%s%s%s%s%s%s%s}"
+  (fprintf ppf "{@\n%s%s%s%s%s%s%s%s}"
      (if d.star = false then ""
       else (asprintf "  Starred@\n"))
      (if d.title = "" then ""
@@ -79,6 +82,8 @@ let pp_doc ppf (d : t) =
       else (sprintf "  Year: %s@\n" d.year))
      (if d.tags = [] then ""
       else (sprintf "  Tags: %s@\n" (String.concat "; " d.tags)))
+     (if d.notes = "" then ""
+      else (sprintf "  Notes: %s@\n" d.notes))
   )
 
                
@@ -92,6 +97,7 @@ let to_json (doc : t) : Json.t =
           ("isbn", `String doc.isbn);
           ("year", `String doc.year);
           ("tags", `List (List.map (fun x -> `String x) doc.tags));
+          ("notes", `String doc.notes);
     ]
 
 let from_json (json : Json.t) : t =
@@ -105,6 +111,7 @@ let from_json (json : Json.t) : t =
     year = (to_string (raise_opt "year" (get "year" json)));
     tags = (List.map to_string
               (to_list (raise_opt "tags" (get "tags" json))));
+    notes = (to_string (raise_opt "notes" (get "notes" json)));
   }
 
 
@@ -131,6 +138,7 @@ let init : t =
    isbn="";
    year="";
    tags=[];
+   notes="";
   }
 
 let to_string doc = (Format.asprintf "%a" pp_doc doc)
@@ -157,5 +165,6 @@ let merge doc1 doc2 =
        isbn = merge_str doc1.doi doc2.doi;
        year = merge_str doc1.year doc2.year;
        tags = merge_lst doc1.tags doc2.tags;
+       notes = merge_str doc1.notes doc2.notes;
       }
   with CannotMerge -> Log.push ("Could not merge!");None

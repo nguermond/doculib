@@ -90,32 +90,20 @@ let help_dialog () : unit =
   let swindow = GBin.scrolled_window ~height:500 ~shadow_type:`ETCHED_IN
                   ~vpolicy:`AUTOMATIC ~packing:(help_w#vbox#pack) () in
 
-  let help_text =
-    ["# Features";
-     " * files can be moved or renamed without losing metadata";
-     " * metadata includes authors, title, publishing year, tags, bookmark, and DOI/ISBN";
-     " * search for metadata on 'openlibrary.org' and 'semanticscholar.org'";
-     " * manage multiple libraries in different locations";
-     " * error permissive search";
-     "";
-     "# Libraries";
-     " * Each library points to a unique directory, and all files in that directory are automatically added to that library. Each library must have a unique document type, book or article, which indicates";
-     "   - the type of new items added to the library";
-     "   - the default database to search for metadata";
-     "   - whether to store DOI or ISBN.";
-     " * Libraries can be managed by selecting the 'Library' menu.";
-     " * Files can be moved between libraries by selecting the files (use CONTROL and SHIFT keys to select multiple files), and dragging them to a new tab.";
-     "";
-     "# Editing Metadata";
-     " * Right click on an entry for the following options:";
-     "   - Open -- opens the file";
-     "   - Search Metadata -- The default search query is either the title or the name of the file. It works best to only use the full title as search query, without authors, date, etc.";
-     "   - Open DOI -- if the file has a DOI, open the doi in a web browser";
-     "   - Delete File -- will delete the physical file and metadata in your library";
-     " * Double click on an entry to manually edit.";
-    ]
-     in
-  let buffer = GText.buffer ~text:(String.concat "\n" help_text) () in
+  let help_file = open_in "help.txt" in
+  let help_text = ref "" in
+  try
+    (while true do
+       help_text := !help_text^"\n"^(input_line help_file)
+     done)
+  with End_of_file -> close_in help_file;
+  let tag_table = GText.tag_table() in
+  (* let tag = GText.tag() in
+   * let font_desc = (Pango.Font.from_string "13") in
+   * let _ = Pango.Font.set_family font_desc "monospace"  in
+   * tag#set_properties [`FONT_DESC font_desc];
+   * tag_table#add tag#as_tag; *)
+  let buffer = GText.buffer ~tag_table ~text:!help_text () in
   let view = GText.view ~buffer ~editable:false ~wrap_mode:`WORD_CHAR ~packing:(swindow#add) () in
   help_w#add_button_stock `OK `OK;
 
@@ -126,6 +114,8 @@ let help_dialog () : unit =
 let about_dialog () : unit =
   let licenses = ["doculib: GPLv3.0+";
                   "https://github.com/nguermond/doculib\n";
+                  "metadb: GPLv3.0+";
+                  "https://github.com/nguermond/metadb\n";
                   "agrep: LGPLv2+";
                   "https://github.com/xavierleroy/ocamlagrep\n";
                   "quodlibet (MultiDragTreeView): GPLv2+";
@@ -135,6 +125,7 @@ let about_dialog () : unit =
                  ] in
   ignore @@
     GWindow.about_dialog ~name:"DocuLib" ~authors:["nguermond"]
+      ~version:"v1.3.3"
       ~website:"https://github.com/nguermond/doculib"
       ~website_label:"source" ~logo:Icons.doculib_icon
       ~comments:"A GUI for managing document metadata for books, textbooks, or articles."
@@ -384,6 +375,8 @@ let main () =
   let factory = new GMenu.factory menubar in
   let library_menu = factory#add_submenu "Library" in
   let library_factory = new GMenu.factory library_menu in
+  let view_menu = factory#add_submenu "View" in
+  let view_factory = new GMenu.factory view_menu in
   let help_menu = factory#add_submenu "Help" in
   let help_factory = new GMenu.factory help_menu in
   let about_menu = factory#add_submenu "About" in
@@ -424,7 +417,7 @@ let main () =
   ignore @@
     context_factory#add_item "Open"
       ~callback:(fun _ ->
-        notebook#action_on_selected (fun library path ->
+        notebook#action_on_selected ~action:(fun library path ->
             let file = (Db.get_file ~library ~path) in
             if System.file_exists file then
               System.open_file file
@@ -451,13 +444,38 @@ let main () =
   ignore @@
     context_factory#add_item "Open DOI"
       ~callback:(fun _ ->
-        notebook#action_on_selected (fun library path ->
+        notebook#action_on_selected ~action:(fun library path ->
             let doi = (Db.get ~library ~path).doi in
             (if doi = "" then (error_dialog "No DOI for selected entry!")
              else System.open_url ("https://www.doi.org/" ^ doi));
             false)
       );
-  
+
+  (* Obtain BibTex from DOI/ISBN *)
+  ignore @@
+    context_factory#add_item "Copy BibTex"
+      ~callback:(fun _ ->
+        let clipboard = GtkBase.Clipboard.get Gdk.Atom.clipboard in
+        let text = ref "" in        
+        notebook#action_on_selected ~action:(fun library path ->
+            (match Db.get_doc_type ~library with
+             | `Book ->
+                (error_dialog "BibTex search unavailable for ISBN")
+             | `Article ->
+                let doi = (Db.get ~library ~path).doi in
+                if doi <> "" then
+                  (match (Search.get_bibtex_from_doi doi) with
+                   | Some bibtex ->
+                      text := (if !text="" then "" else !text^"\n")^bibtex
+                   | None -> (error_dialog
+                                (Format.sprintf "Could not find BibTex for entry `%s`"
+                                   (Path.string_of_rel path))))
+                else
+                  (error_dialog "No DOI for selected entry!"));
+            false);
+        (GtkBase.Clipboard.set_text clipboard !text)
+      );
+
   ignore @@ context_factory#add_separator ();
 
   (* Copy file name to clipboard *)
@@ -531,6 +549,20 @@ let main () =
   ignore @@ library_factory#add_separator ();
 
   ignore @@ library_factory#add_item "Quit" ~callback:window#destroy;
+
+  (****************************************************)
+  (* View factory                                     *)
+  (****************************************************)
+  ignore @@
+    view_factory#add_item "Compact" ~callback:(fun () ->
+        Model.Options.set_row_size 1
+      );
+
+  ignore @@
+    view_factory#add_item "Relaxed" ~callback:(fun () ->
+        Model.Options.set_row_size 2
+      );
+
 
   (****************************************************)
   (* Help factory                                     *)

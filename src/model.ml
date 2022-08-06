@@ -35,6 +35,16 @@ type view = GTree.view
           
 type row = Gtk.tree_iter
 
+module Options =
+  struct
+    let row_size = ref 2
+
+    let set_row_size n =
+      row_size := n
+
+    let get_row_size () =
+      !row_size
+  end
          
 let dnd_targets : Gtk.target_entry list = [
     (* { target = "GTK_TREE_MODEL_ROW"; flags = []; info = 0}; *)
@@ -153,6 +163,7 @@ let get_entry (m : t) ~key : Entry.t =
     |> Doc.edit_document (Doc.set_attribute "star" (string_of_bool star))
     |> Doc.edit_document (Doc.set_attribute "title" title)
     |> Doc.edit_document (Doc.set_attribute "authors" authors)
+    |> Doc.edit_document (Doc.set_attribute "year" year)
     |> Doc.edit_document (Doc.set_attribute "doi" doi)
     |> Doc.edit_document (Doc.set_attribute "isbn" isbn)
     |> Doc.edit_document (Doc.set_attribute "tags" tags)
@@ -367,7 +378,7 @@ let make_text_cell_renderer ~(store : store) ~(model:t) ~view ~width ~editable ~
     (GTree.cell_renderer_text
        [`EDITABLE editable;`YPAD 2;
         `HEIGHT (Font.calc_font_height
-                   ~widget:view#coerce ~ypad:2 2);
+                   ~widget:view#coerce ~ypad:2 (Options.get_row_size()));
         `WRAP_WIDTH width;
         `WRAP_MODE `WORD_CHAR;
         `CELL_BACKGROUND_GDK

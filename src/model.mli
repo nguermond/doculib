@@ -23,7 +23,13 @@ type column
 type packing
 
 val dnd_targets : Gtk.target_entry list
-  
+
+module Options :
+sig
+  val set_row_size : int -> unit
+  val get_row_size : unit -> int
+end
+
 module Attr :
 sig
   val star : bool GTree.column

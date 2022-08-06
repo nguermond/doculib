@@ -1,0 +1,47 @@
+****** Libraries ******
+
+• Each library points to a unique directory. Each library must 
+  have a unique document type, which indicates:
+	> Whether to keep track of DOI or ISBN book
+	> The default database to search for metadata
+• Libraries can be managed by selecting the 'Library' menu:
+	> A library may be renamed by selecting the name field
+	> Removing a library will never remove the physical files in 
+	the library. If 'Delete metadata' is selected, the metadata 
+	will be removed, but not the files
+	> A new library may be created by selecting an existing 
+	directory. All files in that directory are automatically 
+	added to that library
+• Selected files may be moved between libraries by dragging them 
+  to a library tab
+• Libraries may be rearranged by dragging tabs
+
+****** Entries ******
+
+• Right click on an entry for the following options:
+	> Open -- opens the file
+	> Search Metadata -- Search for metadata on either 
+	openlibrary.org (for books) or semanticscholar.org 
+	(for articles). The default search query is either the 
+	title (if nonempty) or the name of the file. It typically 
+	works best to use the full title as search query, 
+	without authors, date, etc.
+	> Open DOI -- if the file has a DOI, open the doi address 
+	in a web browser
+	> Copy BibTex -- if the file has a DOI, search for the BibTex 
+	entry at crossref.org. Note this is not supported for books
+	> Copy File Name -- copy file name to clipboard
+	> Copy File Path -- copy absolute file path to clipboard
+	> Delete File -- will delete the physical file and metadata 
+	in your library
+• Left click on an entry's field to edit
+• Multiple entries may be selected by holding SHIFT or CONTROL
+
+****** Missing/Duplicate Files ******
+
+• If multiple entries refer to identical files (irrespective of 
+  their file names), they will be marked as duplicates
+• If an entry refers to a file which is missing, and the file cannot 
+  be found, it will be marked as missing. If the missing file 
+  is found, the entry will be appropriately remapped
+  

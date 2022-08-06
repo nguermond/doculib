@@ -35,6 +35,7 @@ val rename_library : library:string -> string -> unit
 
 
 val get_library_root : library:string -> Path.root
+val get_doc_type : library:string -> Library.doc_type
 
 val get_file : library:string -> path:Path.rel -> Path.root
 val get : library:string -> path:Path.rel -> Doc.t

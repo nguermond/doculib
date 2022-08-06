@@ -21,8 +21,8 @@ exception InvalidDocType
 open Metadb
 
 (* The database is versioned, to prevent data loss upon upgrade. *)
-let branches = ["3.0"; "2.1"; "2.0"]
-let current_branch = "3.0"
+let branches = ["3.1";"3.0"; "2.1"; "2.0"]
+let current_branch = "3.1"
 
 type doc_type = [`Book | `Article]
 

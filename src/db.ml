@@ -80,6 +80,9 @@ let get_file ~library ~path : Path.root =
   let root = get_library_root ~library in
   Path.merge root path
 
+let get_doc_type ~library : Library.doc_type =
+  (List.assoc library (Libraries.get_libdata ())).doc_type
+
 let remove_entry ~library ~path : unit =
   Libraries.remove_entry ~library path
 

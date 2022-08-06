@@ -75,9 +75,7 @@ let parse_article (doc_type : string) (article : Json.t) : Doc.t =
                       doi = doi;
                       isbn = "";
                       tags = [];
-                      (* path = "";
-                       * doc_type = doc_type;
-                       * hash = ""; *)
+                      notes = "";
                      }
   in doc
 
@@ -100,9 +98,7 @@ let parse_book (doc_type : string) (book : Json.t) : Doc.t =
                       doi = "";
                       isbn = isbn;
                       tags = [];
-                      (* path = "";
-                       * doc_type = doc_type;
-                       * hash = ""; *)
+                      notes = "";
                      }
   in doc
 
@@ -141,3 +137,17 @@ let search_document (doc_type : string) (search_type : string) (search_str : str
   | _ -> prerr_endline ("Search for document type `"^doc_type^"` not supported!"); []
   
   
+let query_doi (doi : string) : string Lwt.t =
+  let url = "https://api.crossref.org/works/" in
+  let params = "/transform/application/x-bibtex" in
+  let uri = (Uri.of_string (url ^ doi ^ params)) in
+  let open Lwt in
+  (Client.get uri >>= fun (resp, body) ->
+  let code = resp |> Response.status |> Code.code_of_status in
+  body |> Cohttp_lwt.Body.to_string)
+
+let get_bibtex_from_doi (doi : string) : string option =
+  let result = Lwt_main.run (query_doi doi) in
+  if result = "Resource not found." then
+    None
+  else Some result
