@@ -28,5 +28,8 @@ let calc_font_height ~(widget : GObj.widget) ?(ypad = 0) (num_lines : int) : int
 
 (* ampersands must be escaped for Pango *)
 let pango_quote (str : string) : string =
-    Str.global_replace (Str.regexp (Str.quote "&")) "&amp;" str
+  Str.global_replace (Str.regexp (Str.quote "&")) "&amp;" str
                   
+let pango_unquote (str : string) : string =
+  Str.global_replace (Str.regexp (Str.quote "&amp;")) "&" str
+      

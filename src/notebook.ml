@@ -56,6 +56,11 @@ class library library doc_type page label =
       match model with
       | Some _ -> true
       | None -> false
+
+    method unload () : unit =
+      let widgets = page#all_children in
+      List.iter page#remove widgets;
+      model <- None
   end
 
 class notebook notebook context_menu filter_func = object (self)
@@ -66,8 +71,7 @@ class notebook notebook context_menu filter_func = object (self)
 
   method init (libs : (string * string) list) : unit =
     (List.iter (fun (library,doc_type) ->
-         self#add_library ~library ~doc_type ~prepend:false;
-         prerr_endline (string_of_int (List.length libraries)))
+         self#add_library ~library ~doc_type ~prepend:false)
        libs);
     (* On page switch *)
     ignore @@
@@ -87,6 +91,11 @@ class notebook notebook context_menu filter_func = object (self)
         self#load_library ~library
       end
 
+  method reload_libraries () : unit =
+    List.iter (fun (library,lib) -> lib#unload()) libraries;
+    let library = (fst (self#current_library)) in
+    self#load_library ~library
+    
   method add_library ~library ~doc_type ~prepend : unit =
     Log.push (Format.sprintf "Adding library: %s" library);
     let label = (GMisc.label ~text:library ()) in
@@ -116,7 +125,6 @@ class notebook notebook context_menu filter_func = object (self)
        (libraries <- (library, lib) :: libraries)
      else
        (let index = (List.length libraries) in
-        Log.push (Format.sprintf "Adding library %s at [%d]" library index);
         libraries <- (Listutil.insert libraries index (library,lib))))
 
   method private init_DnD_dest (lib : library) : unit =

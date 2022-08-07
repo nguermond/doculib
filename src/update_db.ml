@@ -151,7 +151,7 @@ let mutate_library_2 ~library root : unit =
   Log.push (Format.sprintf "Migrating library: %s @ %s"
               library (Path.string_of_root root));
   let library_md = (Path.merge_lst (data_dir_2_1()) [Path.mk_name library]) in
-  let files = List.of_seq (System.get_files library_md) in
+  let files = List.of_seq (System.get_files ~hidden:true library_md) in
   let new_library_md = Path.merge_lst root [Path.mk_name ".metadata"] in
   List.iter (fun file ->
       let name = Path.strip_root library_md file in
@@ -174,7 +174,10 @@ let mutate_library_2 ~library root : unit =
 let mutate_library_3 ~library root : unit =
   Log.push (Format.sprintf "Migrating library: %s @ %s"
               library (Path.string_of_root root));
-  let library_md = Path.merge_lst root [Path.mk_name ".metadata"] in      
+  let library_md = Path.merge_lst root [Path.mk_name ".metadata"] in
+  let files = (List.of_seq (System.get_files ~hidden:true library_md)) in
+  Log.push (Format.sprintf "Updating %d files in %s\n" (List.length files)
+              (Path.string_of_root library_md));
   List.iter (fun file ->
       let doc,hash = (read_and_mutate_doc_3 file) in
       let json = (`Assoc [("data", Doc.to_json(doc));
@@ -184,7 +187,8 @@ let mutate_library_3 ~library root : unit =
                   (Path.string_of_root file));
       (Json.to_file file json)
     )
-    (List.of_seq (System.get_files library_md))
+    files
+    
 
 (* Create libconfig for 3.1 library from a 2.X library *)
 let mutate_libconfig_2 (libs : (string * library_2) list) : unit =
@@ -240,7 +244,7 @@ let update_2_to_3_1 () : unit =
   (mutate_db_2 libs)
 
 let update_3_to_3_1 () : unit =
-  Log.push(Format.sprintf "Upgrading library from version 3.X to 3.1");
+  Log.push(Format.sprintf "Upgrading libraries from version 3.X to 3.1");
   let libs = read_libconfig_3() in
   (mutate_db_3 libs)
   

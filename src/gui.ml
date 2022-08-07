@@ -85,10 +85,36 @@ let search_bar ~packing : search_bar =
   let _ = sb#init() in
   sb
 
+let edit_notes_dialog ~(doc : Doc.t) : string =
+  let dialog = GWindow.dialog ~title:"Edit Notes"
+                 ~width:400 ~height:400 () in
+  let title_l = GMisc.label ~text:doc.title ~line_wrap:true ~width:400
+                  ~xpad:8 ~ypad:8 ~packing:(dialog#vbox#pack) () in
+
+  let swindow = GBin.scrolled_window ~shadow_type:`ETCHED_IN
+                  ~vpolicy:`AUTOMATIC ~packing:(dialog#vbox#pack ~expand:true)() in
+  let buffer = GText.buffer ~text:doc.notes () in
+  let view = GText.view ~buffer ~wrap_mode:`WORD_CHAR ~packing:(swindow#add) () in
+
+  dialog#add_button "Ok" `OK;
+  dialog#add_button "Cancel" `CANCEL;
+  
+  (match dialog#run() with
+   | `OK ->
+      let str = (buffer#get_text()) in
+      dialog#destroy();
+      str
+   | `CANCEL
+   | `DELETE_EVENT ->
+      dialog#destroy();
+      raise Notebook.Cancel)
+      
+
+  
 let help_dialog () : unit =
-  let help_w = GWindow.dialog ~title:"Help" ~border_width:8 ~width:500 ~height:500 ~show:true () in
-  let swindow = GBin.scrolled_window ~height:500 ~shadow_type:`ETCHED_IN
-                  ~vpolicy:`AUTOMATIC ~packing:(help_w#vbox#pack) () in
+  let help_w = GWindow.dialog ~title:"Help" ~border_width:8 ~width:600 ~height:500 ~show:true () in
+  let swindow = GBin.scrolled_window  ~shadow_type:`ETCHED_IN
+                  ~vpolicy:`AUTOMATIC ~packing:(help_w#vbox#pack ~expand:true) () in
 
   let help_file = open_in "help.txt" in
   let help_text = ref "" in
@@ -98,13 +124,7 @@ let help_dialog () : unit =
      done)
   with End_of_file -> close_in help_file;
   let tag_table = GText.tag_table() in
-  (* let tag = GText.tag() in
-   * let font_desc = (Pango.Font.from_string "13") in
-   * let _ = Pango.Font.set_family font_desc "monospace"  in
-   * tag#set_properties [`FONT_DESC font_desc];
-   * tag_table#add tag#as_tag; *)
-  let buffer = GText.buffer ~tag_table ~text:!help_text () in
-  let view = GText.view ~buffer ~editable:false ~wrap_mode:`WORD_CHAR ~packing:(swindow#add) () in
+  let view = GMisc.label ~markup:!help_text ~packing:(swindow#add)() in
   help_w#add_button_stock `OK `OK;
 
   (match help_w#run() with
@@ -476,6 +496,16 @@ let main () =
         (GtkBase.Clipboard.set_text clipboard !text)
       );
 
+  (* Edit notes *)
+  ignore @@
+    context_factory#add_item "Edit Notes"
+      ~callback:(fun _ ->
+        notebook#edit_selected (fun path doc ->
+            let notes = edit_notes_dialog ~doc in
+            let doc = Doc.edit_document (Doc.set_attribute "notes" notes) doc in
+            Some doc)
+      );
+
   ignore @@ context_factory#add_separator ();
 
   (* Copy file name to clipboard *)
@@ -555,12 +585,20 @@ let main () =
   (****************************************************)
   ignore @@
     view_factory#add_item "Compact" ~callback:(fun () ->
-        Model.Options.set_row_size 1
+        if (Model.Options.get_row_size () <> 1) then
+          begin
+            Model.Options.set_row_size 1;
+            notebook#reload_libraries();
+          end
       );
 
   ignore @@
     view_factory#add_item "Relaxed" ~callback:(fun () ->
-        Model.Options.set_row_size 2
+        if (Model.Options.get_row_size () <> 2) then
+          begin
+            Model.Options.set_row_size 2;
+            notebook#reload_libraries();
+          end
       );
 
 

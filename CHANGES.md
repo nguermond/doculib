@@ -6,6 +6,7 @@
 * updates library version from 3.0 to 3.1
 * bug fix: year was not properly saved after retrieving metadata
 * add menu for relaxed or compact view
+* updated help formatting
 
 ## v1.3.2
 * fix bug preventing moving and deleting of multiple entries

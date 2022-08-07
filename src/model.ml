@@ -57,7 +57,7 @@ let dnd_targets : Gtk.target_entry list = [
 module Attr =
   struct
     open Gobject.Data
-    let col_names = ["star"; "authors"; "title"; "year"; "doi"; "isbn"; "tags"; "path"; "missing" ; "duplicate" ; "msg"]
+    let col_names = ["star"; "authors"; "title"; "year"; "doi"; "isbn"; "tags"; "notes"; "path"; "missing" ; "duplicate" ; "msg"; "tooltip"]
 
     let columns = new GTree.column_list
              
@@ -68,10 +68,12 @@ module Attr =
     let doi = columns#add string
     let isbn = columns#add string
     let tags = columns#add string
+    let notes = columns#add string
     let path = columns#add string
     let missing = columns#add boolean
     let duplicate = columns#add boolean
     let msg = columns#add string
+    let tooltip = columns#add string
 
     let get_name i : string =
       List.nth col_names i
@@ -121,6 +123,17 @@ let make filter store view : t =
    num_cols = 0;
   }
 
+
+  
+let update_tooltip (m : t) ~key : unit =
+  let notes = m.store#get ~row:key ~column:Attr.notes in
+  let msg = m.store#get ~row:key ~column:Attr.msg in
+  m.store#set ~row:key ~column:Attr.tooltip
+    (if notes = "" then msg else
+       (if msg = "" then notes else
+          (Font.pango_quote (Format.sprintf "%s\n---\n%s" notes msg))))
+
+  
 let get_row (m : t) p =
   (m.store#get_iter (m.filter#convert_path_to_child_path p))
 
@@ -137,9 +150,11 @@ let set_entry (m : t) ~key (e : Entry.t) : unit =
   m.store#set ~row ~column:Attr.isbn doc.isbn;
   m.store#set ~row ~column:Attr.year doc.year;
   m.store#set ~row ~column:Attr.tags (String.concat "; " doc.tags);
+  m.store#set ~row ~column:Attr.notes doc.notes;
   m.store#set ~row ~column:Attr.path (Path.string_of_rel (Entry.get_path e));
   m.store#set ~row ~column:Attr.missing (Entry.is_missing e);
-  m.store#set ~row ~column:Attr.duplicate (Entry.is_duplicate e)
+  m.store#set ~row ~column:Attr.duplicate (Entry.is_duplicate e);
+  (update_tooltip m ~key:row)
 
 let add_entry (m : t) (e : Entry.t) : key =
   let key = m.store#append () in
@@ -155,6 +170,7 @@ let get_entry (m : t) ~key : Entry.t =
   let isbn = m.store#get ~row ~column:Attr.isbn in
   let year = m.store#get ~row ~column:Attr.year in
   let tags = m.store#get ~row ~column:Attr.tags in
+  let notes = m.store#get ~row ~column:Attr.notes in
   let path = m.store#get ~row ~column:Attr.path in
   let missing = m.store#get ~row ~column:Attr.missing in
   let duplicate = m.store#get ~row ~column:Attr.duplicate in
@@ -167,6 +183,7 @@ let get_entry (m : t) ~key : Entry.t =
     |> Doc.edit_document (Doc.set_attribute "doi" doi)
     |> Doc.edit_document (Doc.set_attribute "isbn" isbn)
     |> Doc.edit_document (Doc.set_attribute "tags" tags)
+    |> Doc.edit_document (Doc.set_attribute "notes" notes)
   in
   Entry.make (Path.mk_rel path) ~missing ~duplicate doc
 
@@ -176,9 +193,11 @@ let string_of_row (m : GTree.model ) ~row : string =
     [m#get ~row ~column:Attr.title;
      m#get ~row ~column:Attr.authors;
      m#get ~row ~column:Attr.tags;
+     m#get ~row ~column:Attr.notes;
      m#get ~row ~column:Attr.path
     ]
-  
+
+
 let flag_missing (m : t) ~key b : unit =
   m.store#set ~row:key ~column:Attr.missing b
 
@@ -186,7 +205,8 @@ let flag_duplicate (m : t) ~key b : unit =
   m.store#set ~row:key ~column:Attr.duplicate b
 
 let set_message (m : t) ~key msg : unit =
-  m.store#set ~row:key ~column:Attr.msg msg
+  m.store#set ~row:key ~column:Attr.msg msg;
+  update_tooltip m ~key
 
 let is_missing (m : t) ~key : bool =
   m.store#get ~row:key ~column:Attr.missing
@@ -441,7 +461,7 @@ let make_document_list ?(height=400) ~(library:string) ~(doc_type:string)
 
   let store = GTree.list_store Attr.columns in
   let filter = (GTree.model_filter store) in
-  let view = GTree.view ~tooltip_column:(Attr.get_index "msg")
+  let view = GTree.view ~tooltip_column:(Attr.get_index "tooltip")
                ~model:filter ~packing:swindow#add() in
   let model = (make filter store view) in
 

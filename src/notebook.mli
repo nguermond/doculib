@@ -20,6 +20,7 @@
 exception LibraryDoesNotExist of string
 exception ModelNotLoaded of string
 exception NoLibrary
+exception Cancel
 
 open Metadb
         
@@ -33,6 +34,7 @@ class library : string -> string -> GPack.box -> GMisc.label ->
     method rename : string -> unit
     method is_loaded : bool
     method set_model : Model.t -> unit
+    method unload : unit -> unit
   end
                                
 class notebook : GPack.notebook -> GMenu.menu -> (string -> bool)
@@ -40,6 +42,8 @@ class notebook : GPack.notebook -> GMenu.menu -> (string -> bool)
   val mutable libraries : (string * library) list
                                                  
   method init : ((string * string) list) -> unit
+  method reload_libraries : unit -> unit
+       
   method add_library : library:string -> doc_type:string -> prepend:bool -> unit
   method remove_library : delete_metadata:bool -> library:string -> unit
   method rename_library : library:string -> string -> bool

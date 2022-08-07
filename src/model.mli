@@ -58,10 +58,7 @@ sig
   val is_duplicate : t -> bool
   val get_path : t -> Path.rel
 end
-
-(* unsafe, only remove entries with iter *)
-(* val remove_entry : t -> key:key -> unit *)
-
+     
 val set_entry : t -> key:key -> Entry.t -> unit
 
 val add_entry : t -> Entry.t -> key
