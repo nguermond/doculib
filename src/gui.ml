@@ -115,16 +115,9 @@ let help_dialog () : unit =
   let help_w = GWindow.dialog ~title:"Help" ~border_width:8 ~width:600 ~height:500 ~show:true () in
   let swindow = GBin.scrolled_window  ~shadow_type:`ETCHED_IN
                   ~vpolicy:`AUTOMATIC ~packing:(help_w#vbox#pack ~expand:true) () in
-
-  let help_file = open_in "help.txt" in
-  let help_text = ref "" in
-  try
-    (while true do
-       help_text := !help_text^"\n"^(input_line help_file)
-     done)
-  with End_of_file -> close_in help_file;
+  let help_text = Help.help_text in
   let tag_table = GText.tag_table() in
-  let view = GMisc.label ~markup:!help_text ~packing:(swindow#add)() in
+  let view = GMisc.label ~markup:help_text ~packing:(swindow#add)() in
   help_w#add_button_stock `OK `OK;
 
   (match help_w#run() with
