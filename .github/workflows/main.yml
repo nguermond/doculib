@@ -29,6 +29,9 @@ jobs:
           repository: nguermond/metadb
           path: metadb
 
+      - name: Install dependencies
+        run: sudo apt install libev4 libgmp10 libcairo2 libexpat1 libgtk-3-0
+
       - name: Setup OCaml ${{ matrix.ocaml-compiler }}
         uses: ocaml/setup-ocaml@v2
         with:
@@ -38,8 +41,8 @@ jobs:
       - name: Install metadb
         run: opam install metadb/
 
-      - name: Install dependencies
-        run: opam install doculib/ --deps-only
+#      - name: Install dependencies
+#        run: opam install doculib/ --deps-only
 
       - name: Install doculib
         run: opam install doculib/
