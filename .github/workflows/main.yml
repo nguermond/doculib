@@ -30,7 +30,7 @@ jobs:
           path: metadb
 
       - name: Install dependencies
-        run: sudo apt install libev4 libgmp10 libcairo2 libexpat1 libgtk-3-0
+        run: sudo apt-get install -y libev4 libgmp10 libcairo2 libexpat1 libgtk-3-0
 
       - name: Setup OCaml ${{ matrix.ocaml-compiler }}
         uses: ocaml/setup-ocaml@v2
