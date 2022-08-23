@@ -68,7 +68,6 @@ let add_library ~library ~root (libdata : Library.t) : unit =
   with
   | Metadb.LibraryExists ->
      raise LibraryExists
-                            
 
 let get_library_descriptions () : (string * Library.t) list =
   Libraries.get_libdata ()
@@ -117,7 +116,6 @@ let refresh_library ~library : (Path.rel * Doc.t) list =
   List.of_seq (Libraries.refresh_library ~library)
 
 (* Assumes library was just refreshed *)
-(* TODO: Remapped files need to be updated in the notebook *)
 let resolve_missing_files ~library : (Path.rel * bool) list =
   Log.push (Format.sprintf "Indexing libraries");
   Libraries.index_files();

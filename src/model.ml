@@ -343,10 +343,10 @@ let refilter (m : t) : unit =
 let set_visible_func (m : t) (f : string -> bool) : unit =
   m.filter#set_visible_func (fun m row -> f (string_of_row m ~row))
 
-let on_selected (m : t) (f : key -> Path.rel -> 'a) : 'a = 
+let on_selected (m : t) ~(action: key -> Path.rel -> 'a) : 'a = 
   let row = get_row m (List.nth m.view#selection#get_selected_rows 0) in
   let path = Path.mk_rel (m.store#get ~row ~column:Attr.path) in
-  (f row path)
+  (action row path)
 
   
 let iter_selected (m : t) ~(action:(key -> Path.rel -> bool)) =
@@ -375,7 +375,18 @@ let iter (m : t) ~(action:(key -> Path.rel -> 'a -> bool)) paths =
             del_rows := row::!del_rows);
       (if !n = 0 then true else false));
     List.iter (fun key -> (remove_entry m ~key)) !del_rows
-  
+
+let iter_all (m : t) ~(action:(key -> Path.rel -> bool)) =
+  let del_rows = ref [] in
+  m.store#foreach (fun p _ ->
+      let row = (get_row m p) in
+      let path = Path.mk_rel(m.store#get ~row ~column:Attr.path) in
+      if (action row path) then
+        (del_rows := row::!del_rows);
+      false);
+    List.iter (fun key -> (remove_entry m ~key)) !del_rows
+
+    
 let make_toggle_cell_renderer ~(store : store) ~(model : t) ~library ~(column : bool GTree.column) : cell_renderer =
   let renderer,values =
     (GTree.cell_renderer_toggle

@@ -1,9 +1,0 @@
-(library
- (name
-  agrep)
- (flags
-  :standard -w -3-6-7-10-24-26-27-32-33-35-50
-  -no-strict-sequence)
- (foreign_stubs (language c)
-  (names engine))
- )

@@ -138,7 +138,7 @@ let about_dialog () : unit =
                  ] in
   ignore @@
     GWindow.about_dialog ~name:"DocuLib" ~authors:["nguermond"]
-      ~version:"v1.3.3"
+      ~version:"v1.3.4"
       ~website:"https://github.com/nguermond/doculib"
       ~website_label:"source" ~logo:Icons.doculib_icon
       ~comments:"A GUI for managing document metadata for books, textbooks, or articles."
@@ -360,7 +360,7 @@ let search_metadata ~(default : Doc.t) ~doc_type (search_str : string) : Doc.t o
   
   let ret =
     (match dialog#run() with
-     | `OK -> Model.on_selected model (fun key path ->
+     | `OK -> Model.on_selected model ~action:(fun key path ->
                   let e = Model.get_entry model ~key in
                   let doc = Model.Entry.get_doc e
                             |> Doc.edit_document (Doc.Tags default.tags) in

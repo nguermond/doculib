@@ -94,11 +94,12 @@ val set_visible_func : t -> (string -> bool) -> unit
 
 val iter_selected : t -> action:(key -> Path.rel -> bool) -> unit
 
-val on_selected : t -> (key -> Path.rel -> 'a) -> 'a
+val on_selected : t -> action:(key -> Path.rel -> 'a) -> 'a
   
 val iter : t -> action:(key -> Path.rel -> 'a -> bool) -> (Path.rel * 'a) list -> unit
-(* val iter_remove : t -> action:(key -> Path.rel -> 'a -> unit) -> (Path.rel * 'a) list -> unit *)
-  
+
+val iter_all : t -> action:(key -> Path.rel -> bool) -> unit
+    
 val make_document_list : ?height:int -> library:string -> doc_type:string ->
                          ?sort:(('a GTree.column) option) ->
                          packing:(GObj.widget -> unit) -> (Path.rel * Doc.t) list -> t

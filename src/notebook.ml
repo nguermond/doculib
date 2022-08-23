@@ -244,10 +244,16 @@ class notebook notebook context_menu filter_func = object (self)
     Log.push (Format.sprintf "Refreshing library %s" library);
     let lib = self#get_library library in
     let new_data = (Db.refresh_library ~library) in
-    (Model.import_documents (lib#get_model) new_data);
+    let model = lib#get_model in
+    (Model.import_documents model new_data);
+    Model.iter_all model (fun key path ->
+        (* reset missing + duplicate flags/messages *)
+        Model.set_message model ~key "";
+        Model.flag_duplicate model ~key false;
+        Model.flag_missing model ~key false;
+        false);
     (* returns a list of entries with missing files *)
     let missing_docs = (Db.resolve_missing_files ~library) in
-    let model = lib#get_model in
     Model.iter model ~action:(fun key path missing ->
         if missing then
           (Model.set_message model ~key
