@@ -55,3 +55,4 @@ val init : t
 val to_string : t -> string
 
 val merge : t -> t -> t option
+val force_merge : t -> default:t -> t

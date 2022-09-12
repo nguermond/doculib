@@ -362,8 +362,8 @@ let search_metadata ~(default : Doc.t) ~doc_type (search_str : string) : Doc.t o
     (match dialog#run() with
      | `OK -> Model.on_selected model (fun key path ->
                   let e = Model.get_entry model ~key in
-                  let doc = Model.Entry.get_doc e
-                            |> Doc.edit_document (Doc.Tags default.tags) in
+                  let doc = Model.Entry.get_doc e in
+                  let doc = Doc.force_merge doc default in
                   Some doc)
      | `CANCEL -> None
      | `DELETE_EVENT -> Some default) in

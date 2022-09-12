@@ -171,3 +171,19 @@ let merge doc1 doc2 =
        notes = merge_str doc1.notes doc2.notes;
       }
   with CannotMerge -> Log.push ("Could not merge!");None
+
+let force_merge doc ~default =
+  let try_default merge value default =
+    (try (merge value default) with _ -> default)
+  in
+  {star = doc.star || default.star;
+   title = try_default merge_str doc.title default.title;
+   authors = try_default merge_lst doc.authors default.authors;
+   doi = try_default merge_str doc.doi default.doi;
+   isbn = try_default merge_str doc.isbn default.isbn;
+   year = try_default merge_str doc.year default.year;
+   tags = try_default merge_lst doc.tags default.tags;
+   notes = try_default merge_str doc.notes default.notes;
+  }
+   
+                                                               
