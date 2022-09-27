@@ -1,5 +1,8 @@
 # Changes
 
+* Remove tag column from metadata search
+* bug fix: existing metadata was overwritten when metadata was searched
+
 ## v1.3.3
 * add ability to search for and copy BibTex from DOI
 * add field for notes to each entry
