@@ -510,7 +510,8 @@ let make_entry_list ?(height=400) ~doc_type
       data : t =
   
   let swindow = GBin.scrolled_window
-                  ~height ~shadow_type:`ETCHED_IN ~hpolicy:`AUTOMATIC
+                  ~height ~width:850
+                  ~shadow_type:`ETCHED_IN ~hpolicy:`AUTOMATIC
                   ~vpolicy:`AUTOMATIC ~packing () in
 
   let store = GTree.list_store Attr.columns in
@@ -524,7 +525,8 @@ let make_entry_list ?(height=400) ~doc_type
   let add_text_col ~title ~width col =
     match col with
     | StrCol(attr) ->
-       let cell_renderer = (make_text_cell_renderer ~store ~model ~view ~width ~library:None ~editable:false ~column:attr) in
+       let cell_renderer = (make_text_cell_renderer ~store ~model ~view ~width
+                              ~library:None ~editable:false ~column:attr) in
        add_column model ~title ~width ~cell_renderer col
     | _ -> failwith "Impossible"
   in
@@ -532,10 +534,9 @@ let make_entry_list ?(height=400) ~doc_type
   add_text_col ~title:"Author(s)" ~width:200 (StrCol Attr.authors);
   add_text_col ~title:"Title" ~width:400 (StrCol Attr.title);
   add_text_col ~title:"Year" ~width:100 (StrCol Attr.year);
-  add_text_col ~title:"Tags" ~width:200 (StrCol Attr.tags);
   (match doc_type with
-   | "article" -> add_text_col ~title:"DOI" ~width:80 (StrCol Attr.doi)
-   | "book" -> add_text_col ~title:"ISBN" ~width:80 (StrCol Attr.isbn)
+   | "article" -> add_text_col ~title:"DOI" ~width:150 (StrCol Attr.doi)
+   | "book" -> add_text_col ~title:"ISBN" ~width:150 (StrCol Attr.isbn)
    | _ -> ());
   
   (match sort with
