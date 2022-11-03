@@ -310,6 +310,57 @@ let manage_libraries ~notebook : unit =
   (match dialog#run() with
    | _ -> dialog#destroy()
   )
+
+
+let manage_tags ~notebook : unit =
+  let dialog = GWindow.dialog ~title:"Manage Tags"
+                 ~width:500 ~height:200 ~resizable:false () in
+  let swindow = GBin.scrolled_window ~height:200 ~shadow_type:`ETCHED_IN ~hpolicy:`AUTOMATIC
+                  ~vpolicy:`AUTOMATIC ~packing:(dialog#vbox#add) () in
+  let open Gobject.Data in
+  let columns = new GTree.column_list in
+  let tag1 = columns#add string in
+  let tag2 = columns#add string in
+
+  let store = GTree.list_store columns in
+  let view = GTree.view ~model:store ~packing:swindow#add() in
+
+  view#set_enable_grid_lines `HORIZONTAL;
+  
+  let tag1_renderer,tag1_values = (GTree.cell_renderer_text
+                                     [`EDITABLE true],
+                                   ["text",tag1]) in
+  let tag2_renderer,tag2_values = (GTree.cell_renderer_text
+                                     [`EDITABLE true],
+                                   ["text",tag2]) in
+                    
+  (* save cell edits *)
+
+  let tag1_col = GTree.view_column ~title:"Subtag" ~renderer:(tag1_renderer,tag1_values) () in
+  let tag2_col = GTree.view_column ~title:"Tag" ~renderer:(tag2_renderer,tag2_values) () in
+
+  ignore @@ view#append_column tag1_col;
+  ignore @@ view#append_column tag2_col;
+
+  tag1_col#set_fixed_width 250;
+  tag2_col#set_fixed_width 250;
+  
+  (* load tag relations here *)
+  List.iter (fun (tag1',tag2') ->
+      let row = store#append() in
+      store#set ~row ~column:tag1 tag1';
+      store#set ~row ~column:tag2 tag2';
+    ) [("category-theory", "algebra");
+       ("sequent-calculus", "logic");
+       ("categorical-logic", "category-theory");
+       ("categorical-logic", "logic")];
+
+
+  dialog#add_button "Ok" `OK;
+  (match dialog#run() with
+   | _ -> dialog#destroy()
+  )
+
   
 let search_metadata ~(default : Doc.t) ~doc_type (search_str : string) : Doc.t option =
   let docs =
@@ -569,6 +620,12 @@ let main () =
       ~callback:(fun () -> (manage_libraries ~notebook)
       );
 
+  (* Manage tags *)
+  ignore @@
+    library_factory#add_item "Manage Tags"
+      ~callback:(fun () -> (manage_tags ~notebook)
+      );
+  
   ignore @@ library_factory#add_separator ();
 
   ignore @@ library_factory#add_item "Quit" ~callback:window#destroy;
