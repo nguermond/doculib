@@ -11,6 +11,7 @@
    metadb)
  (modules
    tags
+   dialogs
    icons
    font
    gui

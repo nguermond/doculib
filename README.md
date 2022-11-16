@@ -5,15 +5,17 @@ A simple GUI for managing document metadata for books, textbooks, or articles.
 
 ![screenshot-4.png](https://github.com/nguermond/doculib/blob/screenshots/screenshots/screenshot-4.png)
 
-![screenshot-1.png](https://github.com/nguermond/doculib/blob/screenshots/screenshots/screenshot-3.png)
+![screenshot-3.png](https://github.com/nguermond/doculib/blob/screenshots/screenshots/screenshot-3.png)
 
 ## Features
 * files can be moved or renamed without losing metadata
 * mark duplicate files
 * metadata includes authors, title, publishing year, tags, bookmark, and DOI/ISBN
 * search for metadata on [openlibrary.org](https://openlibrary.org/) and [semanticscholar.org](https://www.semanticscholar.org/)
+* retrieve BibTex from [crossref.org](https://crossref.org)
 * manage multiple libraries in different locations
 * error permissive search
+* tag synonyms and subtags
 
 ## Installation
 On Debian/Ubuntu:
