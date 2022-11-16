@@ -189,6 +189,7 @@ let new_library ~(notebook:Notebook.notebook) : (string * Path.root) option =
       let doc_type = match GEdit.text_combo_get_active doc_type_combo with
         | None -> raise (InternalError "Not possible: doc_type not selected")
         | Some s -> s in
+      let doc_type = Library.doc_type_of_string doc_type in
       let root_txt = (root_path_e#text) in
       let name_txt = Font.pango_quote (name_e#text) in
       dialog#destroy();
@@ -198,7 +199,7 @@ let new_library ~(notebook:Notebook.notebook) : (string * Path.root) option =
          let root = Path.mk_root root_txt in
          let library = name_txt in
          (try
-            let lib = (Library.make (Library.doc_type_of_string doc_type)) in
+            let lib = (Library.make doc_type) in
             Db.add_library ~library ~root lib;
             notebook#add_library ~library ~doc_type ~prepend:false;
             notebook#load_library ~library;

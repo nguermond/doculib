@@ -69,8 +69,9 @@ class notebook notebook context_menu filter_func = object (self)
   val filter_func : string -> bool = filter_func
   val mutable libraries : (string * library) list = []
 
-  method init (libs : (string * string) list) : unit =
-    (List.iter (fun (library,doc_type) ->
+  method init (libs : (string * Library.t) list) : unit =
+    (List.iter (fun (library,lib) ->
+         let doc_type = Library.get_doc_type lib in
          self#add_library ~library ~doc_type ~prepend:false)
        libs);
     (* On page switch *)
@@ -117,7 +118,7 @@ class notebook notebook context_menu filter_func = object (self)
           Db.flush_libconfig ~ord:(fst (List.split libraries)) ()
         );
 
-
+    let doc_type = Library.string_of_doc_type doc_type in             
     let lib = new library library doc_type page label in
     self#init_DnD_dest lib;
     

@@ -43,7 +43,7 @@ let libconfig : Path.root =
        
 module Libraries = Make(Doc)(Library)
 
-let init () =
+let init () : (string * Library.t) list =
   Log.push "Checking database compatilibity";
   (try Update_db.init()
    with (Update_db.CannotMigrate msg) ->
@@ -51,7 +51,8 @@ let init () =
   Log.push "Loading library configuration file";
   Libraries.load_config libconfig;
   Log.push "Initializing libraries";
-  Libraries.init_libraries ()
+  Libraries.init_libraries ();
+  Libraries.get_libdata ()
 
 let flush_metadata () =
   Log.push "Flushing metadata";

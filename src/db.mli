@@ -27,7 +27,7 @@ exception InitializationError of string
 
 open Metadb
 
-val init : unit -> unit
+val init : unit -> (string * Library.t) list
   
 val add_library : library:string -> root:Path.root -> Library.t -> unit
 val remove_library : delete_metadata:bool -> library:string -> unit

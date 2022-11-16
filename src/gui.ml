@@ -20,11 +20,17 @@
 open Metadb
 open Dialogs   
 
-let exit () : unit =
+let quit () : unit =
   Db.flush_metadata();
   Db.flush_libconfig();
   GMain.quit()
 
+(* Init Database *)  
+let init_db () : (string * Library.t) list =
+  (try Db.init() with
+   | Db.InitializationError msg ->
+      (error_dialog msg);
+      raise InitializationError)
     
 let main () =
   ignore @@ GMain.init();
@@ -53,23 +59,12 @@ let main () =
   (* Search bar *)
   let search_bar = search_bar ~packing:(vbox#pack ~from:`START) in
 
-  (* Database *)
-  (try Db.init() with
-   | Db.InitializationError msg ->
-      (error_dialog msg);
-      raise InitializationError);
-
   (* Notebook *)
   let notebook = GPack.notebook ~packing:vbox#add () in
   let notebook = new Notebook.notebook notebook context_menu search_bar#get_filter in
 
-  
-  let libraries = (Db.get_library_descriptions ()) in
-  let libraries = (List.map (fun (name,desc) ->
-                       (name,Library.get_doc_type desc
-                             |> Library.string_of_doc_type)) libraries) in
+  let libraries = init_db() in
   ignore @@ notebook#init libraries;
-  
   
   (* Search on edit *)
   search_bar#on_changed ~callback:(fun _ -> notebook#refilter());
@@ -271,7 +266,7 @@ let main () =
         about_dialog()
       );
   
-  ignore @@ window#connect#destroy ~callback:exit;
+  ignore @@ window#connect#destroy ~callback:quit;
 
   window#set_default_size ~width:1200 ~height:500;
   window#show ();

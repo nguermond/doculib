@@ -41,10 +41,10 @@ class notebook : GPack.notebook -> GMenu.menu -> (string -> bool)
   -> object
   val mutable libraries : (string * library) list
                                                  
-  method init : ((string * string) list) -> unit
+  method init : ((string * Library.t) list) -> unit
   method reload_libraries : unit -> unit
        
-  method add_library : library:string -> doc_type:string -> prepend:bool -> unit
+  method add_library : library:string -> doc_type:Library.doc_type -> prepend:bool -> unit
   method remove_library : delete_metadata:bool -> library:string -> unit
   method rename_library : library:string -> string -> bool
        
