@@ -1,3 +1,21 @@
+(******************************************************************************)
+(* DocuLib                                                                    *)
+(* Copyright (C) 2022 Nathan Guermond                                         *)
+(*                                                                            *)
+(* This program is free software: you can redistribute it and/or modify it    *)
+(* under the terms of the GNU General Public License as published by the Free *)
+(* Software Foundation, either version 3 of the License, or (at your option)  *)
+(* any later version.                                                         *)
+(*                                                                            *)
+(* This program is distributed in the hope that it will be useful, but        *)
+(* WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY *)
+(* or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License    *)
+(* for more details.                                                          *)
+(*                                                                            *)
+(* You should have received a copy of the GNU General Public License along    *)
+(* with this program. If not, see <https://www.gnu.org/licenses/>.            *)
+(*                                                                            *)
+(******************************************************************************)
 open Gobject.Data
 open Metadb
 
@@ -119,7 +137,9 @@ let about_dialog () : unit =
                   "https://www.gnome-look.org/p/1012497";
                  ] in
   ignore @@
-    GWindow.about_dialog ~name:"DocuLib" ~authors:["nguermond"]
+    GWindow.about_dialog ~name:"DocuLib"
+      ~authors:["nguermond"]
+      ~copyright:"Copyright (C) 2022 Nathan Guermond"
       ~version:"v1.3.3"
       ~website:"https://github.com/nguermond/doculib"
       ~website_label:"source" ~logo:Icons.doculib_icon
