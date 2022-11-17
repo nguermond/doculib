@@ -25,7 +25,7 @@ type doc_type = [`Book | `Article]
 (* TODO : these should be private *)
 val string_of_doc_type : doc_type -> string
 val doc_type_of_string : string -> doc_type
-              
+  
 type t = {
     version : string;
     doc_type : doc_type;

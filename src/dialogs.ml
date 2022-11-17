@@ -376,15 +376,18 @@ let manage_tags ~notebook : unit =
         store#set ~row ~column:sub (if value then "=" else "≤");
         store#set ~row ~column:rel value
       );
+
+  let synonyms = (List.map (fun s -> (s,true)) (notebook#get_tag_synonyms ()))  in
+  let subtags = (List.map (fun s -> (s,false)) (notebook#get_subtags ())) in
   
   (* load tag relations here *)
-  List.iter (fun (tag1',tag2') ->
+  List.iter (fun ((tag1',tag2'),syn) ->
       let row = store#append() in
-      store#set ~row ~column:rel false;
+      store#set ~row ~column:rel syn;
       store#set ~row ~column:tag1 tag1';
-      store#set ~row ~column:sub "≤";
+      store#set ~row ~column:sub (if syn then "=" else "≤");
       store#set ~row ~column:tag2 tag2';
-    ) [];
+    ) (List.append synonyms subtags);
 
   dialog#add_button "Ok" `OK;
   (match dialog#run() with

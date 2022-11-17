@@ -39,11 +39,12 @@ let configdir : Path.root =
 let libconfig : Path.root =
   Path.merge_lst configdir [(Path.mk_name "libraries.json")]
 
-
+let tagconfig : Path.root =
+  Path.merge_lst configdir [(Path.mk_name "tags.json")]
        
 module Libraries = Make(Doc)(Library)
 
-let init () : (string * Library.t) list =
+let init () : (string * Library.t) list * Tags.t =
   Log.push "Checking database compatilibity";
   (try Update_db.init()
    with (Update_db.CannotMigrate msg) ->
@@ -52,7 +53,9 @@ let init () : (string * Library.t) list =
   Libraries.load_config libconfig;
   Log.push "Initializing libraries";
   Libraries.init_libraries ();
-  Libraries.get_libdata ()
+  Log.push "Loading tag relations";
+  let g = Tags.load_from_file tagconfig in
+  (Libraries.get_libdata (), g)
 
 let flush_metadata () =
   Log.push "Flushing metadata";
@@ -118,7 +121,7 @@ let refresh_library ~library : (Path.rel * Doc.t) list =
   List.of_seq (Libraries.refresh_library ~library)
 
 (* Assumes library was just refreshed *)
-(* TODO: Remapped files need to be updated in the notebook *)
+(* TODO: Remapped files need to be updated in the notebook (?) *)
 let resolve_missing_files ~library : (Path.rel * bool) list =
   Log.push (Format.sprintf "Indexing libraries");
   Libraries.index_files();

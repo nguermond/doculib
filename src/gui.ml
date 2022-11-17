@@ -18,7 +18,7 @@
 (******************************************************************************)
 
 open Metadb
-open Dialogs   
+open Dialogs
 
 let quit () : unit =
   Db.flush_metadata();
@@ -26,7 +26,7 @@ let quit () : unit =
   GMain.quit()
 
 (* Init Database *)  
-let init_db () : (string * Library.t) list =
+let init_db () : (string * Library.t) list * Tags.t =
   (try Db.init() with
    | Db.InitializationError msg ->
       (error_dialog msg);
@@ -63,8 +63,8 @@ let main () =
   let notebook = GPack.notebook ~packing:vbox#add () in
   let notebook = new Notebook.notebook notebook context_menu search_bar#get_filter in
 
-  let libraries = init_db() in
-  ignore @@ notebook#init libraries;
+  let libraries,tags = init_db() in
+  ignore @@ notebook#init libraries tags;
   
   (* Search on edit *)
   search_bar#on_changed ~callback:(fun _ -> notebook#refilter());
