@@ -26,12 +26,59 @@ let quit () : unit =
   GMain.quit()
 
 (* Init Database *)  
-let init_db () : (string * Library.t) list * Tags.t =
+let init_db () : (string * Library.t) list =
   (try Db.init() with
    | Db.InitializationError msg ->
       (error_dialog msg);
       raise InitializationError)
+
+
+
+
+class search_bar search_box search_entry =
+object
+  val search_box : GPack.box = search_box
+
+  val filter_func = (fun search_string ->
+    let search_query = search_entry#text in
+    let open Agrep in
+    if search_query = "" then true
+    else
+      let pat = (pattern ~transl:Iso8859_15.case_and_accent_insensitive search_query) in
+      (string_match pat ~numerrs:(if (String.length search_string > 2) then 1 else 0)
+         search_string)
+  )
+  val search_entry : GEdit.entry = search_entry
+
+  method init () : unit =
+    search_entry#set_secondary_icon_stock `FIND;
+    search_entry#set_secondary_icon_tooltip_text
+      ( "?X      single character\n"
+        ^"*       any character sequence\n"
+        ^"[X]    character set (eg. [a-z])\n"
+        ^"X & Y    conjunction\n"
+        ^"X | Y    disjunction\n"
+        ^"\\X      character escape")
     
+  method get_text () : string =
+    search_entry#text
+    
+  method on_changed ~callback : unit =
+    ignore(search_entry#connect#changed ~callback)
+
+  method get_filter = filter_func
+end
+  
+let search_bar ~packing : search_bar =
+  let search_box = GPack.hbox ~border_width:8 ~spacing:8 ~packing () in
+  let search_entry = GEdit.entry ~packing:(search_box#add) () in
+  let sb = (new search_bar search_box search_entry) in
+  let _ = sb#init() in
+  sb
+
+
+
+  
 let main () =
   ignore @@ GMain.init();
   let window = GWindow.window
@@ -63,8 +110,8 @@ let main () =
   let notebook = GPack.notebook ~packing:vbox#add () in
   let notebook = new Notebook.notebook notebook context_menu search_bar#get_filter in
 
-  let libraries,tags = init_db() in
-  ignore @@ notebook#init libraries tags;
+  let libraries = init_db() in
+  ignore @@ notebook#init libraries;
   
   (* Search on edit *)
   search_bar#on_changed ~callback:(fun _ -> notebook#refilter());

@@ -57,7 +57,10 @@ let dnd_targets : Gtk.target_entry list = [
 module Attr =
   struct
     open Gobject.Data
-    let col_names = ["star"; "authors"; "title"; "year"; "doi"; "isbn"; "tags"; "notes"; "path"; "missing" ; "duplicate" ; "msg"; "tooltip"]
+    let col_names = ["star"; "authors"; "title"; "year"; "doi";
+                     "isbn"; "tags"; "notes"; "path";
+                     "missing" ; "duplicate" ;
+                     "msg"; "tooltip"; "search"]
 
     let columns = new GTree.column_list
              
@@ -70,10 +73,13 @@ module Attr =
     let tags = columns#add string
     let notes = columns#add string
     let path = columns#add string
-    let missing = columns#add boolean
-    let duplicate = columns#add boolean
-    let msg = columns#add string
-    let tooltip = columns#add string
+
+    (* attributes *)
+    let missing = columns#add boolean           (* missing file flag        *)
+    let duplicate = columns#add boolean         (* duplicate file flag      *)
+    let msg = columns#add string                (* misc. message in tooltip *)
+    let tooltip = columns#add string            (* tooltip = notes + msg    *)
+    let search = columns#add string             (* search string            *)
 
     let get_name i : string =
       List.nth col_names i
@@ -125,13 +131,26 @@ let make filter store view : t =
 
 
   
-let update_tooltip (m : t) ~key : unit =
+let update_tooltip (m : t) ~key : string =
   let notes = m.store#get ~row:key ~column:Attr.notes in
   let msg = m.store#get ~row:key ~column:Attr.msg in
-  m.store#set ~row:key ~column:Attr.tooltip
-    (if notes = "" then msg else
-       (if msg = "" then notes else
-          (Font.pango_quote (Format.sprintf "%s\n---\n%s" notes msg))))
+  (if notes = "" then msg else
+     (if msg = "" then notes else
+        (Font.pango_quote (Format.sprintf "%s\n---\n%s" notes msg))))
+
+  
+let gen_search_str (m : t) ~row : string =
+  let str = (m.store#get ~row ~column:Attr.tags) in
+  let tags = Str.split (Str.regexp "; +") str in
+  let tags = Tags.get_suptags tags in
+  let tags = String.concat " " tags in
+  String.concat " "
+    [m.store#get ~row ~column:Attr.title;
+     m.store#get ~row ~column:Attr.authors;
+     tags;
+     m.store#get ~row ~column:Attr.notes;
+     m.store#get ~row ~column:Attr.path
+    ]
 
   
 let get_row (m : t) p =
@@ -154,8 +173,9 @@ let set_entry (m : t) ~key (e : Entry.t) : unit =
   m.store#set ~row ~column:Attr.path (Path.string_of_rel (Entry.get_path e));
   m.store#set ~row ~column:Attr.missing (Entry.is_missing e);
   m.store#set ~row ~column:Attr.duplicate (Entry.is_duplicate e);
-  (update_tooltip m ~key:row)
-
+  m.store#set ~row ~column:Attr.tooltip (update_tooltip m ~key:row);
+  m.store#set ~row ~column:Attr.search (gen_search_str m ~row)
+  
 let add_entry (m : t) (e : Entry.t) : key =
   let key = m.store#append () in
   let _ = set_entry m ~key e in
@@ -188,15 +208,6 @@ let get_entry (m : t) ~key : Entry.t =
   Entry.make (Path.mk_rel path) ~missing ~duplicate doc
 
 
-let string_of_row (m : GTree.model ) ~row : string =
-  String.concat " "
-    [m#get ~row ~column:Attr.title;
-     m#get ~row ~column:Attr.authors;
-     m#get ~row ~column:Attr.tags;
-     m#get ~row ~column:Attr.notes;
-     m#get ~row ~column:Attr.path
-    ]
-
 
 let flag_missing (m : t) ~key b : unit =
   m.store#set ~row:key ~column:Attr.missing b
@@ -206,7 +217,7 @@ let flag_duplicate (m : t) ~key b : unit =
 
 let set_message (m : t) ~key msg : unit =
   m.store#set ~row:key ~column:Attr.msg msg;
-  update_tooltip m ~key
+  m.store#set ~row:key ~column:Attr.tooltip (update_tooltip m ~key)
 
 let is_missing (m : t) ~key : bool =
   m.store#get ~row:key ~column:Attr.missing
@@ -341,8 +352,9 @@ let refilter (m : t) : unit =
   m.filter#refilter()
   
 let set_visible_func (m : t) (f : string -> bool) : unit =
-  m.filter#set_visible_func (fun m row -> f (string_of_row m ~row))
-
+  m.filter#set_visible_func (fun m row ->
+      f (m#get ~row ~column:Attr.search))
+  
 let on_selected (m : t) (f : key -> Path.rel -> 'a) : 'a = 
   let row = get_row m (List.nth m.view#selection#get_selected_rows 0) in
   let path = Path.mk_rel (m.store#get ~row ~column:Attr.path) in

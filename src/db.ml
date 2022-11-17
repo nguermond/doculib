@@ -44,7 +44,7 @@ let tagconfig : Path.root =
        
 module Libraries = Make(Doc)(Library)
 
-let init () : (string * Library.t) list * Tags.t =
+let init () : (string * Library.t) list =
   Log.push "Checking database compatilibity";
   (try Update_db.init()
    with (Update_db.CannotMigrate msg) ->
@@ -54,8 +54,8 @@ let init () : (string * Library.t) list * Tags.t =
   Log.push "Initializing libraries";
   Libraries.init_libraries ();
   Log.push "Loading tag relations";
-  let g = Tags.load_from_file tagconfig in
-  (Libraries.get_libdata (), g)
+  ignore(Tags.load_from_file tagconfig);
+  (Libraries.get_libdata ())
 
 let flush_metadata () =
   Log.push "Flushing metadata";

@@ -44,47 +44,6 @@ let error_dialog (msg : string) : unit =
    | _ -> error_dialog#destroy()
   )
 
-class search_bar search_box search_entry =
-object
-  val search_box : GPack.box = search_box
-
-  val filter_func = (fun search_string ->
-    let search_query = search_entry#text in
-    let open Agrep in
-    if search_query = "" then true
-    else
-      let pat = (pattern ~transl:Iso8859_15.case_and_accent_insensitive search_query) in
-      (string_match pat ~numerrs:(if (String.length search_string > 2) then 1 else 0)
-         search_string)
-  )
-  val search_entry : GEdit.entry = search_entry
-
-  method init () : unit =
-    search_entry#set_secondary_icon_stock `FIND;
-    search_entry#set_secondary_icon_tooltip_text
-      ( "?X      single character\n"
-        ^"*       any character sequence\n"
-        ^"[X]    character set (eg. [a-z])\n"
-        ^"X & Y    conjunction\n"
-        ^"X | Y    disjunction\n"
-        ^"\\X      character escape")
-    
-  method get_text () : string =
-    search_entry#text
-    
-  method on_changed ~callback : unit =
-    ignore(search_entry#connect#changed ~callback)
-
-  method get_filter = filter_func
-end
-  
-let search_bar ~packing : search_bar =
-  let search_box = GPack.hbox ~border_width:8 ~spacing:8 ~packing () in
-  let search_entry = GEdit.entry ~packing:(search_box#add) () in
-  let sb = (new search_bar search_box search_entry) in
-  let _ = sb#init() in
-  sb
-
 let edit_notes_dialog ~(doc : Doc.t) : string =
   let dialog = GWindow.dialog ~title:"Edit Notes"
                  ~width:400 ~height:400 () in
@@ -377,8 +336,8 @@ let manage_tags ~notebook : unit =
         store#set ~row ~column:rel value
       );
 
-  let synonyms = (List.map (fun s -> (s,true)) (notebook#get_tag_synonyms ()))  in
-  let subtags = (List.map (fun s -> (s,false)) (notebook#get_subtags ())) in
+  let synonyms = (List.map (fun s -> (s,true)) (Tags.get_synonym_lst()))  in
+  let subtags = (List.map (fun s -> (s,false)) (Tags.get_subtag_lst())) in
   
   (* load tag relations here *)
   List.iter (fun ((tag1',tag2'),syn) ->

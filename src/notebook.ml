@@ -68,10 +68,8 @@ class notebook notebook context_menu filter_func = object (self)
   val context_menu : GMenu.menu = context_menu
   val filter_func : string -> bool = filter_func
   val mutable libraries : (string * library) list = []
-  val mutable tags : Tags.t = Tags.init()
 
-  method init (libs : (string * Library.t) list) (ts : Tags.t) : unit =
-    tags <- ts;
+  method init (libs : (string * Library.t) list) : unit =
     (List.iter (fun (library,lib) ->
          let doc_type = Library.get_doc_type lib in
          self#add_library ~library ~doc_type ~prepend:false)
@@ -93,12 +91,6 @@ class notebook notebook context_menu filter_func = object (self)
         let library = (fst (self#current_library)) in
         self#load_library ~library
       end
-
-  method get_tag_synonyms () : Tags.pair list =
-    Tags.get_synonyms tags
-    
-  method get_subtags () : Tags.pair list =
-    Tags.get_subtags tags
        
   method reload_libraries () : unit =
     List.iter (fun (library,lib) -> lib#unload()) libraries;
