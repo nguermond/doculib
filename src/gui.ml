@@ -18,8 +18,10 @@
 (******************************************************************************)
 
 open Metadb
-open Dialogs
+(* open Dialogs *)
 
+exception InitializationError
+   
 let quit () : unit =
   Db.flush_metadata();
   Db.flush_libconfig();
@@ -29,7 +31,7 @@ let quit () : unit =
 let init_db () : (string * Library.t) list =
   (try Db.init() with
    | Db.InitializationError msg ->
-      (error_dialog msg);
+      (Dialogs.error_dialog msg);
       raise InitializationError)
 
 
@@ -128,7 +130,7 @@ let main () =
             if System.file_exists file then
               System.open_file file
             else
-              (error_dialog "File does not exist!");
+              (Dialogs.error_dialog "File does not exist!");
             false)
       );
   
@@ -143,7 +145,7 @@ let main () =
                  (Str.global_replace (Str.regexp ("[-_\\()]\\|\\.[^\\.]+$"))
                     " " (Path.string_of_name (Path.get_leaf_rel path)))
                else doc.title) in
-            search_metadata ~default:doc ~doc_type ~search_str)
+            Dialogs.search_metadata ~default:doc ~doc_type ~search_str)
       );
 
   (* Open DOI of selected files *)
@@ -152,7 +154,7 @@ let main () =
       ~callback:(fun _ ->
         notebook#action_on_selected ~action:(fun library path ->
             let doi = (Db.get ~library ~path).doi in
-            (if doi = "" then (error_dialog "No DOI for selected entry!")
+            (if doi = "" then (Dialogs.error_dialog "No DOI for selected entry!")
              else System.open_url ("https://www.doi.org/" ^ doi));
             false)
       );
@@ -166,18 +168,18 @@ let main () =
         notebook#action_on_selected ~action:(fun library path ->
             (match Db.get_doc_type ~library with
              | `Book ->
-                (error_dialog "BibTex search unavailable for ISBN")
+                (Dialogs.error_dialog "BibTex search unavailable for ISBN")
              | `Article ->
                 let doi = (Db.get ~library ~path).doi in
                 if doi <> "" then
                   (match (Search.get_bibtex_from_doi doi) with
                    | Some bibtex ->
                       text := (if !text="" then "" else !text^"\n")^bibtex
-                   | None -> (error_dialog
+                   | None -> (Dialogs.error_dialog
                                 (Format.sprintf "Could not find BibTex for entry `%s`"
                                    (Path.string_of_rel path))))
                 else
-                  (error_dialog "No DOI for selected entry!"));
+                  (Dialogs.error_dialog "No DOI for selected entry!"));
             false);
         (GtkBase.Clipboard.set_text clipboard !text)
       );
@@ -187,7 +189,7 @@ let main () =
     context_factory#add_item "Edit Notes"
       ~callback:(fun _ ->
         notebook#edit_selected (fun path doc ->
-            let notes = edit_notes_dialog ~doc in
+            let notes = Dialogs.edit_notes_dialog ~doc in
             let doc = Doc.edit_document (Doc.set_attribute "notes" notes) doc in
             Some doc)
       );
@@ -253,13 +255,18 @@ let main () =
   (* Make new library tab *)
   ignore @@
     library_factory#add_item "New Library"
-      ~callback:(fun () -> ignore (new_library ~notebook)
+      ~callback:(fun () -> ignore (Dialogs.new_library ~notebook)
+      );
+
+  ignore @@
+    library_factory#add_item "New Abstract Library"
+      ~callback:(fun () -> ignore (Dialogs.new_abstract_library ~notebook)
       );
 
   (* Manage libraries *)
   ignore @@
     library_factory#add_item "Manage Libraries"
-      ~callback:(fun () -> (manage_libraries ~notebook)
+      ~callback:(fun () -> (Dialogs.manage_libraries ~notebook)
       );
 
   (****************************************************)
@@ -268,7 +275,7 @@ let main () =
   (* Manage tags *)
   ignore @@
     tag_factory#add_item "Tag Relations"
-      ~callback:(fun () -> (manage_tags ~notebook)
+      ~callback:(fun () -> (Dialogs.manage_tags ~notebook)
       );
   
   ignore @@ library_factory#add_separator ();
@@ -302,7 +309,7 @@ let main () =
   (****************************************************)
   ignore @@
     help_factory#add_item "Help" ~callback:(fun () ->
-        help_dialog()
+        Dialogs.help_dialog()
       );
 
   (****************************************************)
@@ -310,7 +317,7 @@ let main () =
   (****************************************************)
   ignore @@
     about_factory#add_item "DocuLib" ~callback:(fun () ->
-        about_dialog()
+        Dialogs.about_dialog()
       );
   
   ignore @@ window#connect#destroy ~callback:quit;

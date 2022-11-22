@@ -30,6 +30,8 @@ val help_dialog : unit -> unit
 val about_dialog : unit -> unit  
   
 val new_library : notebook:Notebook.notebook -> (string * Metadb.Path.root) option
+
+val new_abstract_library : notebook:Notebook.notebook -> unit
   
 val manage_libraries : notebook:Notebook.notebook -> unit
 

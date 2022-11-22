@@ -170,6 +170,8 @@ let new_library ~(notebook:Notebook.notebook) : (string * Path.root) option =
       | `CANCEL | `DELETE_EVENT ->
          dialog#destroy(); None)
 
+let new_abstract_library ~notebook : unit =
+  failwith "NYI"
   
 let manage_libraries ~notebook : unit =
   let dialog = GWindow.dialog ~title:"Manage Libraries"
