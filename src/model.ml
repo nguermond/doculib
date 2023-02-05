@@ -141,13 +141,13 @@ let update_tooltip (m : t) ~key : string =
   
 let gen_search_str (m : t) ~row : string =
   let str = (m.store#get ~row ~column:Attr.tags) in
-  let tags = Str.split (Str.regexp "; +") str in
-  let tags = Tags.get_suptags tags in
-  let tags = String.concat " " tags in
+  (* let tags = Str.split (Str.regexp "; +") str in *)
+  (* let tags = Tags.get_suptags tags in
+   * let tags = String.concat " " tags in *)
   String.concat " "
     [m.store#get ~row ~column:Attr.title;
      m.store#get ~row ~column:Attr.authors;
-     tags;
+     (* tags; *)
      m.store#get ~row ~column:Attr.notes;
      m.store#get ~row ~column:Attr.path
     ]
