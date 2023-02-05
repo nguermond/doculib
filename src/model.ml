@@ -338,6 +338,7 @@ let handle_click_events (m : t) ~(context_menu : GMenu.menu) : unit =
       )
 
 let refilter (m : t) : unit =
+  (* For some reason this takes significantly longer in OCaml 5.0 *)
   m.filter#refilter()
   
 let set_visible_func (m : t) (f : string -> bool) : unit =
