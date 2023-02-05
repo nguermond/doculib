@@ -1,5 +1,6 @@
 # Changes
 
+## v1.3.4
 * Remove tag column from metadata search
 * bug fix: existing metadata was overwritten when metadata was searched
 

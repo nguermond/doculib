@@ -138,7 +138,7 @@ let about_dialog () : unit =
                  ] in
   ignore @@
     GWindow.about_dialog ~name:"DocuLib" ~authors:["nguermond"]
-      ~version:"v1.3.3"
+      ~version:"v1.3.4"
       ~website:"https://github.com/nguermond/doculib"
       ~website_label:"source" ~logo:Icons.doculib_icon
       ~comments:"A GUI for managing document metadata for books, textbooks, or articles."
