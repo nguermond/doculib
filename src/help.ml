@@ -22,7 +22,7 @@ let help_text=
 • Right click on an entry for the following options:
 	- <b>Open</b> -- opens the file
 	- <b>Search Metadata</b> -- Search for metadata on either 
-	  <span foreground=\"blue\">openlibrary.org</span> (for books) or <span foreground=\"blue\">semanticscholar.org</span> 
+	  <a href=\"https://openlibrary.org\">openlibrary.org</a> (for books) or <a href=\"https://semanticscholar.org\">semanticscholar.org</a> 
 	  (for articles). The default search query is either the 
 	  title (if nonempty) or the name of the file. It typically 
 	  works best to use the full title as search query, 
@@ -30,7 +30,7 @@ let help_text=
 	- <b>Open DOI</b> -- if the file has a DOI, open the doi address 
 	  in a web browser
 	- <b>Copy BibTex</b> -- if the file has a DOI, search for the BibTex 
-	  entry at <span foreground=\"blue\">crossref.org</span>. Currently, this does not work for
+	  entry at <a href=\"https://crossref.org\">crossref.org</a>. Currently, this does not work for
 	  entries without DOI
 	- <b>Edit Notes</b> -- add and edit notes for an entry;
 	  notes will appear in tooltip
