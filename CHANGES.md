@@ -1,6 +1,7 @@
 # Changes
 
 * add hyperlinks in help text
+* fix error handling for unfound search queries
 
 ## v1.3.4
 * Remove tag column from metadata search
