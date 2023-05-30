@@ -1,5 +1,5 @@
 # Changes
-
+* change opam dependency from tls to tls-lwt to ensure compilation with tls
 * add hyperlinks in help text
 * fix error handling for unfound search queries
 
