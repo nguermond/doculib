@@ -140,7 +140,7 @@ let about_dialog () : unit =
     GWindow.about_dialog ~name:"DocuLib"
       ~authors:["nguermond"]
       ~copyright:"Copyright (C) 2022 Nathan Guermond"
-      ~version:"v1.3.3"
+      ~version:"v1.3.4"
       ~website:"https://github.com/nguermond/doculib"
       ~website_label:"source" ~logo:Icons.doculib_icon
       ~comments:"A GUI for managing document metadata for books, textbooks, or articles."
@@ -273,7 +273,6 @@ let manage_libraries ~notebook : unit =
   let hbox = GPack.hbox ~border_width:8 ~spacing:8 ~packing:(dialog#vbox#pack ~from:`END)() in  
 
   let add_b = GButton.button ~label:"Add" ~packing:(hbox#pack ~from:`END) () in
-  (* let move_b = GButton.button ~label:"Move" ~packing:(hbox#pack ~from:`END) () in *)
   let remove_b = GButton.button ~label:"Remove" ~packing:(hbox#pack ~from:`END) () in
 
   ignore @@
@@ -305,18 +304,13 @@ let manage_libraries ~notebook : unit =
          | _ -> ());
         confirm_dialog#destroy()
       );
-
-  (* TODO:: Move library *)
-  (* move_b#connect#clicked ~callback:(fun () ->
-   *     (error_dialog "Not yet implemented")
-   *   ); *)
   
   dialog#add_button "Ok" `OK;
   (match dialog#run() with
    | _ -> dialog#destroy()
   )
 
-
+(* TODO: tag relations not yet implemented *)
 let manage_tags ~notebook : unit =
   let dialog = GWindow.dialog ~title:"Tag Relations"
                  ~width:600 ~height:200 ~resizable:false () in

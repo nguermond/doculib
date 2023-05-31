@@ -229,18 +229,21 @@ class notebook notebook context_menu filter_func = object (self)
                 library (Option.get (Listutil.assoc_index libraries library)));
     let lib = (List.assoc library libraries) in
     if lib#is_loaded then () else
-      let library = lib#get_name in
-      let doc_type = lib#get_doc_type in
-      let page = lib#get_page in
-      let data = (Db.get_documents ~library) in
-      let model = (Model.make_document_list
-                     ~sort:(Some Model.Attr.star) ~library
-                     ~doc_type ~packing:page#add data) in
-      Model.handle_click_events model ~context_menu;
-      Model.set_visible_func model filter_func;
-      self#set_model library model;
-      (self#refresh_library ~library)
-
+      begin
+        let library = lib#get_name in
+        let doc_type = lib#get_doc_type in
+        let page = lib#get_page in
+        let data = (Db.get_documents ~library) in
+        let model = (Model.make_document_list
+                       ~sort:(Some Model.Attr.star) ~library
+                       ~doc_type ~packing:page#add data) in
+        Model.handle_click_events model ~context_menu;
+        Model.set_visible_func model filter_func;
+        self#set_model library model;
+        (self#refresh_library ~library)
+      end;      
+    Log.push "Done."
+    
   method refresh_library ~library : unit =
     Log.push (Format.sprintf "Refreshing library %s" library);
     let lib = self#get_library library in

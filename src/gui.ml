@@ -43,8 +43,8 @@ let main () =
   let factory = new GMenu.factory menubar in
   let library_menu = factory#add_submenu "Library" in
   let library_factory = new GMenu.factory library_menu in
-  let tag_menu = factory#add_submenu "Tags" in
-  let tag_factory = new GMenu.factory tag_menu in
+  (* let tag_menu = factory#add_submenu "Tags" in
+   * let tag_factory = new GMenu.factory tag_menu in *)
   let view_menu = factory#add_submenu "View" in
   let view_factory = new GMenu.factory view_menu in
   let help_menu = factory#add_submenu "Help" in
@@ -173,6 +173,18 @@ let main () =
           (GtkBase.Clipboard.set_text clipboard !text)
       );
 
+  (* Open file location *)
+  ignore @@
+    context_factory#add_item "Open File Location"
+      ~callback:(fun _ ->
+        notebook#action_on_selected (fun library path ->
+            let loc = (Path.drop_leaf (Db.get_file ~library ~path)) in
+            if (System.file_exists loc) then
+              (System.open_file loc)
+            else
+              (error_dialog "File location does not exist!");
+            false));
+
   (* Delete physical file *)
   ignore @@
     context_factory#add_item "Delete File"
@@ -214,20 +226,20 @@ let main () =
     library_factory#add_item "Manage Libraries"
       ~callback:(fun () -> (manage_libraries ~notebook)
       );
-
-  (****************************************************)
-  (* Tag factory                                      *)
-  (****************************************************)
-  (* Manage tags *)
-  ignore @@
-    tag_factory#add_item "Tag Relations"
-      ~callback:(fun () -> (manage_tags ~notebook)
-      );
   
   ignore @@ library_factory#add_separator ();
 
   ignore @@ library_factory#add_item "Quit" ~callback:window#destroy;
 
+  (****************************************************)
+  (* Tag factory                                      *)
+  (****************************************************)
+  (* Manage tags *)
+  (* ignore @@
+   *   tag_factory#add_item "Tag Relations"
+   *     ~callback:(fun () -> (manage_tags ~notebook)
+   *     ); *)
+  
   (****************************************************)
   (* View factory                                     *)
   (****************************************************)
