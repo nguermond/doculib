@@ -29,8 +29,8 @@ The underlying idea is to locally store certain types of files in different libr
 ## Installation
 On Debian/Ubuntu:
 ```bash
-wget https://github.com/nguermond/doculib/releases/download/v1.3.4/doculib_1.3.4_amd64.deb
-sudo dpkg -i doculib_1.3.4_amd64.deb
+wget https://github.com/nguermond/doculib/releases/download/v1.3.5/doculib_1.3.5_amd64.deb
+sudo dpkg -i doculib_1.3.5_amd64.deb
 sudo apt -f install
 ```
 
