@@ -12,8 +12,7 @@
 
 ## v1.3.3
 * add ability to search for and copy BibTex from DOI
-* add field for notes to each entry
-* updates library version from 3.0 to 3.1
+* add field for notes to each entry (upgrade database from 3.0 to 3.1)
 * bug fix: year was not properly saved after retrieving metadata
 * add menu for relaxed or compact view
 * updated help formatting
@@ -30,7 +29,7 @@
 * remapping missing entries now attempts to merge
 
 ## v1.3.0
-* major refactoring of JSON database
+* major refactoring of JSON database (upgrade database from 2.1 to 3.0)
 * library configuration is now stored in `$XDG_CONFIG_HOME/doculib` (or `$HOME/.config/doculib` if the former does not exist) instead of `$HOME/.doculib`
 * library metadata is now stored relative to each library in `/path/to/library/.metadata/`
 * searching for moved/renamed/duplicate files is now $O(n)$ instead of $O(n^2)$, and search will span across all libraries
@@ -47,16 +46,19 @@
 * remove edit-entry dialog
 
 ## v1.2.0
-* add md5 hash to each file
-* detect file moving/renaming within the same library
 * selected files can be dragged and dropped between libraries
 * allow renaming libraries
-* files are no longer individually imported -> all files in library root path are automatically added to library
 * cell sizes should now properly render on MacOS
 
 ## v1.1.0
+* add md5 hash to each file (upgrade database from 2.0 to 2.1)
+* detect file moving/renaming within the same library
+* files are no longer individually imported -> all files in library root path are automatically added to library
 * add library manager to add and remove libraries
 
 ## v1.0.1
+* add error dialog + better error handling
+* add option to open DOI in context menu
 
 ## v1.0.0
+* migrate database from Irmin to Json (upgrade database to 2.0)
