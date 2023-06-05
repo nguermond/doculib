@@ -48,6 +48,8 @@ end
 
 type t
 type key
+type action = Delete
+            | Nothing
 
 module Entry :
 sig
@@ -92,11 +94,11 @@ val refilter : t -> unit
 
 val set_visible_func : t -> (string -> bool) -> unit
 
-val iter_selected : t -> action:(key -> Path.rel -> bool) -> unit
+val iter_selected : t -> action:(key -> Path.rel -> action) -> unit
 
 val on_selected : t -> (key -> Path.rel -> 'a) -> 'a
   
-val iter : t -> action:(key -> Path.rel -> 'a -> bool) -> (Path.rel * 'a) list -> unit
+val iter : t -> action:(key -> Path.rel -> 'a -> action) -> (Path.rel * 'a) list -> unit
 (* val iter_remove : t -> action:(key -> Path.rel -> 'a -> unit) -> (Path.rel * 'a) list -> unit *)
   
 val make_document_list : ?height:int -> library:string -> doc_type:string ->

@@ -82,7 +82,7 @@ let main () =
               System.open_file file
             else
               (error_dialog "File does not exist!");
-            false)
+            Model.Nothing)
       );
   
   (* Search for metadata *)
@@ -107,7 +107,7 @@ let main () =
             let doi = (Db.get ~library ~path).doi in
             (if doi = "" then (error_dialog "No DOI for selected entry!")
              else System.open_url ("https://www.doi.org/" ^ doi));
-            false)
+            Model.Nothing)
       );
 
   (* Obtain BibTex from DOI/ISBN *)
@@ -131,7 +131,7 @@ let main () =
                                    (Path.string_of_rel path))))
                 else
                   (error_dialog "No DOI for selected entry!"));
-            false);
+            Model.Nothing);
         (GtkBase.Clipboard.set_text clipboard !text)
       );
 
@@ -156,7 +156,7 @@ let main () =
         notebook#action_on_selected (fun library path ->
             let name = (Path.get_leaf (Db.get_file ~library ~path)) in
             text := (if !text="" then "" else !text^"\n")^(Path.string_of_name name);
-            false);
+            Model.Nothing);
         (GtkBase.Clipboard.set_text clipboard !text)
       );
 
@@ -169,7 +169,7 @@ let main () =
         notebook#action_on_selected (fun library path ->
             let file = (Db.get_file ~library ~path) in
             text := (if !text="" then "" else !text^"\n")^(Path.string_of_root file);
-            false);
+            Model.Nothing);
           (GtkBase.Clipboard.set_text clipboard !text)
       );
 
@@ -183,7 +183,7 @@ let main () =
               (System.open_file loc)
             else
               (error_dialog "File location does not exist!");
-            false));
+            Model.Nothing));
 
   (* Delete physical file *)
   ignore @@
@@ -199,7 +199,7 @@ let main () =
          | `OK -> notebook#action_on_selected (fun library path ->
                       Db.remove_entry ~library ~path;
                       Db.remove_file ~library ~path;
-                      true)
+                      Model.Delete)
          | _ -> ());
         confirm_dialog#destroy()
       );

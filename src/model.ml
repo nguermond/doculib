@@ -123,6 +123,9 @@ let make filter store view : t =
    num_cols = 0;
   }
 
+type action = Delete
+            | Nothing
+
 
   
 let update_tooltip (m : t) ~key : unit =
@@ -350,19 +353,20 @@ let on_selected (m : t) (f : key -> Path.rel -> 'a) : 'a =
   (f row path)
 
   
-let iter_selected (m : t) ~(action:(key -> Path.rel -> bool)) =
+let iter_selected (m : t) ~(action:(key -> Path.rel -> action)) =
   let del_rows = ref [] in
   List.iter (fun p ->
       let row = get_row m p in
       let path = m.store#get ~row ~column:Attr.path in
-      if (action row (Path.mk_rel path)) then
-        del_rows := row::!del_rows)
+      match (action row (Path.mk_rel path)) with
+      | Delete -> del_rows := row::!del_rows
+      | Nothing -> ())
     m.view#selection#get_selected_rows;
   List.iter (fun key -> (remove_entry m ~key)) !del_rows
 
 (* Worst case quadratic on number of entries *)
 (* We cannot remove entries while doing foreach! *)
-let iter (m : t) ~(action:(key -> Path.rel -> 'a -> bool)) paths =
+let iter (m : t) ~(action:(key -> Path.rel -> 'a -> action)) paths =
   let n = ref (List.length paths) in
   let del_rows = ref [] in
   m.store#foreach (fun p _ ->
@@ -372,8 +376,9 @@ let iter (m : t) ~(action:(key -> Path.rel -> 'a -> bool)) paths =
        | None -> ()
        | Some v ->
           n := !n - 1;
-          if (action row path v) then
-            del_rows := row::!del_rows);
+          match (action row path v) with
+          | Delete -> del_rows := row::!del_rows
+          | Nothing -> ());
       (if !n = 0 then true else false));
     List.iter (fun key -> (remove_entry m ~key)) !del_rows
   

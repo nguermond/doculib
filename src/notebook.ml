@@ -161,12 +161,12 @@ class notebook notebook context_menu filter_func = object (self)
              let e = (Model.Entry.make path ~missing ~duplicate doc) in
              let key = (Model.add_entry model' e) in
              (Model.set_message model' ~key tooltip);
-             true (* mark entry for deletion *))
+             Model.Delete (* mark entry for deletion *))
         with
           Db.CannotMigrate ->
           Log.push (Format.sprintf "Could not move file: %s"
                       (Path.string_of_rel path));
-          false
+          Model.Nothing
       ) (List.map (fun x -> prerr_endline (Format.asprintf "File: %a"
                                              Path.pp_rel x);
                               (x,())) paths);
@@ -257,8 +257,8 @@ class notebook notebook context_menu filter_func = object (self)
           (Model.set_message model ~key
              (Format.sprintf "File is missing");
            Model.flag_missing model ~key true;
-          false)
-        else true (* entry was remapped; mark entry for deletion *))
+          Model.Nothing)
+        else Model.Delete (* entry was remapped; mark entry for deletion *))
       missing_docs;
     let duplicates = (Db.find_duplicates()) in
     (* Display list of duplicates *)
@@ -273,7 +273,7 @@ class notebook notebook context_menu filter_func = object (self)
         Model.set_message model ~key
           (Format.sprintf "File is a duplicate:\n%s" msg);
         Model.flag_duplicate model ~key true;
-        false)
+        Model.Nothing)
       ((Seq.filter (fun (path,(library',_)) ->
             (library = library'))
           (Seq.concat_map (fun dups ->
@@ -301,6 +301,6 @@ class notebook notebook context_menu filter_func = object (self)
           let duplicate = Model.is_duplicate model ~key in
           let e = Model.Entry.make path ~missing ~duplicate doc in
           Model.set_entry model ~key e;
-          false)
+          Model.Nothing)
     with Cancel -> ()
 end
