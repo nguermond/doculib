@@ -84,6 +84,12 @@ let get_file ~library ~path : Path.root =
 let get_doc_type ~library : Library.doc_type =
   (List.assoc library (Libraries.get_libdata ())).doc_type
 
+let rename_file ~library ~path ~new_path : bool =
+  try
+    Libraries.rename_file ~library path new_path; true
+  with
+    CouldNotRename _ -> false
+  
 let remove_entry ~library ~path : unit =
   Libraries.remove_entry ~library path
 

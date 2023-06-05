@@ -420,13 +420,17 @@ let make_text_cell_renderer ~(store : store) ~(model:t) ~view ~width ~editable ~
    | true, Some library ->
       ignore @@
         renderer#connect#edited ~callback:(fun p str ->
+            let key = (Attr.get_name (column.index)) in
             let row = (get_row model p) in
             let path = Path.mk_rel (store#get ~row ~column:Attr.path) in
-            let key = (Attr.get_name (column.index)) in
-            let doc = Db.get ~library ~path in
-            let doc = Doc.edit_document (Doc.set_attribute key str) doc in
-            Db.set ~library ~path doc;
-            store#set ~row ~column str
+            if (key = "path") then
+              (if (Db.rename_file ~library ~path ~new_path:(Path.mk_rel str)) then
+                 store#set ~row ~column str)
+            else
+              let doc = Db.get ~library ~path in
+              let doc = Doc.edit_document (Doc.set_attribute key str) doc in
+              Db.set ~library ~path doc;
+              store#set ~row ~column str
           );
    | _ -> ());
   CellRenderer(renderer,values)
@@ -500,7 +504,7 @@ let make_document_list ?(height=400) ~(library:string) ~(doc_type:string)
    | "article" -> add_text_col ~title:"DOI" ~width:80 (StrCol Attr.doi)
    | "book" -> add_text_col ~title:"ISBN" ~width:80 (StrCol Attr.isbn)
    | _ -> ());
-  add_text_col ~title:"Path" ~width:200 ~editable:false (StrCol Attr.path);
+  add_text_col ~title:"Path" ~width:200 (StrCol Attr.path);
   
   (enable_multidrag ~store ~model ~view ~library);
   

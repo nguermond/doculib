@@ -1,5 +1,7 @@
 # Changes
 
+* make path entry editable
+
 ## v1.3.5
 * add option to open file location in context menu
 * change opam dependency from tls to tls-lwt to ensure compilation with tls

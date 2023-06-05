@@ -18,7 +18,7 @@
  (depends
   dune
   (cohttp-lwt-unix (>= 2.5.0))
-  (metadb (= 1.0.2))  ;; (= 1.0.3)
+  (metadb (= 1.0.3))
   (lablgtk3 (>= 3.1.2))
   ; (agrep (>= 1.0))
   (ocaml (>= 4.13.0))

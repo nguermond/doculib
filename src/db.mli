@@ -44,6 +44,8 @@ val remove_entry : library:string -> path:Path.rel -> unit
 val remove_file : library:string -> path:Path.rel -> unit
 val migrate : from_lib:string -> to_lib:string -> path:Path.rel -> unit
 
+(* attempt to rename file, returns true if successful *)
+val rename_file : library:string -> path:Path.rel -> new_path:Path.rel -> bool
 
 val get_documents : library:string -> (Path.rel * Doc.t) list
 val get_library_descriptions : unit -> (string * Library.t) list
