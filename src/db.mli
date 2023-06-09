@@ -17,8 +17,8 @@
 (*                                                                            *)
 (******************************************************************************)
 
-exception EnvVarNotSet
-       
+
+exception UnexpectedError of string
 exception LibraryExists
    
 exception CannotMigrate

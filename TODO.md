@@ -1,6 +1,7 @@
 ### Known bugs
 - remapped files need to be updated in the notebook
   - remapped files are still marked as duplicate until restart
+- renaming files may leave behind empty directories
 
 ### Very high priority
 - make file paths system independent (using FileUtils)

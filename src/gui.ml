@@ -63,7 +63,10 @@ let main () =
   let notebook = GPack.notebook ~packing:vbox#add () in
   let notebook = new Notebook.notebook notebook context_menu search_bar#get_filter in
 
-  let libraries = init_db() in
+  let libraries =
+    try init_db()
+    with Db.UnexpectedError msg -> (error_dialog msg; [])
+  in
   ignore @@ notebook#init libraries;
   
   (* Search on edit *)
