@@ -24,6 +24,23 @@ exception CannotMigrate of string
 
 open Metadb
 
+
+let homevar () : Path.root =
+  match (Sys.getenv_opt "HOME") with
+  | Some home -> Log.push (Format.sprintf "found HOME=%s\n" home);
+                 Path.mk_root home
+  | None -> raise(CannotMigrate("Cannot migrate: HOME var not set!"))
+
+
+let usr_config () =
+  try
+    let usr_config = (XDGBaseDir.Config.user_file "doculib") in
+    Log.push (Format.sprintf "found XDG_CONFIG_HOME=%s\n" usr_config);
+    (Path.mk_root usr_config)
+  with _ ->
+    raise(CannotMigrate("Cannot find XDG Config directory!"))
+
+            
 (* Create a 3.1 doc from a 2.X doc *) 
 let read_and_mutate_doc_2 file : Doc.t =
   let json = Json.from_file file in
@@ -76,34 +93,25 @@ type library_3 = {
 
 (* libconfig location for 2.X *)
 let libconfig_2 () : Path.root =
-  (match (Sys.getenv_opt "HOME") with
-   | Some home -> Path.merge (Path.mk_root home)
-                    (Path.mk_rel ".doculib/libraries.json")
-   | None -> raise (CannotMigrate "$HOME variable is not set!"))
+  Path.merge_lst (homevar())
+    [Path.mk_name ".doculib";
+     Path.mk_name "libraries.json"]
 
 (* data location for 2.1 *)
 let data_dir_2_1 () : Path.root =
-  (match (Sys.getenv_opt "HOME") with
-   | Some home -> Path.merge (Path.mk_root home)
-                    (Path.mk_rel ".doculib/data/2.1")
-   | None -> raise (CannotMigrate "$HOME variable is not set!"))
+  Path.merge_lst (homevar())
+    [Path.mk_name ".doculib";
+     Path.mk_name "data";
+     Path.mk_name "2.1"]
 
 (* libconfig location for 3.X *)
 let libconfig_3 () : Path.root =
-  match (Sys.getenv_opt "XDG_CONFIG_HOME") with
-  | Some usr_config ->
-     Path.merge (Path.mk_root usr_config)
-       (Path.mk_rel "doculib/libraries.json")
-  | None -> 
-     (match (Sys.getenv_opt "HOME") with
-      | Some home ->
-         Path.merge (Path.mk_root home)
-           (Path.mk_rel ".config/doculib/libraries.json")
-      | None ->
-         raise (CannotMigrate "$HOME environment variable is not set!"))
+  Path.merge_lst (usr_config())
+    [(Path.mk_name "libraries.json")]
 
 (* read a 2.X libconfig *)
 let read_libconfig_2 () : string * ((string * library_2) list) =
+  Log.push "reading libconfig 2.X";
   let json = Json.from_file (libconfig_2()) in
   let version = Json.to_string(Json.get_err "version" json) in
   let libs =
@@ -121,6 +129,7 @@ let read_libconfig_2 () : string * ((string * library_2) list) =
 
 (* read a 3.X libconfig *)
 let read_libconfig_3 () : ((string * library_3) list) =
+  Log.push "reading libconfig 3.X";
   let json = Json.from_file (libconfig_3()) in
   let libs =
     Json.to_list json
@@ -150,9 +159,11 @@ let write_libconfig (libs : library_3 list) : unit =
 let mutate_library_2 ~library root : unit =
   Log.push (Format.sprintf "Migrating library: %s @ %s"
               library (Path.string_of_root root));
-  let library_md = (Path.merge_lst (data_dir_2_1()) [Path.mk_name library]) in
+  let library_md = (Path.merge_lst (data_dir_2_1())
+                      [Path.mk_name library]) in
   let files = List.of_seq (System.get_files ~hidden:true library_md) in
-  let new_library_md = Path.merge_lst root [Path.mk_name ".metadata"] in
+  let new_library_md = Path.merge_lst root
+                         [Path.mk_name ".metadata"] in
   List.iter (fun file ->
       let name = Path.strip_root library_md file in
       let new_file = Path.merge new_library_md name in
@@ -174,7 +185,8 @@ let mutate_library_2 ~library root : unit =
 let mutate_library_3 ~library root : unit =
   Log.push (Format.sprintf "Migrating library: %s @ %s"
               library (Path.string_of_root root));
-  let library_md = Path.merge_lst root [Path.mk_name ".metadata"] in
+  let library_md = Path.merge_lst root
+                     [Path.mk_name ".metadata"] in
   let files = (List.of_seq (System.get_files ~hidden:true library_md)) in
   Log.push (Format.sprintf "Updating %d files in %s\n" (List.length files)
               (Path.string_of_root library_md));
@@ -192,6 +204,7 @@ let mutate_library_3 ~library root : unit =
 
 (* Create libconfig for 3.1 library from a 2.X library *)
 let mutate_libconfig_2 (libs : (string * library_2) list) : unit =
+  Log.push "mutating libconfig 2.X to 3.1";
   let new_libs =
     List.map (fun (library, lib) ->
         {name' = lib.name;
@@ -204,6 +217,7 @@ let mutate_libconfig_2 (libs : (string * library_2) list) : unit =
 
 (* Create libconfig for 3.1 library from a 3.X library *)
 let mutate_libconfig_3 (libs : (string * library_3) list) : unit =
+  Log.push "mutating libconfig 3.X to 3.1";
   let new_libs =
     List.map (fun (library, lib) ->
         {name' = lib.name';
@@ -216,12 +230,14 @@ let mutate_libconfig_3 (libs : (string * library_3) list) : unit =
 
 (* Mutate a database of 2.X libraries to a database of 3.1 libraries *)
 let mutate_db_2 (libs : (string * library_2) list) : unit =
+  Log.push "mutating 2.X libraries to 3.1 libraries";
   List.iter (fun (library, lib) ->
       (mutate_library_2 ~library (Path.mk_root lib.root)))
     libs
 
 (* Mutate a database of 3.X libraries to a database of 3.1 libraries *)
 let mutate_db_3 (libs : (string * library_3) list) : unit =
+  Log.push "Checking library 3.1 compatibility";
   let change = ref false in
   List.iter (fun (library, lib) ->
       let version = float_of_string lib.libdata'.version in
@@ -244,7 +260,6 @@ let update_2_to_3_1 () : unit =
   (mutate_db_2 libs)
 
 let update_3_to_3_1 () : unit =
-  Log.push(Format.sprintf "Upgrading libraries from version 3.X to 3.1");
   let libs = read_libconfig_3() in
   (mutate_db_3 libs)
   
