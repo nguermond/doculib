@@ -1,5 +1,7 @@
 # Changes
-
+* update metadb to 1.1.0
+* should now be OS independent (ie. file paths/environment variables/open command/mkdir)
+* fix bug in which file with special characters could not be opened
 * make path entry editable
 
 ## v1.3.5
