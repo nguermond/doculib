@@ -107,14 +107,14 @@ let search_article (doc_type : string) (search_str : string) : Doc.t list =
   let body = Lwt_main.run (query_article_string search_str) in
   let json = Json.from_string body in
   let data =
-    (try Json.to_list (Json.raise_opt "Unexpected result" (Json.get "data" json)) with
+    (try Json.to_list (Json.raise_opt "Could not parse key: data"
+                         (Json.get "data" json)) with
      | Json.ParsingFailure err ->
-        (let msg = (try (Json.to_string (Json.raise_opt "" (Json.get "message" json)))
+        (let msg = (try (Json.to_string (Json.raise_opt "Could not parse key: message"
+                                           (Json.get "message" json)))
                     with _ ->
                       let json_pp = Json.pretty_to_string json in
-                      (prerr_endline err);
-                      (prerr_endline ("Failed to parse JSON:\n"^json_pp));
-                      raise (Json.ParsingFailure "Parse failure")) in
+                      raise (SearchFailure ("Failed to parse JSON:\n"^json_pp^"\n"^err))) in
          raise (SearchFailure ("semanticscholar.org: "^msg))))
   in (List.map (parse_article doc_type) data)                 
 
@@ -122,12 +122,13 @@ let search_article (doc_type : string) (search_str : string) : Doc.t list =
 let search_book (doc_type : string) (search_str : string) : Doc.t list =
   let body = Lwt_main.run (query_book_string search_str) in
   let json = Json.from_string body in
-  let data = try Json.to_list (Json.raise_opt "Unexpected result" (Json.get "docs" json)) with
+  let data = try Json.to_list (Json.raise_opt "Could not parse key: docs"
+                                 (Json.get "docs" json)) with
              | Json.ParsingFailure err -> let json_pp = Json.pretty_to_string json in
                                      (prerr_endline err);
                                      (prerr_endline ("Failed to parse JSON:\n"^json_pp));
-                                     raise (Json.ParsingFailure "Parse failure")
-  in (List.map (parse_book doc_type) data)                 
+                                     raise (SearchFailure ("openlibrary.org: "^err))
+  in (List.map (parse_book doc_type) data)
 
 
 let search_document (doc_type : string) (search_type : string) (search_str : string) : Doc.t list =

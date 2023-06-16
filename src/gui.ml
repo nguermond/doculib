@@ -92,8 +92,8 @@ let main () =
   let factory = new GMenu.factory menubar in
   let library_menu = factory#add_submenu "Library" in
   let library_factory = new GMenu.factory library_menu in
-  let tag_menu = factory#add_submenu "Tags" in
-  let tag_factory = new GMenu.factory tag_menu in
+  (* let tag_menu = factory#add_submenu "Tags" in
+   * let tag_factory = new GMenu.factory tag_menu in *)
   let view_menu = factory#add_submenu "View" in
   let view_factory = new GMenu.factory view_menu in
   let help_menu = factory#add_submenu "Help" in
@@ -112,7 +112,10 @@ let main () =
   let notebook = GPack.notebook ~packing:vbox#add () in
   let notebook = new Notebook.notebook notebook context_menu search_bar#get_filter in
 
-  let libraries = init_db() in
+  let libraries =
+    try init_db()
+    with Db.UnexpectedError msg -> (error_dialog msg; [])
+  in
   ignore @@ notebook#init libraries;
   
   (* Search on edit *)
@@ -130,8 +133,8 @@ let main () =
             if System.file_exists file then
               System.open_file file
             else
-              (Dialogs.error_dialog "File does not exist!");
-            false)
+              (error_dialog "File does not exist!");
+            Model.Nothing)
       );
   
   (* Search for metadata *)
@@ -156,7 +159,7 @@ let main () =
             let doi = (Db.get ~library ~path).doi in
             (if doi = "" then (Dialogs.error_dialog "No DOI for selected entry!")
              else System.open_url ("https://www.doi.org/" ^ doi));
-            false)
+            Model.Nothing)
       );
 
   (* Obtain BibTex from DOI/ISBN *)
@@ -179,8 +182,8 @@ let main () =
                                 (Format.sprintf "Could not find BibTex for entry `%s`"
                                    (Path.string_of_rel path))))
                 else
-                  (Dialogs.error_dialog "No DOI for selected entry!"));
-            false);
+                  (error_dialog "No DOI for selected entry!"));
+            Model.Nothing);
         (GtkBase.Clipboard.set_text clipboard !text)
       );
 
@@ -205,7 +208,7 @@ let main () =
         notebook#action_on_selected (fun library path ->
             let name = (Path.get_leaf (Db.get_file ~library ~path)) in
             text := (if !text="" then "" else !text^"\n")^(Path.string_of_name name);
-            false);
+            Model.Nothing);
         (GtkBase.Clipboard.set_text clipboard !text)
       );
 
@@ -218,9 +221,21 @@ let main () =
         notebook#action_on_selected (fun library path ->
             let file = (Db.get_file ~library ~path) in
             text := (if !text="" then "" else !text^"\n")^(Path.string_of_root file);
-            false);
+            Model.Nothing);
           (GtkBase.Clipboard.set_text clipboard !text)
       );
+
+  (* Open file location *)
+  ignore @@
+    context_factory#add_item "Open File Location"
+      ~callback:(fun _ ->
+        notebook#action_on_selected (fun library path ->
+            let loc = (Path.drop_leaf (Db.get_file ~library ~path)) in
+            if (System.file_exists loc) then
+              (System.open_file loc)
+            else
+              (error_dialog "File location does not exist!");
+            Model.Nothing));
 
   (* Delete physical file *)
   ignore @@
@@ -236,7 +251,7 @@ let main () =
          | `OK -> notebook#action_on_selected (fun library path ->
                       Db.remove_entry ~library ~path;
                       Db.remove_file ~library ~path;
-                      true)
+                      Model.Delete)
          | _ -> ());
         confirm_dialog#destroy()
       );
@@ -269,6 +284,10 @@ let main () =
       ~callback:(fun () -> (Dialogs.manage_libraries ~notebook)
       );
 
+  ignore @@ library_factory#add_separator ();
+
+  ignore @@ library_factory#add_item "Quit" ~callback:window#destroy;
+
   (****************************************************)
   (* Tag factory                                      *)
   (****************************************************)
@@ -278,10 +297,6 @@ let main () =
       ~callback:(fun () -> (Dialogs.manage_tags ~notebook)
       );
   
-  ignore @@ library_factory#add_separator ();
-
-  ignore @@ library_factory#add_item "Quit" ~callback:window#destroy;
-
   (****************************************************)
   (* View factory                                     *)
   (****************************************************)

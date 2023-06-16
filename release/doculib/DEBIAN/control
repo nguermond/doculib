@@ -1,5 +1,5 @@
 Package: doculib
-Version: 1.3.3
+Version: %%VERSION_NUM%%
 Architecture: amd64
 Maintainer: Nathan Guermond <nguermond@proton.me>
 Depends: bash, libev4, libgmp10, libcairo2, libexpat1, libgtk-3-0

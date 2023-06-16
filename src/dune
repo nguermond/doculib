@@ -8,7 +8,9 @@
    str
    ocamlgraph
    agrep
-   metadb)
+   metadb
+   xdg-basedir
+ )
  (modules
    tags
    dialogs

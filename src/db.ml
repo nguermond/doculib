@@ -16,25 +16,20 @@
 (* with this program. If not, see <https://www.gnu.org/licenses/>.            *)
 (*                                                                            *)
 (******************************************************************************)
-exception EnvVarNotSet
 
 open Metadb
 
+   
+exception UnexpectedError of string
 exception LibraryExists
 exception EntryDoesNotExist of string * Path.rel
 exception CannotMigrate
 exception InitializationError of string
 
-                   
+
 let configdir : Path.root =
-  match (Sys.getenv_opt "XDG_CONFIG_HOME") with
-  | Some usr_config -> Path.merge_lst (Path.mk_root usr_config)
-                         [(Path.mk_name "doculib")]
-  | None -> 
-     (match (Sys.getenv_opt "HOME") with
-      | Some home -> Path.merge (Path.mk_root home)
-                       (Path.mk_rel ".config/doculib")
-      | None -> raise EnvVarNotSet)
+  try Path.mk_root (XDGBaseDir.Config.user_file "doculib")
+  with _ -> raise (UnexpectedError "Could not locate XDG user directory")
 
 let libconfig : Path.root =
   Path.merge_lst configdir [(Path.mk_name "libraries.json")]
@@ -87,6 +82,12 @@ let get_file ~library ~path : Path.root =
 let get_doc_type ~library : Library.doc_type =
   (List.assoc library (Libraries.get_libdata ())).doc_type
 
+let rename_file ~library ~path ~new_path : bool =
+  try
+    Libraries.rename_file ~library path new_path; true
+  with
+    CouldNotRename _ -> false
+  
 let remove_entry ~library ~path : unit =
   Libraries.remove_entry ~library path
 

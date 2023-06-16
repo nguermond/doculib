@@ -129,6 +129,9 @@ let make filter store view : t =
    num_cols = 0;
   }
 
+type action = Delete
+            | Nothing
+
 
   
 let update_tooltip (m : t) ~key : string =
@@ -349,6 +352,7 @@ let handle_click_events (m : t) ~(context_menu : GMenu.menu) : unit =
       )
 
 let refilter (m : t) : unit =
+  (* For some reason this takes significantly longer in OCaml 5.0 *)
   m.filter#refilter()
   
 let set_visible_func (m : t) (f : string -> bool) : unit =
@@ -361,19 +365,20 @@ let on_selected (m : t) (f : key -> Path.rel -> 'a) : 'a =
   (f row path)
 
   
-let iter_selected (m : t) ~(action:(key -> Path.rel -> bool)) =
+let iter_selected (m : t) ~(action:(key -> Path.rel -> action)) =
   let del_rows = ref [] in
   List.iter (fun p ->
       let row = get_row m p in
       let path = m.store#get ~row ~column:Attr.path in
-      if (action row (Path.mk_rel path)) then
-        del_rows := row::!del_rows)
+      match (action row (Path.mk_rel path)) with
+      | Delete -> del_rows := row::!del_rows
+      | Nothing -> ())
     m.view#selection#get_selected_rows;
   List.iter (fun key -> (remove_entry m ~key)) !del_rows
 
 (* Worst case quadratic on number of entries *)
 (* We cannot remove entries while doing foreach! *)
-let iter (m : t) ~(action:(key -> Path.rel -> 'a -> bool)) paths =
+let iter (m : t) ~(action:(key -> Path.rel -> 'a -> action)) paths =
   let n = ref (List.length paths) in
   let del_rows = ref [] in
   m.store#foreach (fun p _ ->
@@ -383,8 +388,9 @@ let iter (m : t) ~(action:(key -> Path.rel -> 'a -> bool)) paths =
        | None -> ()
        | Some v ->
           n := !n - 1;
-          if (action row path v) then
-            del_rows := row::!del_rows);
+          match (action row path v) with
+          | Delete -> del_rows := row::!del_rows
+          | Nothing -> ());
       (if !n = 0 then true else false));
     List.iter (fun key -> (remove_entry m ~key)) !del_rows
   
@@ -426,13 +432,17 @@ let make_text_cell_renderer ~(store : store) ~(model:t) ~view ~width ~editable ~
    | true, Some library ->
       ignore @@
         renderer#connect#edited ~callback:(fun p str ->
+            let key = (Attr.get_name (column.index)) in
             let row = (get_row model p) in
             let path = Path.mk_rel (store#get ~row ~column:Attr.path) in
-            let key = (Attr.get_name (column.index)) in
-            let doc = Db.get ~library ~path in
-            let doc = Doc.edit_document (Doc.set_attribute key str) doc in
-            Db.set ~library ~path doc;
-            store#set ~row ~column str
+            if (key = "path") then
+              (if (Db.rename_file ~library ~path ~new_path:(Path.mk_rel str)) then
+                 store#set ~row ~column str)
+            else
+              let doc = Db.get ~library ~path in
+              let doc = Doc.edit_document (Doc.set_attribute key str) doc in
+              Db.set ~library ~path doc;
+              store#set ~row ~column str
           );
    | _ -> ());
   CellRenderer(renderer,values)
@@ -506,7 +516,7 @@ let make_document_list ?(height=400) ~(library:string) ~(doc_type:string)
    | "article" -> add_text_col ~title:"DOI" ~width:80 (StrCol Attr.doi)
    | "book" -> add_text_col ~title:"ISBN" ~width:80 (StrCol Attr.isbn)
    | _ -> ());
-  add_text_col ~title:"Path" ~width:200 ~editable:false (StrCol Attr.path);
+  add_text_col ~title:"Path" ~width:200 (StrCol Attr.path);
   
   (enable_multidrag ~store ~model ~view ~library);
   
